@@ -213,16 +213,19 @@ select {
 }
 
 input,
-select {
+select,
+textarea {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 10px;
   background: var(--bg);
   color: var(--text-h);
+  font-family: inherit;
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
 }

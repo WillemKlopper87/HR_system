@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 
 from core_hr.data_quality import run_data_quality_checks
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
@@ -16,6 +17,8 @@ from rbac_audit.models import ConsentRecord, Role, RoleAssignment
 # data across every module for local dev/UI review, not core_hr business
 # logic — "apps may not import each other" (hcm/README.md) governs feature
 # code, not a dev-tooling script that necessarily spans all of them.
+from performance.models import Feedback, Goal, Review, ReviewCycle
+from performance.services import launch_review_cycle
 from recruitment.models import Applicant, Offer, Requisition
 from recruitment.services import transition_applicant
 
@@ -179,6 +182,7 @@ class Command(BaseCommand):
             eng_head.save(update_fields=["user"])
 
             report_version = eng_head.direct_reports.filter(valid_to__isnull=True).select_related("employee").first()
+            staff = None
             if report_version is not None:
                 staff = report_version.employee
                 staff.user = User.objects.create_user(username="employee", password="employee123")
@@ -194,6 +198,8 @@ class Command(BaseCommand):
                 departments=departments, levels=levels, grades_by_level=grades_by_level,
                 locations=locations, recruiter=slm_head, rng=rng,
             )
+
+            self._seed_performance_demo_data(manager=eng_head, direct_report=staff)
 
         run_data_quality_checks()
 
@@ -269,3 +275,44 @@ class Command(BaseCommand):
         transition_applicant(
             rejected, to_stage=Applicant.Stage.REJECTED, actor=recruiter, rejected_reason="Not enough relevant experience"
         )
+
+    def _seed_performance_demo_data(self, *, manager, direct_report):
+        """Launches one review cycle against the full seeded workforce (so
+        the completion dashboard has a realistic denominator), then
+        completes just a couple of reviews — showing the dashboard as HR
+        would actually see it mid-cycle, not 0% or 100%."""
+        cycle = ReviewCycle.objects.create(
+            name="2026 Annual Review", cycle_type=ReviewCycle.CycleType.ANNUAL,
+            start_date=date(2026, 1, 1), end_date=date(2026, 12, 31),
+        )
+        launch_review_cycle(cycle)
+
+        manager_review = Review.objects.get(review_cycle=cycle, employee=manager)
+        manager_review.self_rating = 4
+        manager_review.self_comments = "Strong delivery quarter over quarter."
+        manager_review.self_submitted_at = timezone.now()
+        manager_review.save()
+
+        if direct_report is not None:
+            report_review = Review.objects.get(review_cycle=cycle, employee=direct_report)
+            report_review.self_rating = 4
+            report_review.self_comments = "Met all sprint commitments."
+            report_review.self_submitted_at = timezone.now()
+            report_review.manager_rating = 4
+            report_review.manager_comments = "Consistently reliable, ready for more scope."
+            report_review.manager_submitted_at = timezone.now()
+            report_review.save()
+
+            Goal.objects.create(
+                employee=direct_report, manager=manager, title="Lead the Q3 migration project",
+                description="Own planning and delivery end to end.", target_date=date(2026, 9, 30),
+                status=Goal.Status.ACTIVE, created_by=manager,
+            )
+            Goal.objects.create(
+                employee=direct_report, manager=manager, title="Complete AWS certification",
+                target_date=date(2026, 6, 30), status=Goal.Status.ACTIVE, created_by=direct_report,
+            )
+            Feedback.objects.create(
+                employee=direct_report, author=manager, feedback_type=Feedback.FeedbackType.MANAGER,
+                text="Great job unblocking the team during the outage last sprint.",
+            )

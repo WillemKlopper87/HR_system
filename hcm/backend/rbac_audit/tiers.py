@@ -66,6 +66,19 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
         "gender": FieldTier.SENSITIVE,
         "disability_status": FieldTier.SENSITIVE,
     },
+    "performance.Goal": {
+        "title": FieldTier.INTERNAL,
+        "description": FieldTier.INTERNAL,
+        "target_date": FieldTier.INTERNAL,
+        "status": FieldTier.INTERNAL,
+    },
+    # performance.Review and performance.Feedback are Sensitive-tier
+    # (Data-Dictionary.md: "review (S — ratings), feedback (S)") but
+    # deliberately NOT registered here — line_manager's generic S-tier
+    # grant is closed (aggregate-only, for demographics) yet RBAC-Roles.md
+    # says line_manager individually "sees own team's reviews/goals".
+    # performance/permissions.py gates these by row-scope alone, the same
+    # exception pattern as recruitment.Offer's pay fields.
 }
 
 

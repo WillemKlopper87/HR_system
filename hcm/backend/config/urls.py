@@ -14,4 +14,5 @@ urlpatterns = [
     path("api/v1/auth/", include("rbac_audit.urls")),
     path("api/v1/", include("core_hr.urls")),
     path("api/v1/", include("recruitment.urls")),
+    path("api/v1/", include("performance.urls")),
 ]

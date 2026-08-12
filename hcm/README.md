@@ -13,10 +13,12 @@ hcm/
     rbac_audit/ shared RBAC + audit + consent layer (Sprint 2); + Sprint 3 session auth;
                 ConsentRecord extended in Sprint 4 to an employee-or-applicant subject
     recruitment/ requisitions, applicant pipeline, offers, hire automation (Sprint 4)
+    performance/ goals, review cycles, self/manager reviews, feedback (Sprint 6)
   frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards
     pages/     employee list/detail, org structure, data quality, headcount dashboard
-               (Sprint 3); requisitions, applicants, recruitment dashboard (Sprint 4)
+               (Sprint 3); requisitions, applicants, recruitment dashboard (Sprint 4);
+               review cycles, reviews (Sprint 6 — goals/feedback live on employee detail)
     api/       fetch client (CSRF-aware) + shared reference-data context
   docker-compose.yml  db + redis + backend + celery worker (ADR-005)
 ```
@@ -79,6 +81,12 @@ docker compose up --build
   Sensitive-tier read for one's own record must never leak onto records reached
   via a different, wider-scoped role the same person holds. Found as a real bug
   during Sprint 3 browser verification; see the sprint plan's Sprint 3 entry.
+- Not every Sensitive-tier model should use the generic tiered-serializer path:
+  where a role's row-scope legitimately grants individual access the role's own
+  blanket tier grant doesn't cover (line_manager on `performance.Review`,
+  recruiter on `recruitment.Offer`'s pay fields), gate on row-scope
+  (`RowScopePermission`) alone instead of forcing the mismatch through
+  `can_access_tier_for_target`.
 
 ## CI
 

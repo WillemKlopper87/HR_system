@@ -12,6 +12,9 @@ import { HeadcountDashboardPage } from './pages/HeadcountDashboardPage'
 import { OrgStructurePage } from './pages/OrgStructurePage'
 import { RecruitmentDashboardPage } from './pages/RecruitmentDashboardPage'
 import { RequisitionsPage } from './pages/RequisitionsPage'
+import { ReviewCyclesPage } from './pages/ReviewCyclesPage'
+import { ReviewDetailPage } from './pages/ReviewDetailPage'
+import { ReviewsPage } from './pages/ReviewsPage'
 
 export default function App() {
   return (
@@ -26,6 +29,7 @@ export default function App() {
             <Route path="/org-structure" element={<OrgStructurePage />} />
             <Route element={<RequireRole roles={['hr_admin']} />}>
               <Route path="/data-quality" element={<DataQualityPage />} />
+              <Route path="/review-cycles" element={<ReviewCyclesPage />} />
             </Route>
             <Route path="/dashboards/headcount" element={<HeadcountDashboardPage />} />
             <Route element={<RequireRole roles={['recruiter', 'hr_admin']} />}>
@@ -34,6 +38,8 @@ export default function App() {
               <Route path="/applicants/:id" element={<ApplicantDetailPage />} />
               <Route path="/dashboards/recruitment" element={<RecruitmentDashboardPage />} />
             </Route>
+            <Route path="/reviews" element={<ReviewsPage />} />
+            <Route path="/reviews/:id" element={<ReviewDetailPage />} />
             <Route path="*" element={<Navigate to="/employees" replace />} />
           </Route>
         </Route>

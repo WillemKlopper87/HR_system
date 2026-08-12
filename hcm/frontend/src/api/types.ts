@@ -209,3 +209,68 @@ export const REQUISITION_STATUS_LABELS: Record<RequisitionStatus, string> = {
   closed: 'Closed',
   filled: 'Filled',
 }
+
+export type ReviewCycleType = 'annual' | 'biannual'
+export type ReviewCycleStatus = 'draft' | 'launched' | 'closed'
+
+export interface ReviewCycle {
+  id: number
+  name: string
+  cycle_type: ReviewCycleType
+  status: ReviewCycleStatus
+  start_date: string
+  end_date: string
+  launched_at: string | null
+  closed_at: string | null
+  created_by: number | null
+}
+
+export interface ReviewCycleCompletion {
+  total: number
+  self_submitted: number
+  self_submitted_pct: number
+  manager_submitted: number
+  manager_submitted_pct: number
+  completed: number
+  completed_pct: number
+}
+
+export type GoalStatus = 'draft' | 'active' | 'completed' | 'cancelled'
+
+export interface Goal {
+  id: number
+  employee: number
+  manager: number | null
+  title: string
+  description?: string
+  target_date: string | null
+  status: GoalStatus
+  created_by: number | null
+}
+
+export type ReviewCompletionStatus = 'not_started' | 'self_submitted' | 'manager_submitted' | 'completed'
+
+export interface Review {
+  id: number
+  review_cycle: number
+  employee: number
+  manager: number | null
+  self_rating: number | null
+  self_comments: string
+  self_submitted_at: string | null
+  manager_rating: number | null
+  manager_comments: string
+  manager_submitted_at: string | null
+  completion_status: ReviewCompletionStatus
+}
+
+export type FeedbackType = 'manager' | 'peer'
+
+export interface Feedback {
+  id: number
+  employee: number
+  author: number | null
+  feedback_type: FeedbackType
+  text: string
+  created_at: string
+}

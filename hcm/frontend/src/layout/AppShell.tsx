@@ -39,6 +39,14 @@ export function AppShell() {
                 </NavLink>
               </>
             )}
+            <NavLink to="/reviews" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              Reviews
+            </NavLink>
+            {hasRole('hr_admin') && (
+              <NavLink to="/review-cycles" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                Review Cycles
+              </NavLink>
+            )}
           </nav>
           <div className="app-user">
             <span>
