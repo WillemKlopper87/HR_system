@@ -21,6 +21,20 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
 
 ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 
+# Django 4+ CSRF checks the browser's Origin header against this list (in
+# addition to ALLOWED_HOSTS) whenever the request didn't arrive same-origin
+# at the network level — which is exactly the dev shape here: the browser's
+# origin is the Vite dev server (localhost:5173), proxied server-side to
+# this app on :8000. Without this, every mutating request 403s with "CSRF
+# Failed: Origin checking failed" even though the session/CSRF cookies are
+# correct. Staging/prod serve frontend + API from one origin behind the
+# reverse proxy (ADR-005) so this only needs dev's split-port shape.
+CSRF_TRUSTED_ORIGINS = [
+    o for o in os.environ.get(
+        "DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",") if o
+]
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",

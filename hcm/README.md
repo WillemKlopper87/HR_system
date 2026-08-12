@@ -9,9 +9,12 @@ Modular-monolith HCM system. Planning and architecture docs live one level up in
 hcm/
   backend/     Django 5.2 LTS + DRF (ADR-001) — one Django app per domain module
     config/    settings, urls, wsgi/asgi
-    core_hr/   employees, org structure, lifecycle (Sprint 1)
-    rbac_audit/ shared RBAC + audit + consent layer (Sprint 2)
-  frontend/    React 19 + TypeScript (Vite)
+    core_hr/   employees, org structure, lifecycle (Sprint 1); + Sprint 3 dashboards/CRUD
+    rbac_audit/ shared RBAC + audit + consent layer (Sprint 2); + Sprint 3 session auth
+  frontend/    React 19 + TypeScript (Vite) + React Router — Sprint 3 UI:
+    auth/      session login/logout, route guards
+    pages/     employee list/detail, org structure, data quality, headcount dashboard
+    api/       fetch client (CSRF-aware) + shared reference-data context
   docker-compose.yml  db + redis + backend + celery worker (ADR-005)
 ```
 
@@ -24,16 +27,25 @@ cd backend
 python -m venv .venv            # NOTE: prefer a venv OUTSIDE OneDrive (see below)
 .venv\Scripts\pip install -r requirements.txt
 .venv\Scripts\python manage.py migrate
+.venv\Scripts\python manage.py seed_demo_data   # synthetic org + employees + demo logins (local dev only)
 .venv\Scripts\python manage.py runserver   # http://localhost:8000/healthz
 ```
 
-Frontend:
+Demo logins from `seed_demo_data` (password = username + "123"): `hradmin` (HR Admin),
+`manager` (Line Manager), `employee` (Employee, self-scope only).
+
+Frontend — the Vite dev server proxies `/api` and `/admin` to `localhost:8000`
+(`vite.config.ts`), so run both at once:
 
 ```powershell
 cd frontend
 npm install
-npm run dev
+npm run dev   # http://localhost:5173
 ```
+
+If the backend runs on a different origin than `localhost:5173`/`127.0.0.1:5173`,
+set `DJANGO_CSRF_TRUSTED_ORIGINS` (see `.env.example`) or mutating requests
+(login excepted) will 403 with a CSRF Origin-check failure.
 
 Full stack via Docker (PostgreSQL + Redis + worker):
 

@@ -69,14 +69,23 @@
 
 ## Sprint 3 — Core HR Dashboards & Admin UI
 **Goal:** HR admins can manage and view core data; unblocks all downstream modules.
+**Status: done** (2026-08-12) — see `hcm/backend/core_hr/` (new API surface) and `hcm/frontend/src/`. Verified end-to-end in a real browser (login → employee list/detail → org structure CRUD → data-quality resolve → headcount dashboard) across all three seeded demo roles (hr_admin, line_manager, employee), not just via the test suite.
 
 **Tasks:**
-- [ ] Employee list/detail UI with RBAC-aware field visibility
-- [ ] Org structure management UI
-- [ ] Data-quality exception dashboard for HR to resolve
-- [ ] Basic org-wide headcount dashboard (department, level, pay band, race, gender, disability) — early version of the equity dashboard, reused/extended in the EE Reporting sprints
+- [x] Employee list/detail UI with RBAC-aware field visibility — `EmployeeListPage`/`EmployeeDetailPage`; the UI renders exactly what the tiered serializer sends (present key → value, absent key → "Restricted" badge) rather than re-implementing the access decision client-side. New backend surface: `EmployeeViewSet` (`/api/v1/employees/`) reusing the Sprint 2 row-scope + field-tier pattern; `EmployeeVersionViewSet` gained `?employee=` and `?current=true` filters
+- [x] Org structure management UI — `OrgStructurePage`: Department/JobGrade/Location CRUD (hr_admin-only writes, `IsHRAdminOrReadOnly`), OccupationalLevel shown read-only (statutory, not user-editable). New `DepartmentViewSet`/`JobGradeViewSet`/`LocationViewSet`/`OccupationalLevelViewSet`
+- [x] Data-quality exception dashboard for HR to resolve — `DataQualityPage`; new `DataQualityExceptionViewSet` (`IsHRAdmin`-gated) with `resolve` and `run_checks` actions over the existing Sprint 1 `run_data_quality_checks()`
+- [x] Basic org-wide headcount dashboard (department, level, pay band, race, gender, disability) — `HeadcountDashboardPage`; new `headcount_dashboard` aggregation endpoint with **small-cell suppression (n<5)** per RBAC-Roles.md standing rule 1 / gap C6, gated on holding an ALL-row-scope role with Sensitive-tier read (`can_see_unsuppressed_aggregates`) — verified visually: a line_manager sees `<5` on small demographic cells while department/level/grade breakdowns (never sensitive) stay exact
+- [x] **(added)** Session-based auth (`/api/v1/auth/{csrf,login,logout,me}/`) — OIDC/Entra SSO (ADR-004) isn't built yet; this is what the SPA needs to log in against local dev/demo accounts today. `seed_demo_data` management command creates synthetic org structure + employees + three demo logins spanning hr_admin/line_manager/employee
+
+**Bugs found and fixed during this sprint's own browser verification (not present in the Sprint 1/2 test suite, which never exercised these paths together):**
+- **RBAC field-tier leak (serious):** `TieredModelSerializer` (Sprint 2) checked "does this employee hold *any* role granting this tier," not "does *that specific role* also cover this record's row-scope." Since every real employee — including managers — legitimately holds the base `employee` role (self-scope, Sensitive-tier read for their own record) alongside e.g. `line_manager`, that grant leaked onto every report's individual demographic fields, which RBAC-Roles.md reserves as aggregate-only for `line_manager`. Fixed via `can_access_tier_for_target` in `rbac_audit/permissions.py`; regression test added (`test_line_manager_who_also_holds_base_employee_role_still_cant_see_report_sensitive_fields`). The same class of bug was independently caught and fixed in the headcount dashboard's suppression check (`can_see_unsuppressed_aggregates`) before this one, via the test suite rather than the browser.
+- **CSRF misconfiguration:** mutating requests 403'd in the real browser (masked by `manage.py test`'s default `enforce_csrf_checks=False`) because Django 4+ validates the browser's `Origin` header against `CSRF_TRUSTED_ORIGINS`, which wasn't set for the Vite dev origin. Added `DJANGO_CSRF_TRUSTED_ORIGINS` (settings.py + `.env.example`).
+- **React anti-pattern in `LoginPage`:** a `navigate()` call in the render body (not an effect) caused erratic post-login redirects using a stale `location.state.from`. Fixed by moving the redirect into `useEffect` and dropping the "return to originally-requested page" feature in favor of always landing on `/employees` — simpler and correct.
 
 **Exit criteria (end of Phase 1 / Core HR):** Core employee data live, RBAC/audit enforced, HR admin can manage records end-to-end. **This is the hard gate — do not start Sprint 4 until this passes UAT-lite (internal review).**
+
+**Verification:** `manage.py check --fail-level WARNING`, `makemigrations --check --dry-run`, and `manage.py test` all pass — 63/63 tests project-wide. Frontend `tsc -b && vite build` and `oxlint` both pass. All of the above additionally verified in a live Chromium session (Playwright) against the real dev servers, not just the test client — this is what surfaced the three bugs above.
 
 ---
 

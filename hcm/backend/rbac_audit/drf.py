@@ -4,7 +4,7 @@ from rest_framework import permissions, serializers
 
 from .audit import log_access
 from .models import AuditLogEntry, Role
-from .permissions import active_roles_for, can_access_tier, has_row_access
+from .permissions import active_roles_for, can_access_tier_for_target, has_row_access
 from .tiers import FieldTier, highest_tier, tier_of
 
 
@@ -50,11 +50,14 @@ class RowScopePermission(permissions.IsAuthenticated):
         return False
 
 
-def row_scoped_queryset(queryset, employee, *, employee_field: str = "employee"):
+def row_scoped_queryset(queryset, employee, *, employee_field: str | None = "employee"):
     """Filters a queryset to rows the employee's active roles' row-scope
-    permits. Adequate for pilot-scale data (loops employees in Python) —
-    Sprint 3's real dashboards should replace this with a set-based query
-    (e.g. a recursive CTE for reporting-line membership) at production scale."""
+    permits. `employee_field=None` means the row itself IS the employee
+    (e.g. the Employee model's own queryset) rather than a queryset with a
+    foreign key to one. Adequate for pilot-scale data (loops employees in
+    Python) — Sprint 3's real dashboards should replace this with a
+    set-based query (e.g. a recursive CTE for reporting-line membership)
+    at production scale."""
     from core_hr.models import Employee
 
     if employee is None:
@@ -64,18 +67,27 @@ def row_scoped_queryset(queryset, employee, *, employee_field: str = "employee")
         return queryset
 
     accessible_ids = [e.id for e in Employee.objects.all() if has_row_access(employee, e)]
-    return queryset.filter(**{f"{employee_field}_id__in": accessible_ids})
+    lookup = "pk__in" if employee_field is None else f"{employee_field}_id__in"
+    return queryset.filter(**{lookup: accessible_ids})
 
 
 class TieredModelSerializer(serializers.ModelSerializer):
     """Drops fields the requesting employee's roles don't have read access
-    to, and logs an AuditLogEntry for the highest sensitivity tier
-    actually returned. Every module's read serializers for tiered models
-    should subclass this instead of building bespoke field filtering."""
+    to *for this specific record*, and logs an AuditLogEntry for the
+    highest sensitivity tier actually returned. Every module's read
+    serializers for tiered models should subclass this instead of building
+    bespoke field filtering.
+
+    Requires the viewset to implement get_target_employee(obj) — the same
+    method RowScopePermission already requires — so a role's tier grant
+    only applies within that role's own row-scope (can_access_tier_for_target),
+    not "this employee holds a matching grant via any role, for any record."""
 
     def to_representation(self, instance):
         request = self.context.get("request")
+        view = self.context.get("view")
         employee = get_request_employee(request) if request is not None else None
+        target_employee = view.get_target_employee(instance) if view is not None else None
         model_label = f"{self.Meta.model._meta.app_label}.{self.Meta.model._meta.object_name}"
 
         data = super().to_representation(instance)
@@ -83,7 +95,7 @@ class TieredModelSerializer(serializers.ModelSerializer):
             name
             for name in data
             if tier_of(model_label, name) == FieldTier.PUBLIC
-            or can_access_tier(employee, tier_of(model_label, name), mode="read")
+            or can_access_tier_for_target(employee, target_employee, tier_of(model_label, name), mode="read")
         ]
         filtered = {name: data[name] for name in allowed_fields}
 

@@ -269,6 +269,29 @@ class EmployeeVersionApiTests(TestCase):
         self.assertNotIn("disability_status", response.data)
         self.assertIn("department", response.data)  # public tier still visible
 
+    def test_line_manager_who_also_holds_base_employee_role_still_cant_see_report_sensitive_fields(self):
+        # Regression: every real employee — including managers — also
+        # holds the base 'employee' role (self row-scope, S:read=True, for
+        # their OWN profile). A field-tier check that isn't row-scope-aware
+        # per role would let that grant leak onto every record the SAME
+        # person's line_manager role can reach, defeating "aggregate-only"
+        # (RBAC-Roles.md) for line managers entirely. can_access_tier_for_target
+        # is what prevents this — this pins the observable behavior.
+        RoleAssignment.objects.create(employee=self.manager, role=Role.objects.get(name="employee"))
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.get(self._detail_url(self.report_version_id))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("race", response.data)
+        self.assertNotIn("gender", response.data)
+        self.assertNotIn("disability_status", response.data)
+        # but the manager's own record still shows sensitive fields, via
+        # that same base role's self-scope grant
+        own_version_id = self.manager.current_version.id
+        own_response = self.client.get(self._detail_url(own_version_id))
+        self.assertEqual(own_response.status_code, 200)
+        self.assertIn("race", own_response.data)
+
     def test_line_manager_blocked_from_outsider_and_denial_is_logged(self):
         outsider_version_id = self.outsider.current_version.id
         self.client.force_authenticate(user=self.manager.user)

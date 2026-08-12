@@ -11,5 +11,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("healthz", healthz),
     # Module APIs mount under /api/v1/ as sprints deliver them.
+    path("api/v1/auth/", include("rbac_audit.urls")),
     path("api/v1/", include("core_hr.urls")),
 ]
