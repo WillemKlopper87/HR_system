@@ -1,12 +1,8 @@
 from __future__ import annotations
 
 from rbac_audit.drf import get_request_employee
-from rbac_audit.permissions import active_roles_for
+from rbac_audit.permissions import has_role
 from rest_framework import permissions
-
-
-def has_role(employee, role_name: str) -> bool:
-    return active_roles_for(employee).filter(name=role_name).exists()
 
 
 class IsHRAdmin(permissions.BasePermission):

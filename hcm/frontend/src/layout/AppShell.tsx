@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 
 export function AppShell() {
   const { user, logout, hasRole } = useAuth()
+  const canRecruit = hasRole('recruiter') || hasRole('hr_admin')
 
   return (
     <ReferenceDataProvider>
@@ -25,6 +26,19 @@ export function AppShell() {
             <NavLink to="/dashboards/headcount" className={({ isActive }) => (isActive ? 'active' : undefined)}>
               Headcount
             </NavLink>
+            {canRecruit && (
+              <>
+                <NavLink to="/requisitions" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                  Requisitions
+                </NavLink>
+                <NavLink to="/applicants" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                  Applicants
+                </NavLink>
+                <NavLink to="/dashboards/recruitment" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                  Recruitment
+                </NavLink>
+              </>
+            )}
           </nav>
           <div className="app-user">
             <span>

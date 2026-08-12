@@ -9,7 +9,15 @@ from django.db import transaction
 
 from core_hr.data_quality import run_data_quality_checks
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
-from rbac_audit.models import Role, RoleAssignment
+from rbac_audit.consent import record_consent
+from rbac_audit.models import ConsentRecord, Role, RoleAssignment
+
+# Cross-module import exception: this command's whole job is seeding demo
+# data across every module for local dev/UI review, not core_hr business
+# logic — "apps may not import each other" (hcm/README.md) governs feature
+# code, not a dev-tooling script that necessarily spans all of them.
+from recruitment.models import Applicant, Offer, Requisition
+from recruitment.services import transition_applicant
 
 User = get_user_model()
 
@@ -176,10 +184,88 @@ class Command(BaseCommand):
                 staff.user = User.objects.create_user(username="employee", password="employee123")
                 staff.save(update_fields=["user"])
 
+            recruiter_role = Role.objects.get(name="recruiter")
+            slm_head = dept_heads[dept_codes.index("SLM")]
+            RoleAssignment.objects.create(employee=slm_head, role=recruiter_role)
+            slm_head.user = User.objects.create_user(username="recruiter", password="recruiter123")
+            slm_head.save(update_fields=["user"])
+
+            self._seed_recruitment_demo_data(
+                departments=departments, levels=levels, grades_by_level=grades_by_level,
+                locations=locations, recruiter=slm_head, rng=rng,
+            )
+
         run_data_quality_checks()
 
         self.stdout.write(self.style.SUCCESS(f"Seeded {employee_counter} employees across {len(departments)} departments."))
         self.stdout.write(
             "Demo logins — hradmin/hradmin123 (HR Admin), manager/manager123 (Line Manager), "
-            "employee/employee123 (Employee). Local development only."
+            "recruiter/recruiter123 (Recruiter), employee/employee123 (Employee). Local development only."
+        )
+
+    def _seed_recruitment_demo_data(self, *, departments, levels, grades_by_level, locations, recruiter, rng):
+        """A handful of requisitions/applicants spanning the pipeline —
+        including one carried all the way through transition_applicant to
+        HIRED, so the demo shows the Sprint 4 acceptance criterion (hire
+        creates an employees row) with real seeded data, not just tests."""
+        eng_dept = next(d for d in departments if d.code == "ENG")
+        fin_dept = next(d for d in departments if d.code == "FIN")
+        junior_level = levels[-1]
+        mid_level = levels[len(levels) // 2]
+        grade = grades_by_level[junior_level.code][0]
+
+        eng_req = Requisition.objects.create(
+            title="Backend Engineer", department=eng_dept, occupational_level=junior_level, job_grade=grade,
+            location=locations[0], headcount=2, status=Requisition.Status.OPEN,
+            opened_at=date(2026, 6, 1), created_by=recruiter,
+        )
+        fin_req = Requisition.objects.create(
+            title="Financial Analyst", department=fin_dept, occupational_level=mid_level,
+            job_grade=grades_by_level[mid_level.code][0], location=locations[0],
+            headcount=1, status=Requisition.Status.OPEN, opened_at=date(2026, 7, 1), created_by=recruiter,
+        )
+
+        Applicant.objects.create(
+            requisition=eng_req, first_name="Nomsa", last_name="Khumalo",
+            email="nomsa.khumalo@applicant-demo.example", date_of_birth=date(1996, 4, 12),
+        )
+        interviewing = Applicant.objects.create(
+            requisition=eng_req, first_name="Werner", last_name="Botha",
+            email="werner.botha@applicant-demo.example", date_of_birth=date(1993, 9, 2),
+        )
+        for stage in (Applicant.Stage.SCREENED, Applicant.Stage.INTERVIEW):
+            transition_applicant(interviewing, to_stage=stage, actor=recruiter)
+
+        with_offer = Applicant.objects.create(
+            requisition=fin_req, first_name="Aisha", last_name="Cassim",
+            email="aisha.cassim@applicant-demo.example", date_of_birth=date(1991, 11, 20),
+        )
+        for stage in (Applicant.Stage.SCREENED, Applicant.Stage.INTERVIEW, Applicant.Stage.OFFER):
+            transition_applicant(with_offer, to_stage=stage, actor=recruiter)
+        Offer.objects.create(
+            applicant=with_offer, proposed_job_grade=grades_by_level[mid_level.code][0],
+            proposed_annual_salary="420000.00", proposed_by=recruiter,
+        )
+
+        to_hire = Applicant.objects.create(
+            requisition=eng_req, first_name="Sibusiso", last_name="Mahlangu",
+            email="sibusiso.mahlangu@applicant-demo.example", date_of_birth=date(1994, 2, 8),
+        )
+        record_consent(
+            applicant=to_hire, purpose=ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID,
+            lawful_basis=ConsentRecord.LawfulBasis.CONSENT, text_version="v1", actor=recruiter,
+        )
+        to_hire.race = _weighted_choice(RACE_WEIGHTS, rng)
+        to_hire.gender = _weighted_choice(GENDER_WEIGHTS, rng)
+        to_hire.disability_status = _weighted_choice(DISABILITY_WEIGHTS, rng)
+        to_hire.save(update_fields=["race", "gender", "disability_status"])
+        for stage in (Applicant.Stage.SCREENED, Applicant.Stage.INTERVIEW, Applicant.Stage.OFFER, Applicant.Stage.HIRED):
+            transition_applicant(to_hire, to_stage=stage, actor=recruiter, hire_date=date(2026, 8, 1))
+
+        rejected = Applicant.objects.create(
+            requisition=fin_req, first_name="Johan", last_name="van Wyk",
+            email="johan.vanwyk@applicant-demo.example", date_of_birth=date(1989, 6, 15),
+        )
+        transition_applicant(
+            rejected, to_stage=Applicant.Stage.REJECTED, actor=recruiter, rejected_reason="Not enough relevant experience"
         )

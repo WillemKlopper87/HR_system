@@ -13,6 +13,10 @@ def active_roles_for(employee):
     return Role.objects.filter(id__in=active_role_ids)
 
 
+def has_role(employee, role_name: str) -> bool:
+    return active_roles_for(employee).filter(name=role_name).exists()
+
+
 def can_access_tier(employee, tier: str, *, mode: str = "read") -> bool:
     """mode: 'read' or 'write'. Public-tier fields are always accessible."""
     if tier == FieldTier.PUBLIC:

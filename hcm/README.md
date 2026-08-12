@@ -10,10 +10,13 @@ hcm/
   backend/     Django 5.2 LTS + DRF (ADR-001) — one Django app per domain module
     config/    settings, urls, wsgi/asgi
     core_hr/   employees, org structure, lifecycle (Sprint 1); + Sprint 3 dashboards/CRUD
-    rbac_audit/ shared RBAC + audit + consent layer (Sprint 2); + Sprint 3 session auth
-  frontend/    React 19 + TypeScript (Vite) + React Router — Sprint 3 UI:
+    rbac_audit/ shared RBAC + audit + consent layer (Sprint 2); + Sprint 3 session auth;
+                ConsentRecord extended in Sprint 4 to an employee-or-applicant subject
+    recruitment/ requisitions, applicant pipeline, offers, hire automation (Sprint 4)
+  frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards
     pages/     employee list/detail, org structure, data quality, headcount dashboard
+               (Sprint 3); requisitions, applicants, recruitment dashboard (Sprint 4)
     api/       fetch client (CSRF-aware) + shared reference-data context
   docker-compose.yml  db + redis + backend + celery worker (ADR-005)
 ```
@@ -32,7 +35,7 @@ python -m venv .venv            # NOTE: prefer a venv OUTSIDE OneDrive (see belo
 ```
 
 Demo logins from `seed_demo_data` (password = username + "123"): `hradmin` (HR Admin),
-`manager` (Line Manager), `employee` (Employee, self-scope only).
+`manager` (Line Manager), `recruiter` (Recruiter), `employee` (Employee, self-scope only).
 
 Frontend — the Vite dev server proxies `/api` and `/admin` to `localhost:8000`
 (`vite.config.ts`), so run both at once:
@@ -63,11 +66,19 @@ docker compose up --build
 ## Module rules (enforced in review — see Architecture-Design.md §4)
 
 - Apps may import `core_hr` and `rbac_audit`; apps may **not** import each other.
+  (`core_hr/management/commands/seed_demo_data.py` is the one intentional exception —
+  it seeds demo data across every module for local dev/UI review, not core_hr logic,
+  so it imports `recruitment` too; noted inline where it does.)
 - All API access goes through the shared RBAC permission classes + field-tier
   serializer mixin from `rbac_audit` (Sprint 2). No per-module access control.
 - Slow work (imports, report generation, webhooks) runs in Celery, never in-request.
 - Sensitive fields (race, gender, disability, pay, ratings, assessment results)
   are tiered per `Data-Dictionary.md` — hard constraint from the sprint plan.
+- A role's field-tier grant only applies within that role's own row-scope
+  (`can_access_tier_for_target`) — the base self-scope `employee` role granting
+  Sensitive-tier read for one's own record must never leak onto records reached
+  via a different, wider-scoped role the same person holds. Found as a real bug
+  during Sprint 3 browser verification; see the sprint plan's Sprint 3 entry.
 
 ## CI
 

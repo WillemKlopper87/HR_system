@@ -165,7 +165,7 @@ class ConsentTests(TestCase):
         )
 
     def test_record_and_withdraw_consent(self):
-        self.assertFalse(has_active_consent(self.employee, ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID))
+        self.assertFalse(has_active_consent(employee=self.employee, purpose=ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID))
 
         consent = record_consent(
             employee=self.employee,
@@ -173,7 +173,7 @@ class ConsentTests(TestCase):
             lawful_basis=ConsentRecord.LawfulBasis.CONSENT,
             text_version="v1",
         )
-        self.assertTrue(has_active_consent(self.employee, ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID))
+        self.assertTrue(has_active_consent(employee=self.employee, purpose=ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID))
         self.assertTrue(
             AuditLogEntry.objects.filter(
                 entity_type="rbac_audit.ConsentRecord", entity_id=str(consent.pk), action=AuditLogEntry.Action.CREATE
@@ -181,7 +181,7 @@ class ConsentTests(TestCase):
         )
 
         withdraw_consent(consent)
-        self.assertFalse(has_active_consent(self.employee, ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID))
+        self.assertFalse(has_active_consent(employee=self.employee, purpose=ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID))
         self.assertTrue(
             AuditLogEntry.objects.filter(
                 entity_type="rbac_audit.ConsentRecord", entity_id=str(consent.pk), action=AuditLogEntry.Action.UPDATE

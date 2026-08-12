@@ -131,8 +131,12 @@ class AuditLogEntry(models.Model):
 
 class ConsentRecord(models.Model):
     """POPIA consent tracking for demographic self-ID and assessments
-    (Data-Dictionary.md consent_record; gap C1). Withdrawal never deletes
-    the record — it sets withdrawn_at, preserving the audit trail."""
+    (Data-Dictionary.md consent_record: "employee or applicant (FK, one
+    of)"; gap C1). Withdrawal never deletes the record — it sets
+    withdrawn_at, preserving the audit trail. One shared table for both
+    pre-hire (recruitment's applicant demographic capture, Sprint 4) and
+    post-hire (ESS self-ID, Sprint 15) consent, per the Data Dictionary,
+    rather than two divergent tables."""
 
     class Purpose(models.TextChoices):
         DEMOGRAPHIC_SELF_ID = "demographic_self_id", "Demographic self-identification"
@@ -144,7 +148,10 @@ class ConsentRecord(models.Model):
         LEGAL_OBLIGATION_EEA = "legal_obligation_eea", "Legal obligation (Employment Equity Act)"
 
     employee = models.ForeignKey(
-        "core_hr.Employee", related_name="consent_records", on_delete=models.CASCADE
+        "core_hr.Employee", null=True, blank=True, related_name="consent_records", on_delete=models.CASCADE
+    )
+    applicant = models.ForeignKey(
+        "recruitment.Applicant", null=True, blank=True, related_name="consent_records", on_delete=models.CASCADE
     )
     purpose = models.CharField(max_length=30, choices=Purpose.choices)
     lawful_basis = models.CharField(max_length=30, choices=LawfulBasis.choices)
@@ -154,10 +161,20 @@ class ConsentRecord(models.Model):
 
     class Meta:
         ordering = ["-granted_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(employee__isnull=False, applicant__isnull=True)
+                    | models.Q(employee__isnull=True, applicant__isnull=False)
+                ),
+                name="consentrecord_exactly_one_subject",
+            )
+        ]
 
     def __str__(self):
+        subject = self.employee.employee_number if self.employee_id else f"applicant#{self.applicant_id}"
         status = "active" if self.withdrawn_at is None else "withdrawn"
-        return f"{self.employee.employee_number}: {self.get_purpose_display()} ({status})"
+        return f"{subject}: {self.get_purpose_display()} ({status})"
 
 
 class RetentionRule(TimestampedModel):

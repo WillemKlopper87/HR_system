@@ -112,3 +112,100 @@ export const EXCEPTION_TYPE_LABELS: Record<DataQualityException['exception_type'
   missing_demographics: 'Missing demographics',
   orphan_record: 'Orphan record (no version history)',
 }
+
+export type RequisitionStatus = 'draft' | 'open' | 'on_hold' | 'closed' | 'filled'
+
+export interface Requisition {
+  id: number
+  title: string
+  department: number
+  occupational_level: number
+  job_grade: number | null
+  location: number
+  headcount: number
+  status: RequisitionStatus
+  hiring_manager: number | null
+  created_by: number | null
+  opened_at: string | null
+  target_fill_date: string | null
+  closed_at: string | null
+}
+
+export type ApplicantStage = 'applied' | 'screened' | 'interview' | 'offer' | 'hired' | 'rejected'
+
+export interface Applicant {
+  id: number
+  requisition: number
+  first_name: string
+  last_name: string
+  email: string
+  phone?: string
+  date_of_birth?: string
+  current_stage: ApplicantStage
+  rejected_reason?: string
+  has_demographic_consent: boolean
+  // Sensitive-tier, consent-gated — absent (not empty) until consent
+  // exists AND the viewer's role grants Sensitive-tier read.
+  race?: string
+  gender?: string
+  disability_status?: string
+  resulting_employee: number | null
+}
+
+export interface ApplicantStageEvent {
+  id: number
+  applicant: number
+  from_stage: string
+  to_stage: string
+  changed_by: number | null
+  notes: string
+  created_at: string
+}
+
+export type OfferStatus = 'proposed' | 'approved' | 'accepted' | 'declined' | 'withdrawn'
+
+export interface Offer {
+  id: number
+  applicant: number
+  proposed_job_grade: number
+  proposed_annual_salary: string
+  status: OfferStatus
+  proposed_by: number | null
+  approved_by: number | null
+  approved_at: string | null
+  start_date: string | null
+}
+
+export interface RecruitmentBreakdownRow {
+  key: string
+  count: number | string
+  suppressed?: boolean
+}
+
+export interface RecruitmentDashboard {
+  open_requisitions: number
+  total_applicants: number
+  avg_time_to_fill_days: number | null
+  small_cell_suppression_applied: boolean
+  by_stage: RecruitmentBreakdownRow[]
+  by_race: RecruitmentBreakdownRow[]
+  by_gender: RecruitmentBreakdownRow[]
+  by_disability_status: RecruitmentBreakdownRow[]
+}
+
+export const STAGE_LABELS: Record<ApplicantStage, string> = {
+  applied: 'Applied',
+  screened: 'Screened',
+  interview: 'Interview',
+  offer: 'Offer',
+  hired: 'Hired',
+  rejected: 'Rejected',
+}
+
+export const REQUISITION_STATUS_LABELS: Record<RequisitionStatus, string> = {
+  draft: 'Draft',
+  open: 'Open',
+  on_hold: 'On hold',
+  closed: 'Closed',
+  filled: 'Filled',
+}

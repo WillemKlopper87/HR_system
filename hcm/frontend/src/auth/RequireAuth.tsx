@@ -9,8 +9,8 @@ export function RequireAuth() {
   return <Outlet />
 }
 
-export function RequireRole({ role }: { role: string }) {
+export function RequireRole({ roles }: { roles: string[] }) {
   const { hasRole } = useAuth()
-  if (!hasRole(role)) return <Navigate to="/employees" replace />
+  if (!roles.some(hasRole)) return <Navigate to="/employees" replace />
   return <Outlet />
 }

@@ -52,6 +52,20 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
         "race_source": FieldTier.SENSITIVE,
         "disability_source": FieldTier.SENSITIVE,
     },
+    "recruitment.Applicant": {
+        "first_name": FieldTier.PUBLIC,
+        "last_name": FieldTier.PUBLIC,
+        "email": FieldTier.INTERNAL,
+        "phone": FieldTier.INTERNAL,
+        "date_of_birth": FieldTier.SENSITIVE,
+        "current_stage": FieldTier.PUBLIC,
+        "rejected_reason": FieldTier.INTERNAL,
+        # Consent-gated on top of this tier grant, not instead of it — see
+        # recruitment/serializers.py::ApplicantSerializer.
+        "race": FieldTier.SENSITIVE,
+        "gender": FieldTier.SENSITIVE,
+        "disability_status": FieldTier.SENSITIVE,
+    },
 }
 
 
