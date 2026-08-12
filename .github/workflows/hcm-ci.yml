@@ -1,0 +1,66 @@
+name: hcm-ci
+
+on:
+  push:
+    paths:
+      - "hcm/**"
+      - ".github/workflows/hcm-ci.yml"
+  pull_request:
+    paths:
+      - "hcm/**"
+      - ".github/workflows/hcm-ci.yml"
+
+jobs:
+  backend:
+    name: Backend (Django checks, migrations, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hcm/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: hcm/backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Django system checks
+        run: python manage.py check --fail-level WARNING
+
+      - name: Missing-migration guard
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Migrate (SQLite, CI-local)
+        run: python manage.py migrate
+
+      - name: Test suite
+        run: python manage.py test
+
+  frontend:
+    name: Frontend (typecheck, lint, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hcm/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          cache: "npm"
+          cache-dependency-path: hcm/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck + build
+        run: npm run build

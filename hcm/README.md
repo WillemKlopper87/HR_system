@@ -7,7 +7,7 @@ Modular-monolith HCM system. Planning and architecture docs live one level up in
 
 ```
 hcm/
-  backend/     Django 6.1 + DRF (ADR-001) — one Django app per domain module
+  backend/     Django 5.2 LTS + DRF (ADR-001) — one Django app per domain module
     config/    settings, urls, wsgi/asgi
     core_hr/   employees, org structure, lifecycle (Sprint 1)
     rbac_audit/ shared RBAC + audit + consent layer (Sprint 2)

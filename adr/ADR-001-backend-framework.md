@@ -1,6 +1,6 @@
 # ADR-001: Backend framework — Django + Django REST Framework
 
-**Status:** Accepted (ratified 2026-08-12; scaffolded on Django 6.1)
+**Status:** Accepted (ratified 2026-08-12; scaffolded on Django 5.2 LTS — the latest Django release on PyPI; Django 6.x does not exist yet)
 
 ## Context
 The sprint plan left the backend open ("Django/Laravel/Node") while mandating a modular monolith, single PostgreSQL database, and a shared RBAC + audit layer. Sprint 0 requires a chosen framework to scaffold.
