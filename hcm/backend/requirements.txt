@@ -1,0 +1,9 @@
+# Sentech HCM backend — ADR-001 (Django + DRF). Scaffolded on Django 6.1.
+django>=6.1,<6.2
+djangorestframework>=3.16
+django-simple-history>=3.10
+openpyxl>=3.1               # Excel (.xlsx) bulk import (Sprint 1)
+psycopg[binary]>=3.2        # PostgreSQL driver (prod/staging; SQLite fallback needs nothing)
+celery[redis]>=5.5          # background jobs: imports, report generation, webhooks
+redis>=5.0
+gunicorn>=23.0              # prod WSGI server (ADR-005)
