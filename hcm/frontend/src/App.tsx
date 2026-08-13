@@ -10,8 +10,11 @@ import { AssessmentsPage } from './pages/AssessmentsPage'
 import { BenefitsPage } from './pages/BenefitsPage'
 import { CompProposalsPage } from './pages/CompProposalsPage'
 import { DataQualityPage } from './pages/DataQualityPage'
+import { EEConfigurationPage } from './pages/EEConfigurationPage'
+import { EEReportsPage } from './pages/EEReportsPage'
 import { EmployeeDetailPage } from './pages/EmployeeDetailPage'
 import { EmployeeListPage } from './pages/EmployeeListPage'
+import { EquityDashboardPage } from './pages/EquityDashboardPage'
 import { HeadcountDashboardPage } from './pages/HeadcountDashboardPage'
 import { OrgStructurePage } from './pages/OrgStructurePage'
 import { PayBandsPage } from './pages/PayBandsPage'
@@ -75,6 +78,11 @@ export default function App() {
             />
             <Route element={<RequireRole roles={['hr_admin']} />}>
               <Route path="/workforce-integrity" element={<WorkforceIntegrityPage />} />
+            </Route>
+            <Route element={<RequireRole roles={['hr_admin', 'ee_manager', 'accounting_officer', 'auditor']} />}>
+              <Route path="/ee-configuration" element={<EEConfigurationPage />} />
+              <Route path="/ee-reports" element={<EEReportsPage />} />
+              <Route path="/dashboards/equity" element={<EquityDashboardPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/employees" replace />} />
           </Route>

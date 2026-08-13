@@ -23,6 +23,11 @@ hcm/
                 enrollment/verification (no biometric vendor — face-api.js runs in the
                 browser) + office-attendance geofence check (Sprint 12c, unplanned
                 addition; see ADR-007 in Architecture-Design.md)
+    ee_reporting/ EEA2/EEA4 draft generation, approval workflow, CSV/Excel/PDF/XML
+                export, equity dashboard (Sprint 13-14); field/category lists extracted
+                verbatim from the official form documents into constants.py; reads
+                learning data via learning/queries.py, not a direct model import —
+                see Module rules below
   frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards
     pages/     employee list/detail, org structure, data quality, headcount dashboard
@@ -32,10 +37,15 @@ hcm/
                pay bands, comp proposals, benefits (Sprint 10 — comp_manager/hr_admin only);
                employee assessments (Sprint 12 — ee_manager/hr_admin only; applicant-subject
                assessments live on ApplicantDetailPage instead, like Offer); my-verification
-               (Sprint 12c — every employee) + workforce-integrity (hr_admin's review queue)
+               (Sprint 12c — every employee) + workforce-integrity (hr_admin's review queue);
+               EE configuration, EE reports, equity dashboard (Sprint 13-14 —
+               hr_admin/ee_manager/accounting_officer/auditor only)
     liveness/  face-api.js wrapper + shared camera-capture component (Sprint 12c);
                lazy-loaded (React.lazy) since TensorFlow.js is ~1MB and only this
                one page needs it
+    ee-reporting/ constants.ts (manual mirror of the backend's constants.py — not
+               auto-synced) + MatrixTable.tsx, the shared level x demographic-column
+               table renderer used by the EE config/reports/dashboard pages (Sprint 13-14)
     components/ small pieces shared across pages (e.g. the dashboard Breakdown chart)
     api/       fetch client (CSRF-aware) + shared reference-data context
   docker-compose.yml  db + redis + backend + celery worker (ADR-005)
@@ -56,7 +66,8 @@ python -m venv .venv            # NOTE: prefer a venv OUTSIDE OneDrive (see belo
 
 Demo logins from `seed_demo_data` (password = username + "123"): `hradmin` (HR Admin),
 `manager` (Line Manager), `recruiter` (Recruiter), `compmanager` (Compensation Manager),
-`eemanager` (EE Manager), `employee` (Employee, self-scope only).
+`eemanager` (EE Manager), `accountingofficer` (Accounting Officer/CEO, EEA2/EEA4
+sign-off only — Sprint 13-14), `employee` (Employee, self-scope only).
 
 `identity_verification`'s face-descriptor model weights are checked into
 `frontend/public/models/` (copied from `node_modules/@vladmandic/face-api/model/` —
@@ -103,6 +114,11 @@ docker compose up --build
   capture likewise goes through recruitment's own `/applicants/{id}/consent/`
   endpoint (generalized with a `purpose` field) rather than being duplicated in
   `assessments`, which only ever reads whether consent already exists.
+  `ee_reporting` needs learning-module data (completed training, for the Skills
+  Development section) without importing `learning.models` directly — it goes
+  through `learning/queries.py`, a small read-only query-interface module that
+  exists purely to be imported by other apps, per Architecture-Design.md §4's
+  own named example of how the "no peer imports" rule is meant to be satisfied.
 - All API access goes through the shared RBAC permission classes + field-tier
   serializer mixin from `rbac_audit` (Sprint 2). No per-module access control.
 - Slow work (imports, report generation, webhooks) runs in Celery, never in-request.
@@ -128,6 +144,17 @@ docker compose up --build
   doesn't fit the generic P/I/S/R tiers at all (POPIA treats it as a stricter
   category than this system's highest generic tier) — see
   `identity_verification/permissions.py::IsSelfOrHRAdmin`.
+  `ee_reporting` follows the same shape: `EEReportingPermission` is a coarse
+  "holds some EE-reporting role" gate at the DRF level, with the real
+  distinctions (hr_admin-only writes; ee_manager's review step; the
+  accounting_officer's sign-off step) enforced by explicit `has_role()` checks
+  inside the specific view methods — a permission class that tried to
+  encode all of that itself silently 403'd the ee_manager/accounting_officer
+  steps in this sprint's own testing (see the sprint plan's Sprint 13-14 entry).
+  `accounting_officer` (row_scope=all, no generic P/I/S/R grants — mirrors
+  `sysadmin`) can read/sign full report snapshots but is still subject to
+  small-cell suppression on the *live* Equity Dashboard, since that check
+  requires an explicit sensitive-tier grant the role deliberately doesn't have.
 
 ## CI
 

@@ -22,6 +22,10 @@ from assessments.models import ProviderConfig
 from assessments.services import assign_assessment, simulate_provider_completion
 from compensation.models import Benefit, BenefitsElection, PayBand
 from compensation.services import approve_proposal, propose_compensation_change, reject_proposal
+from ee_reporting.constants import BARRIER_CATEGORIES
+from ee_reporting.constants import OCCUPATIONAL_LEVEL_CODES as EE_LEVEL_CODES
+from ee_reporting.models import EEPlan, EEQuestionnaire, EmployerConfig, RemunerationRecord
+from ee_reporting.services import ee_manager_approve, generate_report, sign_off, submit_for_review
 from identity_verification.models import LivenessCheck
 from identity_verification.services import enroll_employee, run_liveness_check
 from learning.models import Certification, EmployeeSkill, Skill, TrainingRecord
@@ -220,6 +224,15 @@ class Command(BaseCommand):
             ops_head.user = User.objects.create_user(username="eemanager", password="eemanager123")
             ops_head.save(update_fields=["user"])
 
+            # CEO doubles as the PFMA Accounting Officer for sign-off
+            # purposes (EEA-Form-Spec-Notes.md) — the same person, not a
+            # separate seeded employee, matching how the form itself
+            # names the role "Chief Executive Officer/Accounting Officer".
+            accounting_officer_role = Role.objects.get(name="accounting_officer")
+            RoleAssignment.objects.create(employee=ceo, role=accounting_officer_role)
+            ceo.user = User.objects.create_user(username="accountingofficer", password="accountingofficer123")
+            ceo.save(update_fields=["user"])
+
             self._seed_recruitment_demo_data(
                 departments=departments, levels=levels, grades_by_level=grades_by_level,
                 locations=locations, recruiter=slm_head, rng=rng,
@@ -235,6 +248,9 @@ class Command(BaseCommand):
                 ee_manager=ops_head, hr_admin=hr_head, recruiter=slm_head, direct_report=staff, second_employee=eng_head,
             )
             self._seed_identity_verification_demo_data(direct_report=staff, rng=rng)
+            self._seed_ee_reporting_demo_data(
+                hr_admin=hr_head, ee_manager=ops_head, accounting_officer=ceo, levels=levels, rng=rng,
+            )
 
         run_data_quality_checks()
 
@@ -242,7 +258,8 @@ class Command(BaseCommand):
         self.stdout.write(
             "Demo logins — hradmin/hradmin123 (HR Admin), manager/manager123 (Line Manager), "
             "recruiter/recruiter123 (Recruiter), compmanager/compmanager123 (Comp Manager), "
-            "eemanager/eemanager123 (EE Manager), employee/employee123 (Employee). Local development only."
+            "eemanager/eemanager123 (EE Manager), accountingofficer/accountingofficer123 (Accounting Officer), "
+            "employee/employee123 (Employee). Local development only."
         )
 
     def _seed_recruitment_demo_data(self, *, departments, levels, grades_by_level, locations, recruiter, rng):
@@ -561,3 +578,124 @@ class Command(BaseCommand):
         if direct_report is not None:
             flagged_descriptor = [rng.uniform(-1.0, 1.0) for _ in range(128)]
             run_liveness_check(employee=direct_report, descriptor=flagged_descriptor)
+
+    def _seed_ee_reporting_demo_data(self, *, hr_admin, ee_manager, accounting_officer, levels, rng):
+        """Employer config (Section A) + a current-year questionnaire + a
+        2025-2030 EE plan, then remuneration for every current employee
+        scaled off their real pay band (not flat, so the median/gap
+        stats and highest/lowest-paid figures look real) — enough for
+        EEA2 AND EEA4 to both pass validate_report_readiness(). One EEA2
+        is walked all the way to signed_off (a realistic "what does a
+        finished report look like" demo); its EEA4 sibling is left in
+        draft so the submit/review/sign-off UI has something actionable
+        to demo live."""
+        report_year = 2026
+        period_start, period_end = date(2026, 1, 1), date(2026, 12, 31)
+
+        EmployerConfig.objects.create(
+            trade_name="Sentech SOC Ltd",
+            dti_registration_name="Sentech SOC Limited",
+            dti_registration_number="1996/025054/30",
+            paye_sars_number="7530196842",
+            uif_reference_number="U123456789",
+            ee_reference_number="E123456",
+            national_or_provincial_eap="National",
+            industry_sector="Telecommunications",
+            seta_classification="MICT SETA",
+            telephone_number="0113141000",
+            postal_address="PO Box 21, Honeydew", postal_code="2040", postal_city="Johannesburg",
+            postal_province=Location.Province.GAUTENG,
+            physical_address="Octave Building, 320 Sentech Road, Honeydew", physical_code="2040",
+            physical_city="Johannesburg", physical_province=Location.Province.GAUTENG,
+            ceo_name=f"{accounting_officer.first_name} {accounting_officer.last_name}",
+            ceo_telephone="0113141001", ceo_email=accounting_officer.work_email,
+            ee_senior_manager_name=f"{hr_admin.first_name} {hr_admin.last_name}",
+            ee_senior_manager_telephone="0113141002", ee_senior_manager_email=hr_admin.work_email,
+            business_type="state_owned_enterprise", is_organ_of_state=True,
+            employee_count_band="150_or_more",
+        )
+
+        barriers = {
+            key: {
+                "barriers": i < 6,
+                "aa_measures": i < 6,
+                "start_date": "2026-01-01" if i < 6 else None,
+                "end_date": "2026-12-31" if i < 6 else None,
+            }
+            for i, (key, _label) in enumerate(BARRIER_CATEGORIES)
+        }
+        EEQuestionnaire.objects.create(
+            report_year=report_year,
+            achieved_all_targets=False,
+            justifiable_reasons={
+                "TOP": ["insufficient_target_individuals"],
+                "SENIOR": ["insufficient_promotion_opportunities"],
+                "disability": ["insufficient_recruitment_opportunities"],
+            },
+            consultation={
+                "consultative_body_or_ee_forum": True, "representative_trade_unions": True, "employees": True,
+            },
+            barriers=barriers,
+            monitoring_frequency="quarterly",
+            achieved_annual_objectives=True,
+            achieved_annual_objectives_explanation=(
+                "Met 4 of 5 annual numerical targets; disability representation remains the outstanding gap."
+            ),
+            has_remuneration_policy=True,
+            remuneration_gap_aligned_to_policy=True,
+            has_measures_in_ee_plan=True,
+            differential_reason="seniority_length_of_service",
+            updated_by=hr_admin,
+        )
+
+        EEPlan.objects.create(
+            plan_period_start=date(2025, 1, 1), plan_period_end=date(2030, 12, 31),
+            sector_targets={
+                "TOP": {"african_male": 8, "african_female": 6, "white_male": 3, "white_female": 2},
+                "SENIOR": {"african_male": 10, "african_female": 8, "white_male": 4, "white_female": 3},
+                "PQ": {"african_male": 14, "african_female": 12, "white_male": 3, "white_female": 3},
+                "SKILLED": {"african_male": 20, "african_female": 18, "white_male": 3, "white_female": 3},
+            },
+            numerical_goals={
+                "SEMI": {"african_male": 30, "african_female": 28},
+                "UNSKILLED": {"african_male": 32, "african_female": 30},
+            },
+            disability_5yr_target_pct=Decimal("3.0"),
+            annual_targets={
+                level: {
+                    "african_male": 22, "african_female": 20, "coloured_male": 5, "coloured_female": 4,
+                    "indian_male": 2, "indian_female": 1, "white_male": 6, "white_female": 5,
+                    "foreign_national_male": 1, "foreign_national_female": 1,
+                }
+                for level in EE_LEVEL_CODES
+            },
+            annual_target_disability_value=15, annual_target_disability_pct=Decimal("2.5"),
+            created_by=hr_admin,
+        )
+
+        for employee in Employee.objects.all():
+            version = employee.current_version
+            if version is None:
+                continue
+            band = PayBand.objects.filter(job_grade=version.job_grade).current().first() if version.job_grade else None
+            base = float(band.mid_salary) if band else 250000.0
+            fixed = int(round(base * rng.uniform(0.85, 1.15), -2))
+            variable = int(round(fixed * rng.uniform(0.0, 0.15), -2))
+            RemunerationRecord.objects.create(
+                employee=employee, period_start=period_start, period_end=period_end,
+                fixed_remuneration=fixed, variable_remuneration=variable, imported_by=hr_admin,
+            )
+
+        eea2 = generate_report(
+            form_type="eea2", report_year=report_year, period_start=period_start, period_end=period_end, actor=hr_admin,
+        )
+        submit_for_review(eea2, actor=hr_admin)
+        ee_manager_approve(eea2, actor=ee_manager)
+        sign_off(eea2, actor=accounting_officer, place="Johannesburg")
+
+        # Left in draft on purpose — the demo login can exercise
+        # submit_for_review/ee_review/sign_off live instead of finding
+        # every report already finished.
+        generate_report(
+            form_type="eea4", report_year=report_year, period_start=period_start, period_end=period_end, actor=hr_admin,
+        )

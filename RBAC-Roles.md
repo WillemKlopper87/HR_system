@@ -15,6 +15,7 @@
 | **comp_manager** | all | R | R | R (aggregate) | RW | Pay bands, comp review workflow, benefits config |
 | **auditor** | all | R | R | R | R | **Read-only everywhere**, including audit log; every auditor read is itself audited |
 | **sysadmin** | all | — | — | — | — | Technical operations: user/role mapping, integrations, jobs. **No standing access to S/R business data**; break-glass elevation is logged and alerts hr_admin |
+| **accounting_officer** | all | — | — | — | — | *(Added Sprint 13–14, EEA-Form-Spec-Notes.md)* Final EEA2/EEA4 sign-off (PFMA employer). No standing access to S/R business data outside that one approval action — same reasoning as sysadmin |
 
 ## Standing rules
 
@@ -34,4 +35,5 @@
 | `HCM-Comp-Managers` | comp_manager |
 | `HCM-Auditors` | auditor |
 | `HCM-SysAdmins` | sysadmin |
+| `HCM-Accounting-Officers` | accounting_officer |
 | (all staff) | employee; line_manager derived from having direct reports in `employee_version.manager`, not from a group |

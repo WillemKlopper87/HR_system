@@ -7,6 +7,8 @@ export function AppShell() {
   const canRecruit = hasRole('recruiter') || hasRole('hr_admin')
   const canManageComp = hasRole('comp_manager') || hasRole('hr_admin')
   const canManageAssessments = hasRole('ee_manager') || hasRole('hr_admin')
+  const canSeeEEReporting =
+    hasRole('hr_admin') || hasRole('ee_manager') || hasRole('accounting_officer') || hasRole('auditor')
 
   return (
     <ReferenceDataProvider>
@@ -82,6 +84,19 @@ export function AppShell() {
               <NavLink to="/workforce-integrity" className={({ isActive }) => (isActive ? 'active' : undefined)}>
                 Workforce Integrity
               </NavLink>
+            )}
+            {canSeeEEReporting && (
+              <>
+                <NavLink to="/dashboards/equity" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                  Equity Dashboard
+                </NavLink>
+                <NavLink to="/ee-configuration" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                  EE Configuration
+                </NavLink>
+                <NavLink to="/ee-reports" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                  EE Reports
+                </NavLink>
+              </>
             )}
           </nav>
           <div className="app-user">

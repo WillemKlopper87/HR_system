@@ -500,3 +500,115 @@ export const LIVENESS_REVIEW_STATUS_LABELS: Record<LivenessReviewStatus, string>
   confirmed_match: 'Confirmed match',
   confirmed_mismatch: 'Confirmed mismatch — escalated',
 }
+
+// ---- EE Reporting (Sprint 13-14) — EEA2/EEA4 ----
+
+export type DemographicColumn =
+  | 'african_male' | 'coloured_male' | 'indian_male' | 'white_male'
+  | 'african_female' | 'coloured_female' | 'indian_female' | 'white_female'
+  | 'foreign_national_male' | 'foreign_national_female'
+
+export type WorkforceMatrix = Record<string, Partial<Record<DemographicColumn, number>>>
+
+export interface EmployerConfig {
+  id: number
+  trade_name: string
+  dti_registration_name: string
+  dti_registration_number: string
+  paye_sars_number: string
+  uif_reference_number: string
+  ee_reference_number: string
+  national_or_provincial_eap: string
+  industry_sector: string
+  seta_classification: string
+  bargaining_council: string
+  telephone_number: string
+  postal_address: string
+  postal_code: string
+  postal_city: string
+  postal_province: string
+  physical_address: string
+  physical_code: string
+  physical_city: string
+  physical_province: string
+  ceo_name: string
+  ceo_telephone: string
+  ceo_email: string
+  ee_senior_manager_name: string
+  ee_senior_manager_telephone: string
+  ee_senior_manager_email: string
+  business_type: string
+  is_organ_of_state: boolean
+  employee_count_band: string
+  is_group_or_holding: boolean
+  group_name: string
+}
+
+export interface EEQuestionnaire {
+  id: number
+  report_year: number
+  achieved_all_targets: boolean | null
+  justifiable_reasons: Record<string, string[]>
+  consultation: Record<string, boolean>
+  barriers: Record<string, { barriers: boolean; aa_measures: boolean; start_date: string | null; end_date: string | null }>
+  monitoring_frequency: string
+  achieved_annual_objectives: boolean | null
+  achieved_annual_objectives_explanation: string
+  has_remuneration_policy: boolean | null
+  remuneration_gap_aligned_to_policy: boolean | null
+  has_measures_in_ee_plan: boolean | null
+  differential_reason: string
+  differential_reason_other: string
+  vertical_gap_multiple: string | null
+}
+
+export interface RemunerationRecord {
+  id: number
+  employee: number
+  employee_number: string
+  period_start: string
+  period_end: string
+  fixed_remuneration: number
+  variable_remuneration: number
+  total_remuneration: number
+}
+
+export type EEFormType = 'eea2' | 'eea4'
+export type EEReportStatus = 'draft' | 'pending_ee_review' | 'pending_signoff' | 'signed_off' | 'superseded'
+
+export interface EEReport {
+  id: number
+  form_type: EEFormType
+  report_year: number
+  version: number
+  period_start: string
+  period_end: string
+  status: EEReportStatus
+  data: Record<string, unknown>
+  generated_by: number | null
+  generated_at: string
+  ee_reviewed_by: number | null
+  ee_reviewed_at: string | null
+  signed_off_by: number | null
+  signed_off_at: string | null
+  signed_off_place: string
+}
+
+export const EE_FORM_TYPE_LABELS: Record<EEFormType, string> = { eea2: 'EEA2', eea4: 'EEA4' }
+
+export const EE_REPORT_STATUS_LABELS: Record<EEReportStatus, string> = {
+  draft: 'Draft',
+  pending_ee_review: 'Pending EE manager review',
+  pending_signoff: 'Pending Accounting Officer sign-off',
+  signed_off: 'Signed off',
+  superseded: 'Superseded',
+}
+
+export interface EquityDashboard {
+  as_of: string
+  small_cell_suppression_applied: boolean
+  workforce_profile: WorkforceMatrix
+  disability_workforce: WorkforceMatrix
+  ee_plan_id: number | null
+  target_vs_actual_gap_pct: WorkforceMatrix
+}

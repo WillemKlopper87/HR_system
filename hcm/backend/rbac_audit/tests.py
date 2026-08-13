@@ -23,7 +23,10 @@ def _seed_reference_data():
 
 
 class RoleSeedTests(TestCase):
-    def test_eight_roles_seeded_with_expected_row_scope(self):
+    def test_nine_roles_seeded_with_expected_row_scope(self):
+        # accounting_officer added Sprint 13-14 (EEA-Form-Spec-Notes.md:
+        # EEA2/EEA4 sign-off must end at CEO/Accounting Officer, not just
+        # ee_manager) — see rbac_audit/migrations/0005_seed_accounting_officer_role.py.
         expected_scopes = {
             "employee": "self",
             "line_manager": "own_team",
@@ -33,8 +36,9 @@ class RoleSeedTests(TestCase):
             "comp_manager": "all",
             "auditor": "all",
             "sysadmin": "all",
+            "accounting_officer": "all",
         }
-        self.assertEqual(Role.objects.count(), 8)
+        self.assertEqual(Role.objects.count(), 9)
         for name, scope in expected_scopes.items():
             self.assertEqual(Role.objects.get(name=name).row_scope, scope)
 
