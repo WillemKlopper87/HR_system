@@ -90,11 +90,16 @@ export interface DataQualityException {
   resolved_at: string | null
 }
 
-export interface HeadcountBreakdownRow {
+/** Shared shape for every "count of X by Y" dashboard breakdown — used by
+ * the headcount, recruitment, and skills-inventory dashboards alike, all
+ * rendered through the one shared <Breakdown> component. */
+export interface BreakdownRow {
   key: string
   count: number | string
-  suppressed: boolean
+  suppressed?: boolean
 }
+
+export type HeadcountBreakdownRow = BreakdownRow
 
 export interface HeadcountDashboard {
   total_headcount: number
@@ -176,11 +181,7 @@ export interface Offer {
   start_date: string | null
 }
 
-export interface RecruitmentBreakdownRow {
-  key: string
-  count: number | string
-  suppressed?: boolean
-}
+export type RecruitmentBreakdownRow = BreakdownRow
 
 export interface RecruitmentDashboard {
   open_requisitions: number
@@ -273,4 +274,68 @@ export interface Feedback {
   feedback_type: FeedbackType
   text: string
   created_at: string
+}
+
+export type SkillCategory = 'technical' | 'soft' | 'leadership' | 'compliance' | 'other'
+
+export interface Skill {
+  id: number
+  name: string
+  category: SkillCategory
+  description?: string
+  active: boolean
+}
+
+export type ProficiencyLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert'
+
+export interface EmployeeSkill {
+  id: number
+  employee: number
+  skill: number
+  proficiency?: ProficiencyLevel
+  acquired_date?: string | null
+  notes?: string
+}
+
+export interface Certification {
+  id: number
+  employee: number
+  name?: string
+  issuing_body?: string
+  credential_id?: string
+  issue_date?: string | null
+  expiry_date?: string | null
+  is_expired?: boolean
+}
+
+export type TrainingStatus = 'planned' | 'in_progress' | 'completed' | 'cancelled'
+
+export interface TrainingRecord {
+  id: number
+  employee: number
+  title?: string
+  provider?: string
+  status?: TrainingStatus
+  start_date?: string | null
+  completion_date?: string | null
+  hours?: string | null
+  cost?: string | null
+}
+
+export interface SkillsInventoryRow {
+  skill: string
+  category: SkillCategory
+  total_holders: number
+  by_department: { key: string; count: number }[]
+  by_occupational_level: { key: string; count: number }[]
+}
+
+export interface TeamDevelopmentRow {
+  employee: number
+  employee_number: string
+  name: string
+  skill_count: number
+  certification_count: number
+  active_training_count: number
+  completed_training_count: number
 }

@@ -1,9 +1,9 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useReferenceData } from '../api/ReferenceDataContext'
 import { useAuth } from '../auth/AuthContext'
-import type { Employee, EmployeeVersion, Feedback, Goal } from '../api/types'
+import type { Certification, Employee, EmployeeSkill, EmployeeVersion, Feedback, Goal, Skill, TrainingRecord } from '../api/types'
 
 /** Renders "Restricted" when the key is absent from the API response (the
  * tiered serializer stripped it — the viewer's role lacks read access to
@@ -151,9 +151,391 @@ export function EmployeeDetailPage() {
         </section>
       )}
 
+      {employee && <SkillsSection employeeId={employee.id} />}
+      {employee && <CertificationsSection employeeId={employee.id} />}
+      {employee && <TrainingSection employeeId={employee.id} />}
       {employee && <GoalsSection employeeId={employee.id} />}
       {employee && <FeedbackSection employeeId={employee.id} />}
     </div>
+  )
+}
+
+function SkillsSection({ employeeId }: { employeeId: number }) {
+  const [skills, setSkills] = useState<EmployeeSkill[] | null>(null)
+  const [catalog, setCatalog] = useState<Skill[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function load() {
+    setError(null)
+    Promise.all([fetchAllPages<EmployeeSkill>(`/employee-skills/?employee=${employeeId}`), fetchAllPages<Skill>('/skills/')])
+      .then(([es, cat]) => {
+        setSkills(es)
+        setCatalog(cat)
+      })
+      .catch(() => setError('Failed to load skills.'))
+  }
+
+  useEffect(load, [employeeId])
+
+  const skillById = useMemo(() => new Map(catalog.map((s) => [s.id, s])), [catalog])
+
+  return (
+    <section className="detail-card">
+      <div className="page-header">
+        <h2>Skills</h2>
+        <button type="button" className="btn-secondary" onClick={() => setShowForm((v) => !v)}>
+          {showForm ? 'Cancel' : '+ Add skill'}
+        </button>
+      </div>
+
+      {error && <p className="form-error">{error}</p>}
+
+      {showForm && (
+        <NewSkillForm
+          employeeId={employeeId}
+          catalog={catalog}
+          onCreated={() => {
+            setShowForm(false)
+            load()
+          }}
+        />
+      )}
+
+      {skills === null ? (
+        <p className="empty-state">Loading…</p>
+      ) : skills.length === 0 ? (
+        <p className="empty-state">No skills recorded yet.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Skill</th>
+                <th>Proficiency</th>
+                <th>Acquired</th>
+              </tr>
+            </thead>
+            <tbody>
+              {skills.map((es) => (
+                <tr key={es.id}>
+                  <td>{skillById.get(es.skill)?.name ?? `#${es.skill}`}</td>
+                  <td>
+                    <span className="status-badge">{es.proficiency ?? '—'}</span>
+                  </td>
+                  <td>{es.acquired_date ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function NewSkillForm({
+  employeeId, catalog, onCreated,
+}: { employeeId: number; catalog: Skill[]; onCreated: () => void }) {
+  const [skillId, setSkillId] = useState<number | ''>('')
+  const [proficiency, setProficiency] = useState('intermediate')
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (!skillId) {
+      setError('Select a skill.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await api.post('/employee-skills/', { employee: employeeId, skill: skillId, proficiency })
+      onCreated()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Add failed.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="inline-form" onSubmit={handleSubmit}>
+      <label>
+        Skill
+        <select value={skillId} onChange={(e) => setSkillId(e.target.value ? Number(e.target.value) : '')} required>
+          <option value="">— Select —</option>
+          {catalog.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Proficiency
+        <select value={proficiency} onChange={(e) => setProficiency(e.target.value)}>
+          <option value="beginner">Beginner</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="advanced">Advanced</option>
+          <option value="expert">Expert</option>
+        </select>
+      </label>
+      {error && <p className="form-error">{error}</p>}
+      <div className="form-actions">
+        <button type="submit" className="btn-primary" disabled={submitting}>
+          {submitting ? 'Adding…' : 'Add skill'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function CertificationsSection({ employeeId }: { employeeId: number }) {
+  const [certs, setCerts] = useState<Certification[] | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function load() {
+    setError(null)
+    fetchAllPages<Certification>(`/certifications/?employee=${employeeId}`)
+      .then(setCerts)
+      .catch(() => setError('Failed to load certifications.'))
+  }
+
+  useEffect(load, [employeeId])
+
+  return (
+    <section className="detail-card">
+      <div className="page-header">
+        <h2>Certifications</h2>
+        <button type="button" className="btn-secondary" onClick={() => setShowForm((v) => !v)}>
+          {showForm ? 'Cancel' : '+ Add certification'}
+        </button>
+      </div>
+
+      {error && <p className="form-error">{error}</p>}
+
+      {showForm && (
+        <NewCertificationForm
+          employeeId={employeeId}
+          onCreated={() => {
+            setShowForm(false)
+            load()
+          }}
+        />
+      )}
+
+      {certs === null ? (
+        <p className="empty-state">Loading…</p>
+      ) : certs.length === 0 ? (
+        <p className="empty-state">No certifications recorded yet.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Issuing body</th>
+                <th>Issued</th>
+                <th>Expires</th>
+              </tr>
+            </thead>
+            <tbody>
+              {certs.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.name ?? '—'}</td>
+                  <td>{c.issuing_body || '—'}</td>
+                  <td>{c.issue_date ?? '—'}</td>
+                  <td>
+                    {c.expiry_date ?? '—'}
+                    {c.is_expired && <span className="restricted-badge" style={{ marginLeft: 6 }}>Expired</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function NewCertificationForm({ employeeId, onCreated }: { employeeId: number; onCreated: () => void }) {
+  const [name, setName] = useState('')
+  const [issuingBody, setIssuingBody] = useState('')
+  const [issueDate, setIssueDate] = useState('')
+  const [expiryDate, setExpiryDate] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSubmitting(true)
+    try {
+      await api.post('/certifications/', {
+        employee: employeeId, name, issuing_body: issuingBody,
+        issue_date: issueDate || null, expiry_date: expiryDate || null,
+      })
+      onCreated()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Add failed.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="inline-form" onSubmit={handleSubmit}>
+      <label>
+        Name
+        <input value={name} onChange={(e) => setName(e.target.value)} required />
+      </label>
+      <label>
+        Issuing body
+        <input value={issuingBody} onChange={(e) => setIssuingBody(e.target.value)} />
+      </label>
+      <label>
+        Issue date
+        <input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+      </label>
+      <label>
+        Expiry date
+        <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
+      </label>
+      {error && <p className="form-error">{error}</p>}
+      <div className="form-actions">
+        <button type="submit" className="btn-primary" disabled={submitting}>
+          {submitting ? 'Adding…' : 'Add certification'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function TrainingSection({ employeeId }: { employeeId: number }) {
+  const [records, setRecords] = useState<TrainingRecord[] | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function load() {
+    setError(null)
+    fetchAllPages<TrainingRecord>(`/training-records/?employee=${employeeId}`)
+      .then(setRecords)
+      .catch(() => setError('Failed to load training records.'))
+  }
+
+  useEffect(load, [employeeId])
+
+  return (
+    <section className="detail-card">
+      <div className="page-header">
+        <h2>Training</h2>
+        <button type="button" className="btn-secondary" onClick={() => setShowForm((v) => !v)}>
+          {showForm ? 'Cancel' : '+ Add training record'}
+        </button>
+      </div>
+
+      {error && <p className="form-error">{error}</p>}
+
+      {showForm && (
+        <NewTrainingForm
+          employeeId={employeeId}
+          onCreated={() => {
+            setShowForm(false)
+            load()
+          }}
+        />
+      )}
+
+      {records === null ? (
+        <p className="empty-state">Loading…</p>
+      ) : records.length === 0 ? (
+        <p className="empty-state">No training records yet.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Provider</th>
+                <th>Status</th>
+                <th>Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((t) => (
+                <tr key={t.id}>
+                  <td>{t.title ?? '—'}</td>
+                  <td>{t.provider || '—'}</td>
+                  <td>
+                    <span className="status-badge">{t.status ?? '—'}</span>
+                  </td>
+                  <td>{t.hours ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function NewTrainingForm({ employeeId, onCreated }: { employeeId: number; onCreated: () => void }) {
+  const [title, setTitle] = useState('')
+  const [provider, setProvider] = useState('')
+  const [status, setStatus] = useState('planned')
+  const [hours, setHours] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSubmitting(true)
+    try {
+      await api.post('/training-records/', { employee: employeeId, title, provider, status, hours: hours || null })
+      onCreated()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Add failed.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="inline-form" onSubmit={handleSubmit}>
+      <label>
+        Title
+        <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+      </label>
+      <label>
+        Provider
+        <input value={provider} onChange={(e) => setProvider(e.target.value)} />
+      </label>
+      <label>
+        Status
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="planned">Planned</option>
+          <option value="in_progress">In progress</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </label>
+      <label>
+        Hours
+        <input type="number" min={0} step="0.5" value={hours} onChange={(e) => setHours(e.target.value)} />
+      </label>
+      {error && <p className="form-error">{error}</p>}
+      <div className="form-actions">
+        <button type="submit" className="btn-primary" disabled={submitting}>
+          {submitting ? 'Adding…' : 'Add record'}
+        </button>
+      </div>
+    </form>
   )
 }
 

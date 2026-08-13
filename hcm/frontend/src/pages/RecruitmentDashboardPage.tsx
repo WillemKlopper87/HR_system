@@ -1,29 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
-import { STAGE_LABELS, type RecruitmentBreakdownRow, type RecruitmentDashboard } from '../api/types'
-
-function Breakdown({ title, rows, labels }: { title: string; rows: RecruitmentBreakdownRow[]; labels?: Record<string, string> }) {
-  const maxCount = Math.max(1, ...rows.map((r) => (typeof r.count === 'number' ? r.count : 0)))
-  return (
-    <div className="breakdown-card">
-      <h3>{title}</h3>
-      <ul className="breakdown-list">
-        {rows.map((row) => (
-          <li key={row.key}>
-            <span className="breakdown-label">{labels?.[row.key] ?? row.key}</span>
-            <span className="breakdown-bar-track">
-              <span
-                className="breakdown-bar"
-                style={{ width: `${typeof row.count === 'number' ? Math.max(4, (row.count / maxCount) * 100) : 6}%` }}
-              />
-            </span>
-            <span className={row.suppressed ? 'breakdown-count suppressed' : 'breakdown-count'}>{row.count}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
+import { Breakdown } from '../components/Breakdown'
+import { STAGE_LABELS, type RecruitmentDashboard } from '../api/types'
 
 export function RecruitmentDashboardPage() {
   const [data, setData] = useState<RecruitmentDashboard | null>(null)

@@ -17,6 +17,7 @@ from rbac_audit.models import ConsentRecord, Role, RoleAssignment
 # data across every module for local dev/UI review, not core_hr business
 # logic — "apps may not import each other" (hcm/README.md) governs feature
 # code, not a dev-tooling script that necessarily spans all of them.
+from learning.models import Certification, EmployeeSkill, Skill, TrainingRecord
 from performance.models import Feedback, Goal, Review, ReviewCycle
 from performance.services import launch_review_cycle
 from recruitment.models import Applicant, Offer, Requisition
@@ -200,6 +201,7 @@ class Command(BaseCommand):
             )
 
             self._seed_performance_demo_data(manager=eng_head, direct_report=staff)
+            self._seed_learning_demo_data(manager=eng_head, direct_report=staff, rng=rng)
 
         run_data_quality_checks()
 
@@ -315,4 +317,43 @@ class Command(BaseCommand):
             Feedback.objects.create(
                 employee=direct_report, author=manager, feedback_type=Feedback.FeedbackType.MANAGER,
                 text="Great job unblocking the team during the outage last sprint.",
+            )
+
+    def _seed_learning_demo_data(self, *, manager, direct_report, rng):
+        """A skill catalog + assignments spread across a slice of the
+        workforce, not just the two named demo employees — so the skills
+        inventory (gap analysis by department/level) and WSP/ATR export
+        (Documentation-Review-and-Gap-Analysis.md gap C2) have something
+        realistic to show."""
+        skills = [
+            Skill.objects.create(name="Python", category=Skill.Category.TECHNICAL),
+            Skill.objects.create(name="Project Management", category=Skill.Category.LEADERSHIP),
+            Skill.objects.create(name="Public Speaking", category=Skill.Category.SOFT),
+            Skill.objects.create(name="AWS", category=Skill.Category.TECHNICAL),
+            Skill.objects.create(name="Data Analysis", category=Skill.Category.TECHNICAL),
+            Skill.objects.create(name="POPIA Compliance", category=Skill.Category.COMPLIANCE),
+        ]
+
+        all_employees = list(Employee.objects.all())
+        sampled = rng.sample(all_employees, min(25, len(all_employees)))
+        for employee in sampled:
+            for skill in rng.sample(skills, rng.randint(1, 3)):
+                EmployeeSkill.objects.get_or_create(
+                    employee=employee, skill=skill,
+                    defaults={"proficiency": rng.choice(EmployeeSkill.Proficiency.values)},
+                )
+
+        if direct_report is not None:
+            Certification.objects.create(
+                employee=direct_report, name="AWS Certified Solutions Architect",
+                issuing_body="Amazon Web Services", issue_date=date(2025, 6, 1), expiry_date=date(2028, 6, 1),
+            )
+            TrainingRecord.objects.create(
+                employee=direct_report, title="AWS Solutions Architect Bootcamp", provider="A Cloud Guru",
+                status=TrainingRecord.Status.COMPLETED, start_date=date(2026, 2, 1),
+                completion_date=date(2026, 3, 1), hours="40.0", cost="8500.00",
+            )
+            TrainingRecord.objects.create(
+                employee=direct_report, title="Advanced Python for Data Engineers", provider="Internal L&D",
+                status=TrainingRecord.Status.IN_PROGRESS, start_date=date(2026, 7, 1), hours="16.0",
             )

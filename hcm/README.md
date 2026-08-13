@@ -14,11 +14,14 @@ hcm/
                 ConsentRecord extended in Sprint 4 to an employee-or-applicant subject
     recruitment/ requisitions, applicant pipeline, offers, hire automation (Sprint 4)
     performance/ goals, review cycles, self/manager reviews, feedback (Sprint 6)
+    learning/  skills, certifications, training records, WSP/ATR export (Sprint 8)
   frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards
     pages/     employee list/detail, org structure, data quality, headcount dashboard
                (Sprint 3); requisitions, applicants, recruitment dashboard (Sprint 4);
-               review cycles, reviews (Sprint 6 — goals/feedback live on employee detail)
+               review cycles, reviews (Sprint 6); skills inventory, team development
+               (Sprint 8 — skills/certs/training live on employee detail, like goals/feedback)
+    components/ small pieces shared across pages (e.g. the dashboard Breakdown chart)
     api/       fetch client (CSRF-aware) + shared reference-data context
   docker-compose.yml  db + redis + backend + celery worker (ADR-005)
 ```

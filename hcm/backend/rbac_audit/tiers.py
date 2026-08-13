@@ -79,6 +79,27 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
     # says line_manager individually "sees own team's reviews/goals".
     # performance/permissions.py gates these by row-scope alone, the same
     # exception pattern as recruitment.Offer's pay fields.
+    "learning.EmployeeSkill": {
+        "proficiency": FieldTier.INTERNAL,
+        "acquired_date": FieldTier.INTERNAL,
+        "notes": FieldTier.INTERNAL,
+    },
+    "learning.Certification": {
+        "name": FieldTier.INTERNAL,
+        "issuing_body": FieldTier.INTERNAL,
+        "credential_id": FieldTier.INTERNAL,
+        "issue_date": FieldTier.INTERNAL,
+        "expiry_date": FieldTier.INTERNAL,
+    },
+    "learning.TrainingRecord": {
+        "title": FieldTier.INTERNAL,
+        "provider": FieldTier.INTERNAL,
+        "status": FieldTier.INTERNAL,
+        "start_date": FieldTier.INTERNAL,
+        "completion_date": FieldTier.INTERNAL,
+        "hours": FieldTier.INTERNAL,
+        "cost": FieldTier.INTERNAL,
+    },
 }
 
 

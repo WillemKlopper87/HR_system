@@ -47,6 +47,14 @@ export function AppShell() {
                 Review Cycles
               </NavLink>
             )}
+            <NavLink to="/team-development" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              Team Development
+            </NavLink>
+            {hasRole('hr_admin') && (
+              <NavLink to="/skills-inventory" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                Skills Inventory
+              </NavLink>
+            )}
           </nav>
           <div className="app-user">
             <span>

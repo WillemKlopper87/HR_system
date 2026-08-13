@@ -15,6 +15,8 @@ import { RequisitionsPage } from './pages/RequisitionsPage'
 import { ReviewCyclesPage } from './pages/ReviewCyclesPage'
 import { ReviewDetailPage } from './pages/ReviewDetailPage'
 import { ReviewsPage } from './pages/ReviewsPage'
+import { SkillsInventoryPage } from './pages/SkillsInventoryPage'
+import { TeamDevelopmentPage } from './pages/TeamDevelopmentPage'
 
 export default function App() {
   return (
@@ -30,6 +32,7 @@ export default function App() {
             <Route element={<RequireRole roles={['hr_admin']} />}>
               <Route path="/data-quality" element={<DataQualityPage />} />
               <Route path="/review-cycles" element={<ReviewCyclesPage />} />
+              <Route path="/skills-inventory" element={<SkillsInventoryPage />} />
             </Route>
             <Route path="/dashboards/headcount" element={<HeadcountDashboardPage />} />
             <Route element={<RequireRole roles={['recruiter', 'hr_admin']} />}>
@@ -40,6 +43,7 @@ export default function App() {
             </Route>
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/reviews/:id" element={<ReviewDetailPage />} />
+            <Route path="/team-development" element={<TeamDevelopmentPage />} />
             <Route path="*" element={<Navigate to="/employees" replace />} />
           </Route>
         </Route>
