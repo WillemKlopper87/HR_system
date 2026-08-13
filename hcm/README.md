@@ -15,12 +15,14 @@ hcm/
     recruitment/ requisitions, applicant pipeline, offers, hire automation (Sprint 4)
     performance/ goals, review cycles, self/manager reviews, feedback (Sprint 6)
     learning/  skills, certifications, training records, WSP/ATR export (Sprint 8)
+    compensation/ pay bands, comp proposal workflow, benefits catalog + elections (Sprint 10)
   frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards
     pages/     employee list/detail, org structure, data quality, headcount dashboard
                (Sprint 3); requisitions, applicants, recruitment dashboard (Sprint 4);
                review cycles, reviews (Sprint 6); skills inventory, team development
-               (Sprint 8 — skills/certs/training live on employee detail, like goals/feedback)
+               (Sprint 8 — skills/certs/training live on employee detail, like goals/feedback);
+               pay bands, comp proposals, benefits (Sprint 10 — comp_manager/hr_admin only)
     components/ small pieces shared across pages (e.g. the dashboard Breakdown chart)
     api/       fetch client (CSRF-aware) + shared reference-data context
   docker-compose.yml  db + redis + backend + celery worker (ADR-005)
@@ -40,7 +42,8 @@ python -m venv .venv            # NOTE: prefer a venv OUTSIDE OneDrive (see belo
 ```
 
 Demo logins from `seed_demo_data` (password = username + "123"): `hradmin` (HR Admin),
-`manager` (Line Manager), `recruiter` (Recruiter), `employee` (Employee, self-scope only).
+`manager` (Line Manager), `recruiter` (Recruiter), `compmanager` (Compensation Manager),
+`employee` (Employee, self-scope only).
 
 Frontend — the Vite dev server proxies `/api` and `/admin` to `localhost:8000`
 (`vite.config.ts`), so run both at once:
@@ -87,9 +90,10 @@ docker compose up --build
 - Not every Sensitive-tier model should use the generic tiered-serializer path:
   where a role's row-scope legitimately grants individual access the role's own
   blanket tier grant doesn't cover (line_manager on `performance.Review`,
-  recruiter on `recruitment.Offer`'s pay fields), gate on row-scope
-  (`RowScopePermission`) alone instead of forcing the mismatch through
-  `can_access_tier_for_target`.
+  recruiter on `recruitment.Offer`'s pay fields, comp_manager across the whole
+  `compensation` module), gate on row-scope (`RowScopePermission`) or a
+  dedicated role-check permission class alone instead of forcing the mismatch
+  through `can_access_tier_for_target`.
 
 ## CI
 

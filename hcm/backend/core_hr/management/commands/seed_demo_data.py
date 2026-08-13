@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
@@ -17,6 +18,8 @@ from rbac_audit.models import ConsentRecord, Role, RoleAssignment
 # data across every module for local dev/UI review, not core_hr business
 # logic — "apps may not import each other" (hcm/README.md) governs feature
 # code, not a dev-tooling script that necessarily spans all of them.
+from compensation.models import Benefit, BenefitsElection, PayBand
+from compensation.services import approve_proposal, propose_compensation_change, reject_proposal
 from learning.models import Certification, EmployeeSkill, Skill, TrainingRecord
 from performance.models import Feedback, Goal, Review, ReviewCycle
 from performance.services import launch_review_cycle
@@ -195,6 +198,12 @@ class Command(BaseCommand):
             slm_head.user = User.objects.create_user(username="recruiter", password="recruiter123")
             slm_head.save(update_fields=["user"])
 
+            comp_manager_role = Role.objects.get(name="comp_manager")
+            fin_head = dept_heads[dept_codes.index("FIN")]
+            RoleAssignment.objects.create(employee=fin_head, role=comp_manager_role)
+            fin_head.user = User.objects.create_user(username="compmanager", password="compmanager123")
+            fin_head.save(update_fields=["user"])
+
             self._seed_recruitment_demo_data(
                 departments=departments, levels=levels, grades_by_level=grades_by_level,
                 locations=locations, recruiter=slm_head, rng=rng,
@@ -202,13 +211,18 @@ class Command(BaseCommand):
 
             self._seed_performance_demo_data(manager=eng_head, direct_report=staff)
             self._seed_learning_demo_data(manager=eng_head, direct_report=staff, rng=rng)
+            self._seed_compensation_demo_data(
+                levels=levels, grades_by_level=grades_by_level, comp_manager=fin_head,
+                hr_admin=hr_head, direct_report=staff, rng=rng,
+            )
 
         run_data_quality_checks()
 
         self.stdout.write(self.style.SUCCESS(f"Seeded {employee_counter} employees across {len(departments)} departments."))
         self.stdout.write(
             "Demo logins — hradmin/hradmin123 (HR Admin), manager/manager123 (Line Manager), "
-            "recruiter/recruiter123 (Recruiter), employee/employee123 (Employee). Local development only."
+            "recruiter/recruiter123 (Recruiter), compmanager/compmanager123 (Comp Manager), "
+            "employee/employee123 (Employee). Local development only."
         )
 
     def _seed_recruitment_demo_data(self, *, departments, levels, grades_by_level, locations, recruiter, rng):
@@ -357,3 +371,89 @@ class Command(BaseCommand):
                 employee=direct_report, title="Advanced Python for Data Engineers", provider="Internal L&D",
                 status=TrainingRecord.Status.IN_PROGRESS, start_date=date(2026, 7, 1), hours="16.0",
             )
+
+    def _seed_compensation_demo_data(self, *, levels, grades_by_level, comp_manager, hr_admin, direct_report, rng):
+        """Pay bands scaled by seniority (order 1 = top management = highest
+        pay), plus a spread of comp proposals across every workflow state
+        (pending, approved in-band, approved out-of-band with an override
+        reason, rejected) so the Sprint 10-11 propose/approve UI has
+        something real to show rather than an empty state. One grade gets
+        two bands (an expired one and the current one) to demonstrate the
+        effective-dated pattern (PayBand.objects.current())."""
+        for level in levels:
+            base = max(180000, 1400000 - (level.order - 1) * 220000)
+            for i, grade in enumerate(grades_by_level[level.code]):
+                mid = base + i * 60000
+                PayBand.objects.create(
+                    job_grade=grade, min_salary=round(mid * 0.75, -3), mid_salary=mid, max_salary=round(mid * 1.25, -3),
+                    valid_from=date(2024, 1, 1), created_by=comp_manager,
+                )
+
+        first_grade = grades_by_level[levels[0].code][0]
+        PayBand.objects.filter(job_grade=first_grade, valid_from=date(2024, 1, 1)).update(valid_to=date(2025, 12, 31))
+        current_mid = max(180000, 1400000 - (levels[0].order - 1) * 220000) * 1.15
+        PayBand.objects.create(
+            job_grade=first_grade, min_salary=round(current_mid * 0.75, -3), mid_salary=round(current_mid, -3),
+            max_salary=round(current_mid * 1.25, -3), valid_from=date(2026, 1, 1), created_by=comp_manager,
+        )
+
+        benefits = [
+            Benefit.objects.create(name="Discovery Health Medical Aid", category=Benefit.Category.MEDICAL),
+            Benefit.objects.create(name="Bonitas Medical Aid", category=Benefit.Category.MEDICAL),
+            Benefit.objects.create(name="Sentech Provident Fund", category=Benefit.Category.RETIREMENT),
+            Benefit.objects.create(name="Group Life & Disability Cover", category=Benefit.Category.RISK_COVER),
+        ]
+        all_employees = list(Employee.objects.all())
+        sampled = rng.sample(all_employees, min(30, len(all_employees)))
+        for employee in sampled:
+            for benefit in rng.sample(benefits, rng.randint(1, 2)):
+                BenefitsElection.objects.get_or_create(
+                    employee=employee, benefit=benefit,
+                    defaults={
+                        "status": _weighted_choice(
+                            [(BenefitsElection.Status.ENROLLED, 0.8), (BenefitsElection.Status.WAIVED, 0.2)], rng
+                        ),
+                        "effective_date": date(2024, 1, 1),
+                    },
+                )
+
+        proposal_candidates = [e for e in sampled if e.current_version and e.current_version.job_grade_id][:4]
+        if direct_report is not None and direct_report not in proposal_candidates:
+            proposal_candidates = [direct_report] + proposal_candidates
+        proposal_candidates = proposal_candidates[:4]
+
+        def _band_for(employee):
+            return PayBand.objects.filter(job_grade=employee.current_version.job_grade).current().first()
+
+        if len(proposal_candidates) >= 1:
+            band = _band_for(proposal_candidates[0])
+            out_of_band_salary = (band.max_salary * 2) if band else Decimal("1500000")
+            propose_compensation_change(
+                employee=proposal_candidates[0], proposed_annual_salary=out_of_band_salary,
+                justification="Market benchmarking shows this role is under-banded relative to peers.",
+                proposed_by=comp_manager,
+            )
+        if len(proposal_candidates) >= 2:
+            band = _band_for(proposal_candidates[1])
+            in_band_salary = band.mid_salary if band else Decimal("400000")
+            approved_in_band = propose_compensation_change(
+                employee=proposal_candidates[1], proposed_annual_salary=in_band_salary,
+                justification="Annual merit increase.", proposed_by=comp_manager,
+            )
+            approve_proposal(approved_in_band, approver=hr_admin)
+        if len(proposal_candidates) >= 3:
+            band = _band_for(proposal_candidates[2])
+            out_of_band_salary = (band.max_salary * Decimal("1.5")) if band else Decimal("2000000")
+            approved_override = propose_compensation_change(
+                employee=proposal_candidates[2], proposed_annual_salary=out_of_band_salary,
+                justification="Retention counter-offer.", proposed_by=comp_manager,
+            )
+            approve_proposal(approved_override, approver=hr_admin, override_reason="Approved by Exco — retention risk.")
+        if len(proposal_candidates) >= 4:
+            band = _band_for(proposal_candidates[3])
+            in_band_salary = band.min_salary if band else Decimal("220000")
+            rejected = propose_compensation_change(
+                employee=proposal_candidates[3], proposed_annual_salary=in_band_salary,
+                justification="Requested adjustment.", proposed_by=comp_manager,
+            )
+            reject_proposal(rejected, approver=hr_admin)

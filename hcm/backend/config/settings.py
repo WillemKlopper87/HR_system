@@ -46,13 +46,13 @@ INSTALLED_APPS = [
     "rest_framework",
     "simple_history",
     # domain modules (one Django app per module — ADR-001).
-    # Later sprints append: compensation, assessments, ee_reporting,
-    # self_service.
+    # Later sprints append: assessments, ee_reporting, self_service.
     "core_hr",
     "rbac_audit",
     "recruitment",
     "performance",
     "learning",
+    "compensation",
 ]
 
 MIDDLEWARE = [

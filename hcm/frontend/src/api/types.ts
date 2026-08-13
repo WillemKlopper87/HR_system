@@ -322,6 +322,74 @@ export interface TrainingRecord {
   cost?: string | null
 }
 
+export interface PayBand {
+  id: number
+  job_grade: number
+  min_salary: string
+  mid_salary: string
+  max_salary: string
+  valid_from: string
+  valid_to: string | null
+  created_by: number | null
+}
+
+export type CompProposalStatus = 'proposed' | 'approved' | 'rejected'
+
+export interface CompProposal {
+  id: number
+  employee: number
+  current_job_grade: number
+  proposed_annual_salary: string
+  justification: string
+  status: CompProposalStatus
+  requires_override: boolean
+  override_reason: string
+  effective_date: string | null
+  proposed_by: number | null
+  approved_by: number | null
+  approved_at: string | null
+}
+
+export const COMP_PROPOSAL_STATUS_LABELS: Record<CompProposalStatus, string> = {
+  proposed: 'Proposed',
+  approved: 'Approved',
+  rejected: 'Rejected',
+}
+
+export type BenefitCategory = 'medical' | 'retirement' | 'risk_cover' | 'other'
+
+export interface Benefit {
+  id: number
+  name: string
+  category: BenefitCategory
+  description: string
+  active: boolean
+}
+
+export const BENEFIT_CATEGORY_LABELS: Record<BenefitCategory, string> = {
+  medical: 'Medical aid',
+  retirement: 'Retirement fund',
+  risk_cover: 'Risk cover (life/disability)',
+  other: 'Other',
+}
+
+export type BenefitsElectionStatus = 'enrolled' | 'waived' | 'pending'
+
+export interface BenefitsElection {
+  id: number
+  employee: number
+  benefit: number
+  status: BenefitsElectionStatus
+  effective_date: string | null
+  notes: string
+}
+
+export const BENEFITS_ELECTION_STATUS_LABELS: Record<BenefitsElectionStatus, string> = {
+  enrolled: 'Enrolled',
+  waived: 'Waived',
+  pending: 'Pending',
+}
+
 export interface SkillsInventoryRow {
   skill: string
   category: SkillCategory

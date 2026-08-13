@@ -390,7 +390,8 @@ textarea:focus {
   font-size: 12px;
 }
 
-.restricted-badge {
+.restricted-badge,
+.warning-badge {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 999px;

@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 export function AppShell() {
   const { user, logout, hasRole } = useAuth()
   const canRecruit = hasRole('recruiter') || hasRole('hr_admin')
+  const canManageComp = hasRole('comp_manager') || hasRole('hr_admin')
 
   return (
     <ReferenceDataProvider>
@@ -50,6 +51,19 @@ export function AppShell() {
             <NavLink to="/team-development" className={({ isActive }) => (isActive ? 'active' : undefined)}>
               Team Development
             </NavLink>
+            {canManageComp && (
+              <>
+                <NavLink to="/pay-bands" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                  Pay Bands
+                </NavLink>
+                <NavLink to="/comp-proposals" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                  Comp Proposals
+                </NavLink>
+                <NavLink to="/benefits" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                  Benefits
+                </NavLink>
+              </>
+            )}
             {hasRole('hr_admin') && (
               <NavLink to="/skills-inventory" className={({ isActive }) => (isActive ? 'active' : undefined)}>
                 Skills Inventory
