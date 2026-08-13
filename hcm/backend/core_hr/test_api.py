@@ -95,6 +95,112 @@ class EmployeeApiTests(TestCase):
         self.assertEqual(returned_ids, {self.staff.id})
 
 
+class EmployeeSelfServiceApiTests(TestCase):
+    """Sprint 15 (ESS): profile self-edit and consent-gated self-ID."""
+
+    def setUp(self):
+        self.client = APIClient()
+        dept, level, grade, location = _seed_reference_data()
+
+        self.hr_admin = Employee.objects.hire(
+            employee_number="HR1", first_name="HR", last_name="Admin", date_of_birth=date(1985, 1, 1),
+            work_email="hradmin2@example.com", hire_date=date(2015, 1, 1), department=dept,
+            occupational_level=level, job_grade=grade, location=location,
+            user=User.objects.create_user(username="hradmin2", password="x"),
+        )
+        RoleAssignment.objects.create(employee=self.hr_admin, role=Role.objects.get(name="hr_admin"))
+
+        self.staff = Employee.objects.hire(
+            employee_number="E200", first_name="Staff", last_name="Member", date_of_birth=date(1992, 1, 1),
+            work_email="staff2@example.com", hire_date=date(2021, 1, 1), department=dept,
+            occupational_level=level, job_grade=grade, location=location,
+            user=User.objects.create_user(username="staff2", password="x"),
+        )
+        RoleAssignment.objects.create(employee=self.staff, role=Role.objects.get(name="employee"))
+
+        self.outsider = Employee.objects.hire(
+            employee_number="E201", first_name="Out", last_name="Sider", date_of_birth=date(1990, 1, 1),
+            work_email="outsider2@example.com", hire_date=date(2019, 1, 1), department=dept,
+            occupational_level=level, job_grade=grade, location=location,
+            user=User.objects.create_user(username="outsider2", password="x"),
+        )
+        RoleAssignment.objects.create(employee=self.outsider, role=Role.objects.get(name="employee"))
+
+    def test_employee_can_update_own_contact_details(self):
+        self.client.force_authenticate(user=self.staff.user)
+        response = self.client.patch(
+            f"/api/v1/employees/{self.staff.id}/", {"phone": "0821234567", "personal_email": "me@personal.example"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["phone"], "0821234567")
+
+    def test_employee_cannot_update_identity_fields(self):
+        self.client.force_authenticate(user=self.staff.user)
+        response = self.client.patch(
+            f"/api/v1/employees/{self.staff.id}/", {"national_id_number": "1234567890123"}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_employee_cannot_update_someone_elses_profile(self):
+        self.client.force_authenticate(user=self.outsider.user)
+        response = self.client.patch(
+            f"/api/v1/employees/{self.staff.id}/", {"phone": "0821234567"}, format="json"
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_hr_admin_can_update_contact_details_on_behalf_of_employee(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.patch(
+            f"/api/v1/employees/{self.staff.id}/", {"phone": "0827654321"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_self_identify_requires_consent_first(self):
+        self.client.force_authenticate(user=self.staff.user)
+        response = self.client.post(
+            f"/api/v1/employees/{self.staff.id}/self_identify/", {"race": "african"}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("consent", response.data["detail"].lower())
+
+    def test_self_identify_updates_current_version_after_consent(self):
+        self.client.force_authenticate(user=self.staff.user)
+        consent_response = self.client.post(f"/api/v1/employees/{self.staff.id}/consent/")
+        self.assertEqual(consent_response.status_code, 201)
+
+        response = self.client.post(
+            f"/api/v1/employees/{self.staff.id}/self_identify/",
+            {"race": "african", "gender": "female", "disability_status": "no"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["race"], "african")
+        self.assertEqual(response.data["race_source"], "self_identified")
+
+        version = self.staff.current_version
+        self.assertEqual(version.race, "african")
+        self.assertEqual(version.gender, "female")
+        self.assertEqual(version.race_source, "self_identified")
+
+    def test_self_identify_rejects_invalid_choice(self):
+        self.client.force_authenticate(user=self.staff.user)
+        self.client.post(f"/api/v1/employees/{self.staff.id}/consent/")
+        response = self.client.post(
+            f"/api/v1/employees/{self.staff.id}/self_identify/", {"race": "not-a-real-race"}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_employee_cannot_self_identify_for_someone_else(self):
+        self.client.force_authenticate(user=self.outsider.user)
+        response = self.client.post(f"/api/v1/employees/{self.staff.id}/consent/")
+        self.assertEqual(response.status_code, 403)
+        response = self.client.post(
+            f"/api/v1/employees/{self.staff.id}/self_identify/", {"race": "african"}, format="json"
+        )
+        self.assertEqual(response.status_code, 403)
+
+
 class EmployeeVersionQueryParamTests(TestCase):
     """Sprint 3 additions to the Sprint 2 endpoint: ?employee= and
     ?current=true, used by the detail page's history panel and the list

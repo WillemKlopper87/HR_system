@@ -22,6 +22,7 @@ export interface Employee {
   personal_email?: string
   phone?: string
   hire_date: string
+  has_demographic_consent: boolean
 }
 
 export interface EmployeeVersion {
@@ -308,7 +309,7 @@ export interface Certification {
   is_expired?: boolean
 }
 
-export type TrainingStatus = 'planned' | 'in_progress' | 'completed' | 'cancelled'
+export type TrainingStatus = 'requested' | 'planned' | 'in_progress' | 'completed' | 'cancelled'
 
 export interface TrainingRecord {
   id: number
@@ -320,6 +321,14 @@ export interface TrainingRecord {
   completion_date?: string | null
   hours?: string | null
   cost?: string | null
+}
+
+export const TRAINING_STATUS_LABELS: Record<TrainingStatus, string> = {
+  requested: 'Requested',
+  planned: 'Planned',
+  in_progress: 'In progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
 }
 
 export interface PayBand {

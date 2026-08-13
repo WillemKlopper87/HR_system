@@ -1,4 +1,7 @@
-from rbac_audit.drf import TieredModelSerializer
+from rbac_audit.consent import has_active_consent
+from rbac_audit.drf import TieredModelSerializer, get_request_employee
+from rbac_audit.models import ConsentRecord
+from rbac_audit.permissions import has_role
 from rest_framework import serializers
 
 from .models import (
@@ -10,6 +13,13 @@ from .models import (
     Location,
     OccupationalLevel,
 )
+
+# Sprint 15 (ESS): the only fields a PATCH through EmployeeViewSet may
+# touch, for self or hr_admin alike — RBAC-Roles.md's employee row: "*W on
+# ESS-editable fields only (contact details, self-ID via consent flow)".
+# Demographic self-ID is a separate, consent-gated action
+# (EmployeeViewSet.self_identify), not a plain field PATCH.
+ESS_EDITABLE_FIELDS = {"preferred_name", "personal_email", "phone"}
 
 
 class EmployeeVersionSerializer(TieredModelSerializer):
@@ -29,13 +39,39 @@ class EmployeeSerializer(TieredModelSerializer):
     kept as a separate fetch rather than duplicated here so tiering logic
     for time-varying attributes stays in one place (EmployeeVersionSerializer)."""
 
+    # Same shape as recruitment.ApplicantSerializer.has_demographic_consent
+    # — PUBLIC-tier (unregistered in FIELD_TIERS, defaults there), always
+    # shown, so the ESS self-ID UI knows whether to show "capture consent"
+    # or the self-ID form without a separate lookup.
+    has_demographic_consent = serializers.SerializerMethodField()
+
     class Meta:
         model = Employee
         fields = [
             "id", "employee_number", "first_name", "last_name", "preferred_name",
             "national_id_number", "passport_number", "date_of_birth", "work_email",
-            "personal_email", "phone", "hire_date",
+            "personal_email", "phone", "hire_date", "has_demographic_consent",
         ]
+
+    def get_has_demographic_consent(self, instance) -> bool:
+        return instance.pk is not None and has_active_consent(
+            employee=instance, purpose=ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID
+        )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        requester = get_request_employee(request) if request is not None else None
+        target = self.instance
+        if target is not None:
+            is_self = requester is not None and requester.id == target.id
+            is_hr_admin = requester is not None and has_role(requester, "hr_admin")
+            if not (is_self or is_hr_admin):
+                raise serializers.ValidationError("You don't have access to update this employee's profile.")
+            if attrs.keys() - ESS_EDITABLE_FIELDS:
+                raise serializers.ValidationError(
+                    f"Only these fields can be updated here: {', '.join(sorted(ESS_EDITABLE_FIELDS))}."
+                )
+        return attrs
 
 
 class DepartmentSerializer(serializers.ModelSerializer):

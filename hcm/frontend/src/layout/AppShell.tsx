@@ -80,6 +80,15 @@ export function AppShell() {
             <NavLink to="/my-verification" className={({ isActive }) => (isActive ? 'active' : undefined)}>
               My Verification
             </NavLink>
+            <NavLink to="/my-profile" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              My Profile
+            </NavLink>
+            <NavLink to="/my-benefits" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              My Benefits
+            </NavLink>
+            <NavLink to="/my-learning" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              My Learning
+            </NavLink>
             {hasRole('hr_admin') && (
               <NavLink to="/workforce-integrity" className={({ isActive }) => (isActive ? 'active' : undefined)}>
                 Workforce Integrity

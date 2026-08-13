@@ -251,6 +251,7 @@ class Command(BaseCommand):
             self._seed_ee_reporting_demo_data(
                 hr_admin=hr_head, ee_manager=ops_head, accounting_officer=ceo, levels=levels, rng=rng,
             )
+            self._seed_ess_demo_data(direct_report=staff)
 
         run_data_quality_checks()
 
@@ -699,3 +700,27 @@ class Command(BaseCommand):
         generate_report(
             form_type="eea4", report_year=report_year, period_start=period_start, period_end=period_end, actor=hr_admin,
         )
+
+    def _seed_ess_demo_data(self, *, direct_report):
+        """Sprint 15 (ESS): deliberately light-touch — the 'employee' demo
+        login's own profile contact details and self-ID are left untouched
+        (empty/not-consented) so MyProfilePage has something real to fill
+        in live, not just a page confirming already-seeded data renders.
+        One REQUESTED training record and a guaranteed benefits election
+        are the only pre-seeded rows, so My Learning/My Benefits aren't
+        empty on first login either."""
+        if direct_report is None:
+            return
+
+        TrainingRecord.objects.create(
+            employee=direct_report, title="Certified Kubernetes Administrator", provider="Linux Foundation",
+            status=TrainingRecord.Status.REQUESTED,
+        )
+
+        if not BenefitsElection.objects.filter(employee=direct_report).exists():
+            benefit = Benefit.objects.filter(active=True).first()
+            if benefit is not None:
+                BenefitsElection.objects.create(
+                    employee=direct_report, benefit=benefit, status=BenefitsElection.Status.ENROLLED,
+                    effective_date=date(2024, 1, 1),
+                )

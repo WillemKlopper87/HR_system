@@ -77,9 +77,17 @@ class TrainingRecord(TimestampedModel):
     """Data-Dictionary.md: "training_record (I — feeds WSP/ATR)". The
     fields here (hours, cost, status, dates) are exactly what a WSP/ATR
     (SETA) submission needs (Documentation-Review-and-Gap-Analysis.md gap
-    C2) — see learning/views.py::wsp_atr_export."""
+    C2) — see learning/views.py::wsp_atr_export.
+
+    REQUESTED (Sprint 15/ESS) is the server-forced starting status for a
+    self-submitted enrollment request — learning/serializers.py::
+    TrainingRecordSerializer.validate() strips status/hours/cost/
+    completion_date from a self-submission and won't let the requester
+    change them afterwards either; only a manager/hr_admin moves a record
+    past REQUESTED (see PLANNED and onward)."""
 
     class Status(models.TextChoices):
+        REQUESTED = "requested", "Requested"
         PLANNED = "planned", "Planned"
         IN_PROGRESS = "in_progress", "In progress"
         COMPLETED = "completed", "Completed"

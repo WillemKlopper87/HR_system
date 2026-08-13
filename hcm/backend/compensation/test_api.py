@@ -64,9 +64,10 @@ class CompensationApiTestCase(TestCase):
 
 class ModuleWidePermissionTests(CompensationApiTestCase):
     """Sprint 10 acceptance criterion: 'Pay-data visibility restricted to
-    comp manager/HR admin roles only (strict RBAC)' — applies to every
-    endpoint in the module, including the benefits catalog, not just
-    individual pay figures."""
+    comp manager/HR admin roles only (strict RBAC)' — still true for pay
+    bands and comp proposals, genuine pay figures. Sprint 15 (ESS) opens
+    the benefits catalog and elections to self-service — see
+    BenefitsSelfServiceApiTests below for that surface's own tests."""
 
     def test_line_manager_cannot_view_pay_bands(self):
         self.client.force_authenticate(user=self.line_manager.user)
@@ -78,15 +79,27 @@ class ModuleWidePermissionTests(CompensationApiTestCase):
         response = self.client.get("/api/v1/comp-proposals/")
         self.assertEqual(response.status_code, 403)
 
-    def test_plain_employee_cannot_view_benefits_catalog(self):
+    def test_plain_employee_can_view_but_not_write_benefits_catalog(self):
         self.client.force_authenticate(user=self.plain_employee.user)
         response = self.client.get("/api/v1/benefits/")
+        self.assertEqual(response.status_code, 200)
+        response = self.client.post("/api/v1/benefits/", {"name": "New Benefit"}, format="json")
         self.assertEqual(response.status_code, 403)
 
-    def test_plain_employee_cannot_view_benefits_elections(self):
+    def test_plain_employee_sees_only_own_benefits_elections(self):
+        benefit = Benefit.objects.create(name="Medical Aid", category=Benefit.Category.MEDICAL)
+        BenefitsElection.objects.create(
+            employee=self.plain_employee, benefit=benefit, status=BenefitsElection.Status.ENROLLED
+        )
+        other_benefit = Benefit.objects.create(name="Retirement Fund", category=Benefit.Category.RETIREMENT)
+        BenefitsElection.objects.create(
+            employee=self.line_manager, benefit=other_benefit, status=BenefitsElection.Status.ENROLLED
+        )
         self.client.force_authenticate(user=self.plain_employee.user)
         response = self.client.get("/api/v1/benefits-elections/")
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["employee"], self.plain_employee.id)
 
     def test_comp_manager_can_view_all_endpoints(self):
         self.client.force_authenticate(user=self.comp_manager.user)
@@ -234,3 +247,54 @@ class BenefitsElectionApiTests(CompensationApiTestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
+
+
+class BenefitsSelfServiceApiTests(CompensationApiTestCase):
+    """Sprint 15 (ESS): an employee electing/waiving their own benefits."""
+
+    def test_employee_can_elect_a_benefit_for_self(self):
+        benefit = Benefit.objects.create(name="Medical Aid", category=Benefit.Category.MEDICAL)
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.post(
+            "/api/v1/benefits-elections/",
+            {"employee": self.plain_employee.id, "benefit": benefit.id, "status": "enrolled"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["employee"], self.plain_employee.id)
+
+    def test_employee_cannot_elect_a_benefit_for_someone_else(self):
+        """perform_create forces employee=requester for non-privileged
+        callers — whatever employee id the client sends is ignored, not
+        rejected with a 4xx, so this asserts the actual created row's
+        owner rather than expecting the request to fail outright."""
+        benefit = Benefit.objects.create(name="Medical Aid", category=Benefit.Category.MEDICAL)
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.post(
+            "/api/v1/benefits-elections/",
+            {"employee": self.line_manager.id, "benefit": benefit.id, "status": "enrolled"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["employee"], self.plain_employee.id)
+
+    def test_employee_cannot_read_someone_elses_election_by_id(self):
+        benefit = Benefit.objects.create(name="Medical Aid", category=Benefit.Category.MEDICAL)
+        election = BenefitsElection.objects.create(
+            employee=self.line_manager, benefit=benefit, status=BenefitsElection.Status.ENROLLED
+        )
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.get(f"/api/v1/benefits-elections/{election.id}/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_employee_can_waive_their_own_election(self):
+        benefit = Benefit.objects.create(name="Medical Aid", category=Benefit.Category.MEDICAL)
+        election = BenefitsElection.objects.create(
+            employee=self.plain_employee, benefit=benefit, status=BenefitsElection.Status.ENROLLED
+        )
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.patch(
+            f"/api/v1/benefits-elections/{election.id}/", {"status": "waived"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["status"], "waived")

@@ -48,3 +48,29 @@ class TrainingRecordSerializer(RowScopedLearningSerializer):
     class Meta:
         model = TrainingRecord
         fields = ["id", "employee", "title", "provider", "status", "start_date", "completion_date", "hours", "cost"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        request = self.context.get("request")
+        requester = get_request_employee(request) if request is not None else None
+        target = attrs.get("employee") or getattr(self.instance, "employee", None)
+        is_self_submission = requester is not None and target is not None and requester.id == target.id
+
+        if is_self_submission:
+            if self.instance is None:
+                # A self-submitted enrollment is always a REQUEST — the
+                # server decides the starting status, not the client, and
+                # nothing beyond title/provider/start_date is trusted from
+                # a self-submission (hours/cost/completion_date are what a
+                # manager/hr_admin fills in once it's actually approved).
+                attrs["status"] = TrainingRecord.Status.REQUESTED
+                attrs.pop("hours", None)
+                attrs.pop("cost", None)
+                attrs.pop("completion_date", None)
+            else:
+                disallowed = {"status", "hours", "cost", "completion_date"} & attrs.keys()
+                if disallowed:
+                    raise serializers.ValidationError(
+                        "Only your manager or hr_admin can update status/hours/cost/completion date."
+                    )
+        return attrs

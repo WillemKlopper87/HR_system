@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from rbac_audit.drf import get_request_employee
+from rbac_audit.permissions import has_role
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .models import Benefit, BenefitsElection, CompProposal, PayBand
-from .permissions import IsCompManagerOrHRAdmin
+from .permissions import IsCompManagerOrHRAdmin, IsCompManagerOrHRAdminOrReadOnly, IsSelfOrCompManagerOrHRAdmin
 from .serializers import (
     BenefitSerializer,
     BenefitsElectionSerializer,
@@ -74,12 +75,43 @@ class CompProposalViewSet(viewsets.ModelViewSet):
 
 
 class BenefitViewSet(viewsets.ModelViewSet):
+    """Read-open since Sprint 15 (ESS) — an employee needs to see what
+    benefits exist to elect/waive them; only comp_manager/hr_admin manage
+    the catalog itself."""
+
     queryset = Benefit.objects.all()
     serializer_class = BenefitSerializer
-    permission_classes = [IsCompManagerOrHRAdmin]
+    permission_classes = [IsCompManagerOrHRAdminOrReadOnly]
 
 
 class BenefitsElectionViewSet(viewsets.ModelViewSet):
+    """Sprint 15 (ESS): an employee manages their own elections; comp_manager/
+    hr_admin can still record/adjust anyone's, as before Sprint 15."""
+
     queryset = BenefitsElection.objects.select_related("employee", "benefit")
     serializer_class = BenefitsElectionSerializer
-    permission_classes = [IsCompManagerOrHRAdmin]
+    permission_classes = [IsSelfOrCompManagerOrHRAdmin]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.action != "list":
+            # Detail lookups must NOT be row-scope-filtered here — same
+            # reasoning as core_hr.EmployeeVersionViewSet.get_queryset():
+            # DRF's get_object() 404s on anything missing from the queryset
+            # before has_object_permission ever runs, which would silently
+            # skip IsSelfOrCompManagerOrHRAdmin's block. Let that permission
+            # produce the 403 instead. List filtering stays queryset-level.
+            return queryset
+        employee = get_request_employee(self.request)
+        if employee is not None and (has_role(employee, "comp_manager") or has_role(employee, "hr_admin")):
+            return queryset
+        return queryset.filter(employee=employee)
+
+    def perform_create(self, serializer):
+        employee = get_request_employee(self.request)
+        if employee is not None and (has_role(employee, "comp_manager") or has_role(employee, "hr_admin")):
+            serializer.save()
+        else:
+            # Self-service: whatever `employee` the client sent is ignored —
+            # you can only ever elect for yourself this way.
+            serializer.save(employee=employee)

@@ -16,6 +16,9 @@ import { EmployeeDetailPage } from './pages/EmployeeDetailPage'
 import { EmployeeListPage } from './pages/EmployeeListPage'
 import { EquityDashboardPage } from './pages/EquityDashboardPage'
 import { HeadcountDashboardPage } from './pages/HeadcountDashboardPage'
+import { MyBenefitsPage } from './pages/MyBenefitsPage'
+import { MyLearningPage } from './pages/MyLearningPage'
+import { MyProfilePage } from './pages/MyProfilePage'
 import { OrgStructurePage } from './pages/OrgStructurePage'
 import { PayBandsPage } from './pages/PayBandsPage'
 import { RecruitmentDashboardPage } from './pages/RecruitmentDashboardPage'
@@ -76,6 +79,9 @@ export default function App() {
                 </Suspense>
               }
             />
+            <Route path="/my-profile" element={<MyProfilePage />} />
+            <Route path="/my-benefits" element={<MyBenefitsPage />} />
+            <Route path="/my-learning" element={<MyLearningPage />} />
             <Route element={<RequireRole roles={['hr_admin']} />}>
               <Route path="/workforce-integrity" element={<WorkforceIntegrityPage />} />
             </Route>

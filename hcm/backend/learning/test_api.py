@@ -147,6 +147,72 @@ class CertificationAndTrainingRecordTests(LearningApiTestCase):
         self.assertEqual(response.status_code, 201)
 
 
+class TrainingRecordEnrollmentRequestApiTests(LearningApiTestCase):
+    """Sprint 15 (ESS): learning enrollment requests — a self-submission is
+    always forced to REQUESTED regardless of what the client sends, and the
+    requester can't later self-approve it."""
+
+    def test_self_submission_forces_requested_status_and_strips_hours_cost(self):
+        self.client.force_authenticate(user=self.report.user)
+        response = self.client.post(
+            "/api/v1/training-records/",
+            {
+                "employee": self.report.id, "title": "Advanced Kubernetes", "provider": "A Cloud Guru",
+                "status": "completed", "hours": "40.0", "cost": "9999.00",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["status"], "requested")
+        self.assertIsNone(response.data["hours"])
+        self.assertIsNone(response.data["cost"])
+
+    def test_manager_submission_for_report_is_not_forced_to_requested(self):
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post(
+            "/api/v1/training-records/",
+            {"employee": self.report.id, "title": "AWS Bootcamp", "status": "planned"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["status"], "planned")
+
+    def test_self_cannot_edit_status_hours_cost_on_own_request(self):
+        self.client.force_authenticate(user=self.report.user)
+        create = self.client.post(
+            "/api/v1/training-records/", {"employee": self.report.id, "title": "Advanced Kubernetes"}, format="json"
+        )
+        record_id = create.data["id"]
+        response = self.client.patch(
+            f"/api/v1/training-records/{record_id}/", {"status": "planned"}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_self_can_still_edit_title_on_own_pending_request(self):
+        self.client.force_authenticate(user=self.report.user)
+        create = self.client.post(
+            "/api/v1/training-records/", {"employee": self.report.id, "title": "Advanced Kubernetes"}, format="json"
+        )
+        record_id = create.data["id"]
+        response = self.client.patch(
+            f"/api/v1/training-records/{record_id}/", {"title": "Advanced Kubernetes & Helm"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_manager_can_approve_a_report_request(self):
+        self.client.force_authenticate(user=self.report.user)
+        create = self.client.post(
+            "/api/v1/training-records/", {"employee": self.report.id, "title": "Advanced Kubernetes"}, format="json"
+        )
+        record_id = create.data["id"]
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.patch(
+            f"/api/v1/training-records/{record_id}/", {"status": "planned"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["status"], "planned")
+
+
 class SkillsInventoryTests(LearningApiTestCase):
     def test_non_hr_admin_cannot_view_inventory(self):
         self.client.force_authenticate(user=self.manager.user)

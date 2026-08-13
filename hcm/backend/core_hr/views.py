@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from django.db.models import Count, Q
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from rbac_audit.audit import log_access
+from rbac_audit.consent import has_active_consent, record_consent
 from rbac_audit.drf import RowScopePermission, get_request_employee, row_scoped_queryset
-from rbac_audit.models import AuditLogEntry
-from rbac_audit.permissions import can_see_unsuppressed_aggregates
+from rbac_audit.models import AuditLogEntry, ConsentRecord
+from rbac_audit.permissions import can_see_unsuppressed_aggregates, has_role
 from rbac_audit.tiers import FieldTier
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -62,14 +65,29 @@ class EmployeeVersionViewSet(viewsets.ReadOnlyModelViewSet):
         return obj.employee
 
 
-class EmployeeViewSet(viewsets.ReadOnlyModelViewSet):
+class EmployeeViewSet(viewsets.ModelViewSet):
     """Identity records (core_hr.Employee) — same row-scope + field-tier +
     audit pattern as EmployeeVersionViewSet. The list/detail UI (Sprint 3)
     joins this with EmployeeVersionViewSet's ?current=true for a
-    complete "who they are + where they sit today" view."""
+    complete "who they are + where they sit today" view.
+
+    Writable since Sprint 15 (ESS) — PATCH plus the two POST actions below
+    only; no generic create/delete (employees are created via hire()/
+    recruitment, never through this endpoint — create() is overridden
+    below rather than dropped from http_method_names, since DRF's router
+    wires POST-method actions like consent/self_identify through the same
+    method-name allowlist as the generic create()). RowScopePermission's
+    object-level check would let any row-access-holder (e.g. line_manager
+    over a report, auditor via an all-scope role) reach PATCH here, which
+    is too broad for a write — EmployeeSerializer.validate() is the real
+    write gate (self or hr_admin only, ESS-editable fields only)."""
 
     serializer_class = EmployeeSerializer
     permission_classes = [permissions.IsAuthenticated, RowScopePermission]
+    http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def create(self, request, *args, **kwargs):
+        return Response({"detail": 'Method "POST" not allowed.'}, status=405)
 
     def get_queryset(self):
         queryset = Employee.objects.all()
@@ -89,6 +107,92 @@ class EmployeeViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_target_employee(self, obj):
         return obj
+
+    @action(detail=True, methods=["post"])
+    def consent(self, request, pk=None):
+        """Same shape as recruitment.ApplicantViewSet.consent, generalized
+        the same way — purpose defaults to demographic_self_id (this
+        action's primary ESS use: gating self_identify below)."""
+        employee = self.get_object()
+        actor = get_request_employee(request)
+        if actor is None or not (actor.id == employee.id or has_role(actor, "hr_admin")):
+            return Response({"detail": "You don't have access to record consent for this employee."}, status=403)
+        purpose = request.data.get("purpose", ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID)
+        if purpose not in ConsentRecord.Purpose.values:
+            return Response({"detail": "Invalid purpose."}, status=400)
+        record_consent(
+            employee=employee,
+            purpose=purpose,
+            lawful_basis=request.data.get("lawful_basis", ConsentRecord.LawfulBasis.CONSENT),
+            text_version=request.data.get("text_version", "v1"),
+            actor=actor,
+        )
+        return Response({"detail": "Consent recorded."}, status=201)
+
+    @action(detail=True, methods=["post"])
+    def self_identify(self, request, pk=None):
+        """Employee (or hr_admin, on their behalf) submits/updates
+        race/gender/disability self-identification — consent-gated the
+        same way recruitment.ApplicantSerializer gates applicant
+        demographic writes. Updates the CURRENT EmployeeVersion's fields
+        in place rather than going through apply_lifecycle_event: this is
+        a classification correction, not an employment-lifecycle fact, so
+        none of the fixed EmploymentEvent.EventType choices fit, and
+        EmployeeVersion's own HistoricalRecords already gives it an audit
+        trail without needing a new version+event."""
+        employee = self.get_object()
+        actor = get_request_employee(request)
+        if actor is None or not (actor.id == employee.id or has_role(actor, "hr_admin")):
+            return Response({"detail": "You don't have access to self-identify for this employee."}, status=403)
+        if not has_active_consent(employee=employee, purpose=ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID):
+            return Response(
+                {"detail": "Active consent is required first — POST /employees/{id}/consent/."}, status=400
+            )
+
+        choice_fields = {
+            "race": EmployeeVersion.Race.values,
+            "gender": EmployeeVersion.Gender.values,
+            "disability_status": EmployeeVersion.DisabilityStatus.values,
+        }
+        allowed_fields = set(choice_fields) | {"disability_detail"}
+        fields = {k: v for k, v in request.data.items() if k in allowed_fields}
+        if not fields:
+            return Response({"detail": "No self-ID fields provided."}, status=400)
+        for field, value in fields.items():
+            if field in choice_fields and value not in choice_fields[field]:
+                return Response({"detail": f"Invalid value for {field}."}, status=400)
+
+        version = employee.current_version
+        if version is None:
+            return Response({"detail": "Employee has no current version to update."}, status=400)
+
+        update_fields = []
+        for field, value in fields.items():
+            setattr(version, field, value)
+            update_fields.append(field)
+        if "race" in fields:
+            version.race_source = EmployeeVersion.DemographicSource.SELF_IDENTIFIED
+            update_fields.append("race_source")
+        if {"disability_status", "disability_detail"} & fields.keys():
+            version.disability_source = EmployeeVersion.DemographicSource.SELF_IDENTIFIED
+            update_fields.append("disability_source")
+        version.save(update_fields=update_fields)
+
+        log_access(
+            actor=actor,
+            action=AuditLogEntry.Action.UPDATE,
+            entity_type="core_hr.EmployeeVersion",
+            entity_id=version.pk,
+            field_tier=FieldTier.SENSITIVE,
+            fields_touched=",".join(fields.keys()),
+        )
+        # Not self.get_serializer_context(): that context's `view` is this
+        # EmployeeViewSet, whose get_target_employee(obj) assumes obj is an
+        # Employee (returns obj itself) — wrong for a TieredModelSerializer
+        # rendering an EmployeeVersion, which needs obj.employee instead
+        # (EmployeeVersionViewSet's own get_target_employee shape).
+        version_context = {"request": request, "view": SimpleNamespace(get_target_employee=lambda obj: obj.employee)}
+        return Response(EmployeeVersionSerializer(version, context=version_context).data)
 
 
 class ProtectedDeleteMixin:

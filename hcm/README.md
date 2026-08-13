@@ -9,13 +9,19 @@ Modular-monolith HCM system. Planning and architecture docs live one level up in
 hcm/
   backend/     Django 5.2 LTS + DRF (ADR-001) — one Django app per domain module
     config/    settings, urls, wsgi/asgi
-    core_hr/   employees, org structure, lifecycle (Sprint 1); + Sprint 3 dashboards/CRUD
+    core_hr/   employees, org structure, lifecycle (Sprint 1); + Sprint 3 dashboards/CRUD;
+                + Sprint 15 ESS (EmployeeViewSet: PATCH own contact details, consent-gated
+                self-ID via consent/self_identify actions)
     rbac_audit/ shared RBAC + audit + consent layer (Sprint 2); + Sprint 3 session auth;
                 ConsentRecord extended in Sprint 4 to an employee-or-applicant subject
     recruitment/ requisitions, applicant pipeline, offers, hire automation (Sprint 4)
     performance/ goals, review cycles, self/manager reviews, feedback (Sprint 6)
-    learning/  skills, certifications, training records, WSP/ATR export (Sprint 8)
-    compensation/ pay bands, comp proposal workflow, benefits catalog + elections (Sprint 10)
+    learning/  skills, certifications, training records, WSP/ATR export (Sprint 8);
+                + Sprint 15 ESS (TrainingRecord.Status.REQUESTED — self-submitted
+                enrollment requests, forced status/field restrictions)
+    compensation/ pay bands, comp proposal workflow, benefits catalog + elections (Sprint 10);
+                + Sprint 15 ESS (benefits catalog read-open, elections self-service
+                row-scoped)
     assessments/ provider-agnostic assessment adapter, consent-gated assign workflow,
                 HMAC-signed inbound webhook (Sprint 12); applicant_id is an unconstrained
                 reference, not a cross-app FK — see Module rules below
@@ -39,7 +45,9 @@ hcm/
                assessments live on ApplicantDetailPage instead, like Offer); my-verification
                (Sprint 12c — every employee) + workforce-integrity (hr_admin's review queue);
                EE configuration, EE reports, equity dashboard (Sprint 13-14 —
-               hr_admin/ee_manager/accounting_officer/auditor only)
+               hr_admin/ee_manager/accounting_officer/auditor only); my-profile,
+               my-benefits, my-learning (Sprint 15 — every employee, self-scoped
+               server-side, same unrouted-from-RequireRole shape as my-verification)
     liveness/  face-api.js wrapper + shared camera-capture component (Sprint 12c);
                lazy-loaded (React.lazy) since TensorFlow.js is ~1MB and only this
                one page needs it
@@ -67,7 +75,10 @@ python -m venv .venv            # NOTE: prefer a venv OUTSIDE OneDrive (see belo
 Demo logins from `seed_demo_data` (password = username + "123"): `hradmin` (HR Admin),
 `manager` (Line Manager), `recruiter` (Recruiter), `compmanager` (Compensation Manager),
 `eemanager` (EE Manager), `accountingofficer` (Accounting Officer/CEO, EEA2/EEA4
-sign-off only — Sprint 13-14), `employee` (Employee, self-scope only).
+sign-off only — Sprint 13-14), `employee` (Employee, self-scope only). Every login can
+reach the Sprint 15 self-service pages (my-profile/my-benefits/my-learning) for their
+own record — `employee`'s own contact details/self-ID are left deliberately unset by
+the seed script so there's something real to fill in on first login.
 
 `identity_verification`'s face-descriptor model weights are checked into
 `frontend/public/models/` (copied from `node_modules/@vladmandic/face-api/model/` —
@@ -155,6 +166,20 @@ docker compose up --build
   `sysadmin`) can read/sign full report snapshots but is still subject to
   small-cell suppression on the *live* Equity Dashboard, since that check
   requires an explicit sensitive-tier grant the role deliberately doesn't have.
+- Row-scope coverage (who can *see* a record via `RowScopePermission`) is not
+  the same set as who should be able to *write* to it — Sprint 15 (ESS) is
+  the first module to layer a real write onto an already-read-only, row-
+  scoped endpoint (`core_hr.EmployeeViewSet`) without a bespoke permission
+  class for it. Every all/own_team-scope role (auditor, line_manager) can
+  already *read* any employee's record; `EmployeeSerializer.validate()`, not
+  the permission class, is where "self or hr_admin only, ESS-editable fields
+  only" is actually enforced. The same shape appears in
+  `learning.TrainingRecordSerializer.validate()` (a self-submission is
+  server-forced to `REQUESTED`, stripped of `hours`/`cost`/
+  `completion_date`, and can't later self-edit those) and
+  `compensation.BenefitsElectionViewSet.perform_create()` (non-privileged
+  callers can only ever create a row for themselves, regardless of what
+  `employee` id the client sends).
 
 ## CI
 
