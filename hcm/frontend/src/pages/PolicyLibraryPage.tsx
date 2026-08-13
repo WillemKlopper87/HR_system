@@ -122,8 +122,8 @@ function PolicyRow({
               </button>
             )}
             {policy.status !== 'draft' && <NewVersionButton policy={policy} onCreated={onChanged} />}
-            {policy.source_file && (
-              <a className="btn-link" href={policy.source_file} target="_blank" rel="noreferrer">
+            {policy.download_url && (
+              <a className="btn-link" href={policy.download_url} target="_blank" rel="noreferrer">
                 Download
               </a>
             )}

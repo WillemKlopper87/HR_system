@@ -7,7 +7,7 @@ from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from rbac_audit.audit import log_access
 from rbac_audit.consent import has_active_consent, record_consent
-from rbac_audit.drf import RowScopePermission, get_request_employee, row_scoped_queryset
+from rbac_audit.drf import RowScopePermission, get_request_employee, int_query_param, row_scoped_queryset
 from rbac_audit.models import AuditLogEntry, ConsentRecord
 from rbac_audit.permissions import can_see_unsuppressed_aggregates, has_role
 from rbac_audit.tiers import FieldTier
@@ -43,8 +43,8 @@ class EmployeeVersionViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = EmployeeVersion.objects.select_related(
             "employee", "department", "occupational_level", "job_grade", "manager", "location"
         )
-        employee_id = self.request.query_params.get("employee")
-        if employee_id:
+        employee_id = int_query_param(self.request, "employee")
+        if employee_id is not None:
             queryset = queryset.filter(employee_id=employee_id)
         if self.request.query_params.get("current") == "true":
             queryset = queryset.current()

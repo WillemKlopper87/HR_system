@@ -23,6 +23,23 @@ def get_request_employee(request):
     return Employee.objects.filter(user=user).first()
 
 
+def int_query_param(request, name: str) -> int | None:
+    """Safely parses a query param used as a DB id filter (e.g. ?employee=).
+    Returns None if absent or not a valid integer — every module's
+    get_queryset() should route these through here rather than passing the
+    raw string straight to .filter(field_id=value): an invalid value (e.g.
+    "1' OR '1'='1" or "10-2") reaching the ORM unvalidated raises an
+    unhandled ValueError, producing a 500 with Django's DEBUG traceback
+    page exposed rather than a clean, filter-ignored response."""
+    value = request.query_params.get(name)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class RowScopePermission(permissions.IsAuthenticated):
     """Object-level row-scope (all/own_team/self) enforcement. Blocks — and
     logs (Sprint 2 acceptance criterion) — access to a record outside the

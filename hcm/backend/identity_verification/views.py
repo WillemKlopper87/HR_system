@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from core_hr.models import Employee
 from rbac_audit.consent import record_consent
-from rbac_audit.drf import get_request_employee
+from rbac_audit.drf import get_request_employee, int_query_param
 from rbac_audit.models import ConsentRecord
 from rbac_audit.permissions import has_role
 from rest_framework import permissions, viewsets
@@ -50,8 +50,8 @@ class BiometricEnrollmentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         base = BiometricEnrollment.objects.select_related("employee", "enrolled_by")
-        target_id = self.request.query_params.get("employee")
-        if target_id:
+        target_id = int_query_param(self.request, "employee")
+        if target_id is not None:
             base = base.filter(employee_id=target_id)
         return _visible_queryset(self.request, base)
 
@@ -83,8 +83,8 @@ class LivenessCheckViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         base = LivenessCheck.objects.select_related("employee", "requested_by", "reviewed_by")
-        target_id = self.request.query_params.get("employee")
-        if target_id:
+        target_id = int_query_param(self.request, "employee")
+        if target_id is not None:
             base = base.filter(employee_id=target_id)
         return _visible_queryset(self.request, base)
 

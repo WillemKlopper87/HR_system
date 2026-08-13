@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from core_hr.permissions import IsHRAdminOrReadOnly
 from django.utils import timezone
-from rbac_audit.drf import RowScopePermission, get_request_employee, row_scoped_queryset
+from rbac_audit.drf import RowScopePermission, get_request_employee, int_query_param, row_scoped_queryset
 from rest_framework import mixins, permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -74,8 +74,8 @@ class GoalViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Goal.objects.select_related("employee", "manager", "created_by")
-        target_id = self.request.query_params.get("employee")
-        if target_id:
+        target_id = int_query_param(self.request, "employee")
+        if target_id is not None:
             queryset = queryset.filter(employee_id=target_id)
         if self.action != "list":
             return queryset
@@ -146,8 +146,8 @@ class FeedbackViewSet(
 
     def get_queryset(self):
         queryset = Feedback.objects.select_related("employee", "author")
-        target_id = self.request.query_params.get("employee")
-        if target_id:
+        target_id = int_query_param(self.request, "employee")
+        if target_id is not None:
             queryset = queryset.filter(employee_id=target_id)
         if self.action != "list":
             return queryset

@@ -6,7 +6,7 @@ from core_hr.models import Employee
 from core_hr.permissions import IsHRAdmin, IsHRAdminOrReadOnly
 from django.db.models import Q
 from django.http import HttpResponse
-from rbac_audit.drf import RowScopePermission, get_request_employee, row_scoped_queryset
+from rbac_audit.drf import RowScopePermission, get_request_employee, int_query_param, row_scoped_queryset
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -33,8 +33,8 @@ class _RowScopedLearningViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.model.objects.select_related(*self.select_related_fields)
-        target_id = self.request.query_params.get("employee")
-        if target_id:
+        target_id = int_query_param(self.request, "employee")
+        if target_id is not None:
             queryset = queryset.filter(employee_id=target_id)
         if self.action != "list":
             return queryset
@@ -133,9 +133,9 @@ def wsp_atr_export(request):
     will be rebuilt in spreadsheets." A CSV in the shape a WSP/ATR
     submission needs — training data joined to the EEA demographic/level
     fields SETA reporting requires alongside it."""
-    year = request.query_params.get("year")
+    year = int_query_param(request, "year")
     records = TrainingRecord.objects.select_related("employee").order_by("employee__employee_number")
-    if year:
+    if year is not None:
         records = records.filter(Q(completion_date__year=year) | Q(start_date__year=year))
 
     filename = f"wsp-atr-export{f'-{year}' if year else ''}.csv"

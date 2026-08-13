@@ -653,7 +653,8 @@ export interface Policy {
   title: string
   category: PolicyCategory
   body: string
-  source_file: string | null
+  has_source_file: boolean
+  download_url: string | null
   chunk_count: number
   version: number
   status: PolicyStatus

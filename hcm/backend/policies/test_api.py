@@ -217,7 +217,9 @@ class PolicyDocumentUploadApiTests(PolicyApiTestCase):
         )
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data["body"], "All leave requests need manager approval.")
-        self.assertIsNotNone(response.data["source_file"])
+        self.assertTrue(response.data["has_source_file"])
+        self.assertIsNotNone(response.data["download_url"])
+        self.assertNotIn("source_file", response.data)  # write-only — never echoed back
         self.assertEqual(response.data["chunk_count"], 1)
 
     def test_uploading_an_unsupported_file_type_is_rejected(self):
@@ -237,13 +239,72 @@ class PolicyDocumentUploadApiTests(PolicyApiTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), PolicyChunk.objects.filter(policy=policy).count())
 
-    def test_plain_employee_can_view_chunks_of_a_readable_policy(self):
-        """IsHRAdminOrReadOnly is read-open — a plain employee can read
-        chunks the same way they can read the policy body itself."""
+    def test_plain_employee_cannot_view_chunks_of_a_draft_policy(self):
+        """IsHRAdminOrReadOnly is read-open on SAFE_METHODS, but
+        get_queryset() restricts non-hr_admin requesters to PUBLISHED
+        policies regardless — a draft isn't readable at all yet, chunks
+        included (both routes share the same queryset)."""
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
         self.client.force_authenticate(user=self.plain_employee.user)
         response = self.client.get(f"/api/v1/policies/{policy.id}/chunks/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_plain_employee_can_view_chunks_of_a_published_policy(self):
+        policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
+        publish_policy(policy, actor=self.hr_admin)
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.get(f"/api/v1/policies/{policy.id}/chunks/")
         self.assertEqual(response.status_code, 200)
+
+    def test_plain_employee_does_not_see_draft_policies_in_list(self):
+        create_policy(title="Draft Only", category=Policy.Category.OTHER, body="...")
+        published = create_policy(title="Published One", category=Policy.Category.OTHER, body="...")
+        publish_policy(published, actor=self.hr_admin)
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.get("/api/v1/policies/")
+        self.assertEqual(response.status_code, 200)
+        titles = {row["title"] for row in response.data["results"]}
+        self.assertEqual(titles, {"Published One"})
+
+    def test_plain_employee_cannot_retrieve_a_draft_policy_directly(self):
+        policy = create_policy(title="Draft Only", category=Policy.Category.OTHER, body="...")
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.get(f"/api/v1/policies/{policy.id}/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_hr_admin_still_sees_draft_policies(self):
+        create_policy(title="Draft Only", category=Policy.Category.OTHER, body="...")
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/policies/?status=draft")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 1)
+
+    def test_download_action_requires_publication_for_non_hr_admin(self):
+        upload = SimpleUploadedFile("handbook.txt", b"Confidential draft content.", content_type="text/plain")
+        self.client.force_authenticate(user=self.hr_admin.user)
+        create = self.client.post(
+            "/api/v1/policies/", {"title": "Draft Doc", "category": "other", "source_file": upload}, format="multipart",
+        )
+        policy_id = create.data["id"]
+
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.get(f"/api/v1/policies/{policy_id}/download/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_download_action_streams_the_real_file_once_published(self):
+        upload = SimpleUploadedFile("handbook.txt", b"Everyone must arrive on time.", content_type="text/plain")
+        self.client.force_authenticate(user=self.hr_admin.user)
+        create = self.client.post(
+            "/api/v1/policies/", {"title": "Attendance Policy", "category": "other", "source_file": upload}, format="multipart",
+        )
+        policy = Policy.objects.get(pk=create.data["id"])
+        publish_policy(policy, actor=self.hr_admin)
+
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.get(f"/api/v1/policies/{policy.id}/download/")
+        self.assertEqual(response.status_code, 200)
+        content = b"".join(response.streaming_content)
+        self.assertEqual(content, b"Everyone must arrive on time.")
 
     def test_patching_draft_body_regenerates_chunks(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="Short.")

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+
+from django.http import FileResponse
 from rbac_audit.drf import get_request_employee
 from rbac_audit.permissions import has_role
 from rest_framework import viewsets
@@ -34,9 +37,21 @@ class PolicyViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        status_param = self.request.query_params.get("status")
-        if status_param:
-            queryset = queryset.filter(status=status_param)
+        employee = get_request_employee(self.request)
+        if employee is None or not has_role(employee, "hr_admin"):
+            # Draft/archived policies aren't just "hr_admin write, everyone
+            # read" — a plain employee has no business seeing an
+            # in-progress or retired policy at all, including via direct
+            # detail/chunks lookup (both route through this queryset), so
+            # this overrides whatever ?status= the client asked for rather
+            # than trusting it. A 404 here (not 403) is deliberate: the
+            # existence of an unpublished policy isn't information a
+            # non-hr_admin should have confirmed to them either.
+            queryset = queryset.filter(status=Policy.Status.PUBLISHED)
+        else:
+            status_param = self.request.query_params.get("status")
+            if status_param:
+                queryset = queryset.filter(status=status_param)
         code = self.request.query_params.get("code")
         if code:
             queryset = queryset.filter(code=code)
@@ -94,6 +109,19 @@ class PolicyViewSet(viewsets.ModelViewSet):
         over (no embeddings exist yet; see the model docstring)."""
         policy = self.get_object()
         return Response(PolicyChunkSerializer(policy.chunks.all(), many=True).data)
+
+    @action(detail=True, methods=["get"])
+    def download(self, request, pk=None):
+        """The authenticated route to the original uploaded document —
+        `self.get_object()` runs the same permission + status-filtered
+        queryset as every other action, unlike a raw MEDIA_URL link (which
+        `django.views.static.serve` would hand out to anyone, logged in or
+        not, if it were still mounted). See PolicySerializer.download_url."""
+        policy = self.get_object()
+        if not policy.source_file:
+            return Response({"detail": "This policy has no uploaded source document."}, status=404)
+        filename = os.path.basename(policy.source_file.name)
+        return FileResponse(policy.source_file.open("rb"), as_attachment=True, filename=filename)
 
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):

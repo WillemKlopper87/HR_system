@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from django.http import HttpResponse
-from rbac_audit.drf import get_request_employee
+from rbac_audit.drf import get_request_employee, int_query_param
 from rbac_audit.permissions import has_role
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -79,8 +79,8 @@ class EEQuestionnaireViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        report_year = self.request.query_params.get("report_year")
-        if report_year:
+        report_year = int_query_param(self.request, "report_year")
+        if report_year is not None:
             qs = qs.filter(report_year=report_year)
         return qs
 
@@ -142,10 +142,13 @@ class EEReportViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        for param, field in (("form_type", "form_type"), ("report_year", "report_year"), ("status", "status")):
+        for param in ("form_type", "status"):
             value = self.request.query_params.get(param)
             if value:
-                qs = qs.filter(**{field: value})
+                qs = qs.filter(**{param: value})
+        report_year = int_query_param(self.request, "report_year")
+        if report_year is not None:
+            qs = qs.filter(report_year=report_year)
         return qs
 
     @action(detail=False, methods=["post"])

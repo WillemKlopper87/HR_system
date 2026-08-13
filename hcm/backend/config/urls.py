@@ -1,5 +1,3 @@
-from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
@@ -31,7 +29,10 @@ urlpatterns = [
     path("webhooks/v1/assessments/", assessment_webhook, name="assessment-webhook"),
 ]
 
-# Dev-only: production serves MEDIA_ROOT from the reverse proxy / object
-# storage (ADR-005), not Django itself — static() here is a no-op unless
-# DEBUG is on.
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# No MEDIA_URL static() mount: django.views.static.serve has no RBAC/
+# authentication layer at all, and the zero-config dev/CI path defaults
+# DEBUG=True (config/settings.py), so mounting it would make every
+# uploaded policy document fetchable by anyone who has the URL, logged in
+# or not. policies.Policy.source_file is served exclusively through
+# PolicyViewSet.download (authenticated, same permission + status-filtered
+# queryset as the rest of the API) instead — see policies/views.py.

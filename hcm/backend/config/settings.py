@@ -66,6 +66,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "config.middleware.ContentSecurityPolicyMiddleware",
     # records the acting user on every simple-history change record
     "simple_history.middleware.HistoryRequestMiddleware",
 ]

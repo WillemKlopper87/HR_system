@@ -8,7 +8,7 @@ from django.db import models
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from rbac_audit.consent import record_consent
-from rbac_audit.drf import get_request_employee
+from rbac_audit.drf import get_request_employee, int_query_param
 from rbac_audit.models import ConsentRecord
 from rbac_audit.permissions import has_role
 from rest_framework import viewsets
@@ -37,11 +37,11 @@ class AssessmentAssignmentViewSet(viewsets.ModelViewSet):
         employee = get_request_employee(self.request)
         base = AssessmentAssignment.objects.select_related("employee", "assigned_by").prefetch_related("result")
 
-        target_employee_id = self.request.query_params.get("employee")
-        if target_employee_id:
+        target_employee_id = int_query_param(self.request, "employee")
+        if target_employee_id is not None:
             base = base.filter(employee_id=target_employee_id)
-        applicant_id = self.request.query_params.get("applicant_id")
-        if applicant_id:
+        applicant_id = int_query_param(self.request, "applicant_id")
+        if applicant_id is not None:
             base = base.filter(applicant_id=applicant_id)
 
         if employee is None:

@@ -121,8 +121,8 @@ function PolicyRow({
                 {busy ? 'Recording…' : 'Acknowledge'}
               </button>
             )}
-            {policy.source_file && (
-              <a className="btn-link" href={policy.source_file} target="_blank" rel="noreferrer">
+            {policy.download_url && (
+              <a className="btn-link" href={policy.download_url} target="_blank" rel="noreferrer">
                 Original document
               </a>
             )}
