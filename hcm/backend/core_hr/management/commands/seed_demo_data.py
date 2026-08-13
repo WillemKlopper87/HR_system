@@ -18,6 +18,8 @@ from rbac_audit.models import ConsentRecord, Role, RoleAssignment
 # data across every module for local dev/UI review, not core_hr business
 # logic — "apps may not import each other" (hcm/README.md) governs feature
 # code, not a dev-tooling script that necessarily spans all of them.
+from assessments.models import ProviderConfig
+from assessments.services import assign_assessment, simulate_provider_completion
 from compensation.models import Benefit, BenefitsElection, PayBand
 from compensation.services import approve_proposal, propose_compensation_change, reject_proposal
 from learning.models import Certification, EmployeeSkill, Skill, TrainingRecord
@@ -204,6 +206,12 @@ class Command(BaseCommand):
             fin_head.user = User.objects.create_user(username="compmanager", password="compmanager123")
             fin_head.save(update_fields=["user"])
 
+            ee_manager_role = Role.objects.get(name="ee_manager")
+            ops_head = dept_heads[dept_codes.index("OPS")]
+            RoleAssignment.objects.create(employee=ops_head, role=ee_manager_role)
+            ops_head.user = User.objects.create_user(username="eemanager", password="eemanager123")
+            ops_head.save(update_fields=["user"])
+
             self._seed_recruitment_demo_data(
                 departments=departments, levels=levels, grades_by_level=grades_by_level,
                 locations=locations, recruiter=slm_head, rng=rng,
@@ -215,6 +223,9 @@ class Command(BaseCommand):
                 levels=levels, grades_by_level=grades_by_level, comp_manager=fin_head,
                 hr_admin=hr_head, direct_report=staff, rng=rng,
             )
+            self._seed_assessments_demo_data(
+                ee_manager=ops_head, hr_admin=hr_head, recruiter=slm_head, direct_report=staff, second_employee=eng_head,
+            )
 
         run_data_quality_checks()
 
@@ -222,7 +233,7 @@ class Command(BaseCommand):
         self.stdout.write(
             "Demo logins — hradmin/hradmin123 (HR Admin), manager/manager123 (Line Manager), "
             "recruiter/recruiter123 (Recruiter), compmanager/compmanager123 (Comp Manager), "
-            "employee/employee123 (Employee). Local development only."
+            "eemanager/eemanager123 (EE Manager), employee/employee123 (Employee). Local development only."
         )
 
     def _seed_recruitment_demo_data(self, *, departments, levels, grades_by_level, locations, recruiter, rng):
@@ -457,3 +468,43 @@ class Command(BaseCommand):
                 justification="Requested adjustment.", proposed_by=comp_manager,
             )
             reject_proposal(rejected, approver=hr_admin)
+
+    def _seed_assessments_demo_data(self, *, ee_manager, hr_admin, recruiter, direct_report, second_employee):
+        """One pending employee-subject assignment (so the demo login can
+        see an in-flight assessment and, as ee_manager/hr_admin, trigger
+        simulate_completion live), one already-completed employee-subject
+        assignment (so there's a real result to look at immediately), and
+        one completed applicant-subject assignment against the recruitment
+        pipeline's mid-stage candidate — exercising the exact same
+        consent -> assign -> webhook pipeline the tests do, just seeded
+        instead of scripted."""
+        ProviderConfig.objects.get_or_create(
+            provider_key="sandbox", defaults={"display_name": "Sandbox (local dev)", "active": True}
+        )
+
+        if direct_report is not None:
+            record_consent(
+                employee=direct_report, purpose=ConsentRecord.Purpose.ASSESSMENT,
+                lawful_basis=ConsentRecord.LawfulBasis.CONSENT, text_version="v1", actor=ee_manager,
+            )
+            assign_assessment(
+                employee=direct_report, assessment_type="cognitive", assigned_by=ee_manager,
+            )
+
+        record_consent(
+            employee=second_employee, purpose=ConsentRecord.Purpose.ASSESSMENT,
+            lawful_basis=ConsentRecord.LawfulBasis.CONSENT, text_version="v1", actor=hr_admin,
+        )
+        completed = assign_assessment(employee=second_employee, assessment_type="personality", assigned_by=hr_admin)
+        simulate_provider_completion(completed)
+
+        applicant = Applicant.objects.filter(email="werner.botha@applicant-demo.example").first()
+        if applicant is not None:
+            record_consent(
+                applicant=applicant, purpose=ConsentRecord.Purpose.ASSESSMENT,
+                lawful_basis=ConsentRecord.LawfulBasis.CONSENT, text_version="v1", actor=recruiter,
+            )
+            applicant_assignment = assign_assessment(
+                applicant_id=applicant.id, assessment_type="technical", assigned_by=recruiter,
+            )
+            simulate_provider_completion(applicant_assignment)

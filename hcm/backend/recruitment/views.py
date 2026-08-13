@@ -65,10 +65,20 @@ class ApplicantViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def consent(self, request, pk=None):
+        """purpose defaults to demographic_self_id (this action's original
+        sole use) but also accepts "assessment" — assessments/services.py's
+        consent gate for applicant-subject assignments can't capture
+        consent itself (it must not import recruitment.Applicant; see
+        assessments/models.py's AssessmentAssignment docstring), so it
+        points callers back at this existing endpoint instead of
+        duplicating consent-capture logic in a second module."""
         applicant = self.get_object()
+        purpose = request.data.get("purpose", ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID)
+        if purpose not in ConsentRecord.Purpose.values:
+            return Response({"detail": "Invalid purpose."}, status=400)
         record_consent(
             applicant=applicant,
-            purpose=ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID,
+            purpose=purpose,
             lawful_basis=request.data.get("lawful_basis", ConsentRecord.LawfulBasis.CONSENT),
             text_version=request.data.get("text_version", "v1"),
             actor=get_request_employee(request),

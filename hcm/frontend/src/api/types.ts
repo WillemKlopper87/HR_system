@@ -390,6 +390,46 @@ export const BENEFITS_ELECTION_STATUS_LABELS: Record<BenefitsElectionStatus, str
   pending: 'Pending',
 }
 
+export type AssessmentType = 'cognitive' | 'personality' | 'technical' | 'other'
+export type AssessmentAssignmentStatus = 'assigned' | 'in_progress' | 'completed' | 'expired' | 'cancelled'
+
+export interface AssessmentResult {
+  raw_score: string
+  summary: string
+  detail: Record<string, unknown>
+  received_at: string
+}
+
+export interface AssessmentAssignment {
+  id: number
+  employee: number | null
+  applicant_id: number | null
+  assessment_type: AssessmentType
+  provider_key: string
+  provider_reference: string
+  access_url: string
+  status: AssessmentAssignmentStatus
+  assigned_by: number | null
+  completed_at: string | null
+  result: AssessmentResult | null
+  created_at: string
+}
+
+export const ASSESSMENT_TYPE_LABELS: Record<AssessmentType, string> = {
+  cognitive: 'Cognitive ability',
+  personality: 'Personality profile',
+  technical: 'Technical / skills test',
+  other: 'Other',
+}
+
+export const ASSESSMENT_STATUS_LABELS: Record<AssessmentAssignmentStatus, string> = {
+  assigned: 'Assigned',
+  in_progress: 'In progress',
+  completed: 'Completed',
+  expired: 'Expired',
+  cancelled: 'Cancelled',
+}
+
 export interface SkillsInventoryRow {
   skill: string
   category: SkillCategory

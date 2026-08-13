@@ -46,13 +46,14 @@ INSTALLED_APPS = [
     "rest_framework",
     "simple_history",
     # domain modules (one Django app per module — ADR-001).
-    # Later sprints append: assessments, ee_reporting, self_service.
+    # Later sprints append: ee_reporting, self_service.
     "core_hr",
     "rbac_audit",
     "recruitment",
     "performance",
     "learning",
     "compensation",
+    "assessments",
 ]
 
 MIDDLEWARE = [
@@ -137,6 +138,16 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# HMAC signing secret for the inbound assessment-provider webhook
+# (Architecture-Design.md §6: "HMAC-signature-verified with replay
+# protection"). A real provider integration would use a per-provider
+# secret issued by that vendor; kept here as one env-sourced value since
+# no real provider is under contract yet (Sprint-0-Decision-Log.md A4).
+ASSESSMENT_WEBHOOK_SECRET = os.environ.get(
+    "ASSESSMENT_WEBHOOK_SECRET",
+    "dev-only-insecure-webhook-secret-change-me",
+)
 
 # Security hardening applied whenever DEBUG is off
 if not DEBUG:

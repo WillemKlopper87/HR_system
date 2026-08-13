@@ -6,6 +6,7 @@ export function AppShell() {
   const { user, logout, hasRole } = useAuth()
   const canRecruit = hasRole('recruiter') || hasRole('hr_admin')
   const canManageComp = hasRole('comp_manager') || hasRole('hr_admin')
+  const canManageAssessments = hasRole('ee_manager') || hasRole('hr_admin')
 
   return (
     <ReferenceDataProvider>
@@ -67,6 +68,11 @@ export function AppShell() {
             {hasRole('hr_admin') && (
               <NavLink to="/skills-inventory" className={({ isActive }) => (isActive ? 'active' : undefined)}>
                 Skills Inventory
+              </NavLink>
+            )}
+            {canManageAssessments && (
+              <NavLink to="/assessments" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                Assessments
               </NavLink>
             )}
           </nav>

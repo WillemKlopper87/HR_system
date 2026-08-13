@@ -5,6 +5,7 @@ import { RequireAuth, RequireRole } from './auth/RequireAuth'
 import { AppShell } from './layout/AppShell'
 import { ApplicantDetailPage } from './pages/ApplicantDetailPage'
 import { ApplicantsPage } from './pages/ApplicantsPage'
+import { AssessmentsPage } from './pages/AssessmentsPage'
 import { BenefitsPage } from './pages/BenefitsPage'
 import { CompProposalsPage } from './pages/CompProposalsPage'
 import { DataQualityPage } from './pages/DataQualityPage'
@@ -51,6 +52,9 @@ export default function App() {
               <Route path="/pay-bands" element={<PayBandsPage />} />
               <Route path="/comp-proposals" element={<CompProposalsPage />} />
               <Route path="/benefits" element={<BenefitsPage />} />
+            </Route>
+            <Route element={<RequireRole roles={['ee_manager', 'hr_admin']} />}>
+              <Route path="/assessments" element={<AssessmentsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/employees" replace />} />
           </Route>

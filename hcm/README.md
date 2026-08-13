@@ -16,13 +16,18 @@ hcm/
     performance/ goals, review cycles, self/manager reviews, feedback (Sprint 6)
     learning/  skills, certifications, training records, WSP/ATR export (Sprint 8)
     compensation/ pay bands, comp proposal workflow, benefits catalog + elections (Sprint 10)
+    assessments/ provider-agnostic assessment adapter, consent-gated assign workflow,
+                HMAC-signed inbound webhook (Sprint 12); applicant_id is an unconstrained
+                reference, not a cross-app FK — see Module rules below
   frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards
     pages/     employee list/detail, org structure, data quality, headcount dashboard
                (Sprint 3); requisitions, applicants, recruitment dashboard (Sprint 4);
                review cycles, reviews (Sprint 6); skills inventory, team development
                (Sprint 8 — skills/certs/training live on employee detail, like goals/feedback);
-               pay bands, comp proposals, benefits (Sprint 10 — comp_manager/hr_admin only)
+               pay bands, comp proposals, benefits (Sprint 10 — comp_manager/hr_admin only);
+               employee assessments (Sprint 12 — ee_manager/hr_admin only; applicant-subject
+               assessments live on ApplicantDetailPage instead, like Offer)
     components/ small pieces shared across pages (e.g. the dashboard Breakdown chart)
     api/       fetch client (CSRF-aware) + shared reference-data context
   docker-compose.yml  db + redis + backend + celery worker (ADR-005)
@@ -43,7 +48,7 @@ python -m venv .venv            # NOTE: prefer a venv OUTSIDE OneDrive (see belo
 
 Demo logins from `seed_demo_data` (password = username + "123"): `hradmin` (HR Admin),
 `manager` (Line Manager), `recruiter` (Recruiter), `compmanager` (Compensation Manager),
-`employee` (Employee, self-scope only).
+`eemanager` (EE Manager), `employee` (Employee, self-scope only).
 
 Frontend — the Vite dev server proxies `/api` and `/admin` to `localhost:8000`
 (`vite.config.ts`), so run both at once:
@@ -76,7 +81,14 @@ docker compose up --build
 - Apps may import `core_hr` and `rbac_audit`; apps may **not** import each other.
   (`core_hr/management/commands/seed_demo_data.py` is the one intentional exception —
   it seeds demo data across every module for local dev/UI review, not core_hr logic,
-  so it imports `recruitment` too; noted inline where it does.)
+  so it imports `recruitment` too; noted inline where it does.) This shapes schema
+  design, not just imports: `assessments.AssessmentAssignment` needs an employee-or-
+  applicant subject but must not import `recruitment.Applicant`, so `applicant_id` is
+  a plain unconstrained integer rather than a cross-app FK (safe in practice —
+  `recruitment.Applicant` rows are never hard-deleted). Applicant-subject consent
+  capture likewise goes through recruitment's own `/applicants/{id}/consent/`
+  endpoint (generalized with a `purpose` field) rather than being duplicated in
+  `assessments`, which only ever reads whether consent already exists.
 - All API access goes through the shared RBAC permission classes + field-tier
   serializer mixin from `rbac_audit` (Sprint 2). No per-module access control.
 - Slow work (imports, report generation, webhooks) runs in Celery, never in-request.
@@ -93,7 +105,11 @@ docker compose up --build
   recruiter on `recruitment.Offer`'s pay fields, comp_manager across the whole
   `compensation` module), gate on row-scope (`RowScopePermission`) or a
   dedicated role-check permission class alone instead of forcing the mismatch
-  through `can_access_tier_for_target`.
+  through `can_access_tier_for_target`. `assessments.AssessmentAssignment` goes
+  further still — its two subject types (employee vs. applicant) have
+  genuinely different access rules, not just a row-scope mismatch, so it skips
+  the generic helpers entirely in favour of an explicit permission class
+  (`assessments/permissions.py::CanAccessAssessmentAssignment`).
 
 ## CI
 
