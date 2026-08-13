@@ -43,7 +43,10 @@ async function request<T>(pathOrUrl: string, options: RequestInit = {}): Promise
     const token = getCookie('csrftoken')
     if (token) headers.set('X-CSRFToken', token)
   }
-  if (options.body && !headers.has('Content-Type')) {
+  // FormData bodies (file uploads) must NOT get an explicit Content-Type —
+  // the browser sets multipart/form-data with the correct boundary itself;
+  // overriding it here would corrupt the upload.
+  if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
 
@@ -66,6 +69,10 @@ export const api = {
   post: <T>(path: string, data?: unknown) => request<T>(path, { method: 'POST', body: data !== undefined ? JSON.stringify(data) : undefined }),
   patch: <T>(path: string, data?: unknown) => request<T>(path, { method: 'PATCH', body: data !== undefined ? JSON.stringify(data) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  // For multipart file uploads (e.g. policies.Policy.source_file) — pass a
+  // FormData directly, never JSON.stringify'd.
+  postForm: <T>(path: string, data: FormData) => request<T>(path, { method: 'POST', body: data }),
+  patchForm: <T>(path: string, data: FormData) => request<T>(path, { method: 'PATCH', body: data }),
 }
 
 export interface Paginated<T> {

@@ -89,6 +89,19 @@ export function AppShell() {
             <NavLink to="/my-learning" className={({ isActive }) => (isActive ? 'active' : undefined)}>
               My Learning
             </NavLink>
+            <NavLink to="/my-policies" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              My Policies
+            </NavLink>
+            {hasRole('hr_admin') && (
+              <>
+                <NavLink to="/policies" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                  Policy Library
+                </NavLink>
+                <NavLink to="/dashboards/policy-acknowledgment" className={({ isActive }) => (isActive ? 'active' : undefined)}>
+                  Policy Compliance
+                </NavLink>
+              </>
+            )}
             {hasRole('hr_admin') && (
               <NavLink to="/workforce-integrity" className={({ isActive }) => (isActive ? 'active' : undefined)}>
                 Workforce Integrity

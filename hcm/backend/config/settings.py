@@ -46,7 +46,6 @@ INSTALLED_APPS = [
     "rest_framework",
     "simple_history",
     # domain modules (one Django app per module — ADR-001).
-    # Later sprints append: ee_reporting, self_service.
     "core_hr",
     "rbac_audit",
     "recruitment",
@@ -56,6 +55,7 @@ INSTALLED_APPS = [
     "assessments",
     "identity_verification",
     "ee_reporting",
+    "policies",
 ]
 
 MIDDLEWARE = [
@@ -138,6 +138,17 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# policies.Policy.source_file (Policy library document upload) is this
+# app's first use of file storage — local disk for dev/pilot scale;
+# production would move this to S3/Azure Blob (ADR-005-style deferral,
+# same as everything else in this codebase that names a real vendor as a
+# later decision rather than building it now).
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+# Default (2.5MB) is too small for a realistic policy PDF.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

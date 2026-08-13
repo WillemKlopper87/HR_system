@@ -19,8 +19,11 @@ import { HeadcountDashboardPage } from './pages/HeadcountDashboardPage'
 import { MyBenefitsPage } from './pages/MyBenefitsPage'
 import { MyLearningPage } from './pages/MyLearningPage'
 import { MyProfilePage } from './pages/MyProfilePage'
+import { MyPoliciesPage } from './pages/MyPoliciesPage'
 import { OrgStructurePage } from './pages/OrgStructurePage'
 import { PayBandsPage } from './pages/PayBandsPage'
+import { PolicyComplianceDashboardPage } from './pages/PolicyComplianceDashboardPage'
+import { PolicyLibraryPage } from './pages/PolicyLibraryPage'
 import { RecruitmentDashboardPage } from './pages/RecruitmentDashboardPage'
 import { RequisitionsPage } from './pages/RequisitionsPage'
 import { ReviewCyclesPage } from './pages/ReviewCyclesPage'
@@ -89,6 +92,11 @@ export default function App() {
               <Route path="/ee-configuration" element={<EEConfigurationPage />} />
               <Route path="/ee-reports" element={<EEReportsPage />} />
               <Route path="/dashboards/equity" element={<EquityDashboardPage />} />
+            </Route>
+            <Route path="/my-policies" element={<MyPoliciesPage />} />
+            <Route element={<RequireRole roles={['hr_admin']} />}>
+              <Route path="/policies" element={<PolicyLibraryPage />} />
+              <Route path="/dashboards/policy-acknowledgment" element={<PolicyComplianceDashboardPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/employees" replace />} />
           </Route>

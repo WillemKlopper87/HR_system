@@ -34,6 +34,13 @@ hcm/
                 verbatim from the official form documents into constants.py; reads
                 learning data via learning/queries.py, not a direct model import —
                 see Module rules below
+    policies/  HR policy document library + versioning + acknowledgment tracking
+                (Policy section, unplanned addition, ADR-008); document upload with
+                PDF/DOCX/TXT text extraction (extraction.py) and a deterministic
+                paragraph/sentence-aware chunking pipeline (chunking.py) — the seam
+                a future RAG/chatbot phase would embed and retrieve over; no
+                embeddings, vector search, or LLM integration exist yet (deliberately
+                deferred — see ADR-008)
   frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards
     pages/     employee list/detail, org structure, data quality, headcount dashboard
@@ -47,7 +54,10 @@ hcm/
                EE configuration, EE reports, equity dashboard (Sprint 13-14 —
                hr_admin/ee_manager/accounting_officer/auditor only); my-profile,
                my-benefits, my-learning (Sprint 15 — every employee, self-scoped
-               server-side, same unrouted-from-RequireRole shape as my-verification)
+               server-side, same unrouted-from-RequireRole shape as my-verification);
+               policies (hr_admin-only library + upload/publish workflow),
+               dashboards/policy-acknowledgment (hr_admin-only compliance %),
+               my-policies (every employee — read + acknowledge, Policy section)
     liveness/  face-api.js wrapper + shared camera-capture component (Sprint 12c);
                lazy-loaded (React.lazy) since TensorFlow.js is ~1MB and only this
                one page needs it
@@ -78,13 +88,22 @@ Demo logins from `seed_demo_data` (password = username + "123"): `hradmin` (HR A
 sign-off only — Sprint 13-14), `employee` (Employee, self-scope only). Every login can
 reach the Sprint 15 self-service pages (my-profile/my-benefits/my-learning) for their
 own record — `employee`'s own contact details/self-ID are left deliberately unset by
-the seed script so there's something real to fill in on first login.
+the seed script so there's something real to fill in on first login. Every login can
+also reach my-policies; `hradmin` additionally sees the Policy Library and Policy
+Compliance dashboard, seeded with a mix of published (varied acknowledgment %) and
+one draft policy left unpublished for a live demo.
 
 `identity_verification`'s face-descriptor model weights are checked into
 `frontend/public/models/` (copied from `node_modules/@vladmandic/face-api/model/` —
 TinyFaceDetector + FaceLandmark68 + FaceRecognition, ~7MB total), so no extra
 download step is needed for local dev. `/my-verification` needs real camera
 (and ideally geolocation) permission in the browser to do anything useful.
+
+`policies.Policy.source_file` is this codebase's first use of file storage —
+uploaded PDF/DOCX/TXT policy documents are saved under `MEDIA_ROOT` (`backend/media/`,
+gitignored, served by Django itself only when `DEBUG=1`; production would point this
+at S3/Azure Blob instead, per ADR-005's deferral pattern). No extra setup needed
+locally — Django's storage backend creates `media/` itself on the first upload.
 
 Frontend — the Vite dev server proxies `/api` and `/admin` to `localhost:8000`
 (`vite.config.ts`), so run both at once:
@@ -180,6 +199,15 @@ docker compose up --build
   `compensation.BenefitsElectionViewSet.perform_create()` (non-privileged
   callers can only ever create a row for themselves, regardless of what
   `employee` id the client sends).
+- `policies` follows `identity_verification`'s "no vendor under contract yet"
+  pattern for two separate things at once (ADR-008): no biometric-style
+  vendor risk applies here, but no LLM vendor is under contract either, and
+  wiring one is a real per-query cost + an abuse-prevention design that
+  needs sign-off before it ships — not something to bolt on incidentally
+  because the plumbing (`policies/chunking.py`) happened to get built.
+  `PolicyChunk` rows exist and are inspectable (`GET /policies/{id}/chunks/`)
+  precisely so that seam is real and tested now, without pretending the
+  retrieval/chatbot layer on top of it exists yet.
 
 ## CI
 

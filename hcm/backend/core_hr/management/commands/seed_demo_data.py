@@ -31,6 +31,8 @@ from identity_verification.services import enroll_employee, run_liveness_check
 from learning.models import Certification, EmployeeSkill, Skill, TrainingRecord
 from performance.models import Feedback, Goal, Review, ReviewCycle
 from performance.services import launch_review_cycle
+from policies.models import Policy
+from policies.services import acknowledge_policy, create_policy, publish_policy
 from recruitment.models import Applicant, Offer, Requisition
 from recruitment.services import transition_applicant
 
@@ -252,6 +254,7 @@ class Command(BaseCommand):
                 hr_admin=hr_head, ee_manager=ops_head, accounting_officer=ceo, levels=levels, rng=rng,
             )
             self._seed_ess_demo_data(direct_report=staff)
+            self._seed_policies_demo_data(hr_admin=hr_head, direct_report=staff, rng=rng)
 
         run_data_quality_checks()
 
@@ -724,3 +727,82 @@ class Command(BaseCommand):
                     employee=direct_report, benefit=benefit, status=BenefitsElection.Status.ENROLLED,
                     effective_date=date(2024, 1, 1),
                 )
+
+    def _seed_policies_demo_data(self, *, hr_admin, direct_report, rng):
+        """Three published policies with a realistic acknowledgment spread
+        (not 0% or 100%, so the compliance dashboard looks real), one
+        created from an uploaded text file to genuinely exercise the
+        extraction/chunking path (not just typed body text), and one
+        policy deliberately left in DRAFT so hr_admin has something
+        actionable to publish live. The 'employee' demo login has
+        acknowledged one policy and left another outstanding, so
+        MyPoliciesPage shows both states on first login."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        conduct = create_policy(
+            title="Code of Conduct",
+            category=Policy.Category.CODE_OF_CONDUCT,
+            body=(
+                "All Sentech employees are expected to act with honesty, integrity, and respect toward "
+                "colleagues, clients, and the public. Conflicts of interest must be disclosed to your manager "
+                "or HR as soon as they arise. Company property and information must be used responsibly and "
+                "never for personal gain. Violations may result in disciplinary action up to and including "
+                "dismissal, in line with the Labour Relations Act."
+            ),
+            effective_date=date(2024, 1, 1), actor=hr_admin,
+        )
+        publish_policy(conduct, actor=hr_admin)
+
+        leave_body = (
+            "Employees accrue annual leave at 1.25 days per completed month of service (15 days per year), "
+            "in line with the Basic Conditions of Employment Act minimum. Leave must be requested at least "
+            "two weeks in advance where possible and approved by your line manager. Sick leave follows a "
+            "36-month cycle entitlement; a medical certificate is required for absences longer than two "
+            "consecutive days. Unused annual leave may be carried over by written agreement with HR, up to "
+            "a maximum of 5 days."
+        )
+        leave_upload = SimpleUploadedFile("leave-policy.txt", leave_body.encode("utf-8"), content_type="text/plain")
+        leave = create_policy(
+            title="Leave Policy", category=Policy.Category.LEAVE, file=leave_upload,
+            effective_date=date(2024, 1, 1), actor=hr_admin,
+        )
+        publish_policy(leave, actor=hr_admin)
+
+        popia = create_policy(
+            title="POPIA / Data Privacy Policy",
+            category=Policy.Category.POPIA_PRIVACY,
+            body=(
+                "Sentech processes personal information strictly for legitimate HR, payroll, and Employment "
+                "Equity reporting purposes, in line with the Protection of Personal Information Act (POPIA). "
+                "Special personal information — race, gender, disability status, and biometric data — is only "
+                "captured with explicit consent, recorded and auditable. Employees may request access to, "
+                "correction of, or deletion of their own personal information at any time by contacting HR."
+            ),
+            effective_date=date(2024, 6, 1), actor=hr_admin,
+        )
+        publish_policy(popia, actor=hr_admin)
+
+        create_policy(
+            title="Remote Work Policy",
+            category=Policy.Category.REMOTE_WORK,
+            body=(
+                "Employees may work remotely up to 3 days per week with manager approval, subject to the "
+                "2-day minimum in-office requirement tracked via the Workforce Integrity module. Draft — "
+                "pending final sign-off from Exco."
+            ),
+            actor=hr_admin,
+        )  # left in DRAFT deliberately — hr_admin's live "publish" demo
+
+        all_employees = list(Employee.objects.all())
+        conduct_ackers = [e for e in rng.sample(all_employees, min(100, len(all_employees))) if e != direct_report]
+        for employee in conduct_ackers:
+            acknowledge_policy(conduct, employee=employee)
+
+        popia_ackers = [direct_report] + [
+            e for e in rng.sample(all_employees, min(60, len(all_employees))) if e != direct_report
+        ]
+        for employee in popia_ackers:
+            if employee is not None:
+                acknowledge_policy(popia, employee=employee)
+        # `leave` is left with zero acknowledgments — freshly published,
+        # nobody's gotten to it yet; a third realistic completion state.

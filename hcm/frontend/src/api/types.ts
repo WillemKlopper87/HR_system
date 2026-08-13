@@ -621,3 +621,76 @@ export interface EquityDashboard {
   ee_plan_id: number | null
   target_vs_actual_gap_pct: WorkforceMatrix
 }
+
+// Policy library (Policy section)
+
+export type PolicyCategory =
+  | 'code_of_conduct' | 'leave' | 'it_acceptable_use' | 'anti_harassment'
+  | 'health_safety' | 'remote_work' | 'popia_privacy' | 'other'
+
+export const POLICY_CATEGORY_LABELS: Record<PolicyCategory, string> = {
+  code_of_conduct: 'Code of Conduct',
+  leave: 'Leave Policy',
+  it_acceptable_use: 'IT Acceptable Use',
+  anti_harassment: 'Anti-Harassment & Anti-Discrimination',
+  health_safety: 'Health & Safety',
+  remote_work: 'Remote Work',
+  popia_privacy: 'POPIA / Data Privacy',
+  other: 'Other',
+}
+
+export type PolicyStatus = 'draft' | 'published' | 'archived'
+
+export const POLICY_STATUS_LABELS: Record<PolicyStatus, string> = {
+  draft: 'Draft',
+  published: 'Published',
+  archived: 'Archived',
+}
+
+export interface Policy {
+  id: number
+  code: string
+  title: string
+  category: PolicyCategory
+  body: string
+  source_file: string | null
+  chunk_count: number
+  version: number
+  status: PolicyStatus
+  effective_date: string | null
+  created_by: number | null
+  published_by: number | null
+  published_at: string | null
+}
+
+export interface PolicyChunk {
+  id: number
+  sequence: number
+  text: string
+}
+
+export interface PolicyAcknowledgment {
+  id: number
+  employee: number
+  employee_number: string
+  policy: number
+  policy_title: string
+  policy_version: number
+  acknowledged_at: string
+}
+
+export interface PolicyAcknowledgmentDashboardRow {
+  policy_id: number
+  title: string
+  category: PolicyCategory
+  version: number
+  published_at: string | null
+  total_employees: number
+  acknowledged_count: number
+  acknowledged_pct: number
+}
+
+export interface PolicyAcknowledgmentDashboard {
+  as_of: string
+  policies: PolicyAcknowledgmentDashboardRow[]
+}
