@@ -20,6 +20,7 @@ urlpatterns = [
     path("api/v1/", include("learning.urls")),
     path("api/v1/", include("compensation.urls")),
     path("api/v1/", include("assessments.urls")),
+    path("api/v1/", include("identity_verification.urls")),
     # Inbound provider webhooks are versioned separately from the session-
     # authenticated /api/v1/ surface (Architecture-Design.md §6) — HMAC
     # signature verification is the auth here, not a Django session.

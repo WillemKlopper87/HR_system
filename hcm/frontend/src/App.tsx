@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { LoginPage } from './auth/LoginPage'
@@ -21,6 +22,14 @@ import { ReviewDetailPage } from './pages/ReviewDetailPage'
 import { ReviewsPage } from './pages/ReviewsPage'
 import { SkillsInventoryPage } from './pages/SkillsInventoryPage'
 import { TeamDevelopmentPage } from './pages/TeamDevelopmentPage'
+import { WorkforceIntegrityPage } from './pages/WorkforceIntegrityPage'
+
+// Code-split: face-api.js pulls in TensorFlow.js (~1MB) for client-side
+// face descriptor extraction. Only this page needs it, so it shouldn't
+// bloat the bundle every other page pays for on load.
+const MyIdentityVerificationPage = lazy(() =>
+  import('./pages/MyIdentityVerificationPage').then((m) => ({ default: m.MyIdentityVerificationPage })),
+)
 
 export default function App() {
   return (
@@ -55,6 +64,17 @@ export default function App() {
             </Route>
             <Route element={<RequireRole roles={['ee_manager', 'hr_admin']} />}>
               <Route path="/assessments" element={<AssessmentsPage />} />
+            </Route>
+            <Route
+              path="/my-verification"
+              element={
+                <Suspense fallback={<p className="empty-state">Loading…</p>}>
+                  <MyIdentityVerificationPage />
+                </Suspense>
+              }
+            />
+            <Route element={<RequireRole roles={['hr_admin']} />}>
+              <Route path="/workforce-integrity" element={<WorkforceIntegrityPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/employees" replace />} />
           </Route>

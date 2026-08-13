@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "learning",
     "compensation",
     "assessments",
+    "identity_verification",
 ]
 
 MIDDLEWARE = [

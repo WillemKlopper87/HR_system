@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -22,6 +22,8 @@ from assessments.models import ProviderConfig
 from assessments.services import assign_assessment, simulate_provider_completion
 from compensation.models import Benefit, BenefitsElection, PayBand
 from compensation.services import approve_proposal, propose_compensation_change, reject_proposal
+from identity_verification.models import LivenessCheck
+from identity_verification.services import enroll_employee, run_liveness_check
 from learning.models import Certification, EmployeeSkill, Skill, TrainingRecord
 from performance.models import Feedback, Goal, Review, ReviewCycle
 from performance.services import launch_review_cycle
@@ -46,10 +48,13 @@ DEPARTMENTS = [
 ]
 
 LOCATIONS = [
-    ("Head Office — Johannesburg", "JHB", "GP"),
-    ("Cape Town Office", "CPT", "WC"),
-    ("Durban Office", "DBN", "KZN"),
-    ("Pretoria Office", "PTA", "GP"),
+    # name, code, province, latitude, longitude — coordinates are each
+    # office's approximate real-world CBD location, used by
+    # identity_verification's office-attendance geofence check.
+    ("Head Office — Johannesburg", "JHB", "GP", -26.2041, 28.0473),
+    ("Cape Town Office", "CPT", "WC", -33.9249, 18.4241),
+    ("Durban Office", "DBN", "KZN", -29.8587, 31.0218),
+    ("Pretoria Office", "PTA", "GP", -25.7479, 28.2293),
 ]
 
 FIRST_NAMES = [
@@ -101,7 +106,10 @@ class Command(BaseCommand):
 
         with transaction.atomic():
             departments = [Department.objects.create(name=name, code=code) for name, code in DEPARTMENTS]
-            locations = [Location.objects.create(name=n, code=c, province=p) for n, c, p in LOCATIONS]
+            locations = [
+                Location.objects.create(name=n, code=c, province=p, latitude=lat, longitude=lng)
+                for n, c, p, lat, lng in LOCATIONS
+            ]
             levels = list(OccupationalLevel.objects.order_by("order"))
             grades_by_level = {
                 level.code: [
@@ -226,6 +234,7 @@ class Command(BaseCommand):
             self._seed_assessments_demo_data(
                 ee_manager=ops_head, hr_admin=hr_head, recruiter=slm_head, direct_report=staff, second_employee=eng_head,
             )
+            self._seed_identity_verification_demo_data(direct_report=staff, rng=rng)
 
         run_data_quality_checks()
 
@@ -508,3 +517,47 @@ class Command(BaseCommand):
                 applicant_id=applicant.id, assessment_type="technical", assigned_by=recruiter,
             )
             simulate_provider_completion(applicant_assignment)
+
+    def _seed_identity_verification_demo_data(self, *, direct_report, rng):
+        """Enrolls a sample of employees (fake random descriptors — not
+        tied to any real face) with a spread of this-week check-in history,
+        so MyIdentityVerificationPage has real data for the 'employee'
+        demo login and WorkforceIntegrityPage's attendance table shows a
+        realistic mix of compliant/non-compliant employees. One check for
+        the direct_report is deliberately built from a mismatched
+        descriptor and left pending, so the hr_admin review queue isn't
+        empty in a fresh demo."""
+        all_employees = list(Employee.objects.all())
+        sampled = rng.sample(all_employees, min(15, len(all_employees)))
+        if direct_report is not None and direct_report not in sampled:
+            sampled = [direct_report] + sampled[:14]
+
+        today = timezone.localdate()
+        week_start = today - timedelta(days=today.weekday())
+
+        for employee in sampled:
+            record_consent(
+                employee=employee, purpose=ConsentRecord.Purpose.BIOMETRIC,
+                lawful_basis=ConsentRecord.LawfulBasis.CONSENT, text_version="v1",
+            )
+            descriptor = [rng.uniform(-1.0, 1.0) for _ in range(128)]
+            enroll_employee(employee=employee, descriptor=descriptor)
+
+            version = employee.current_version
+            office = version.location if version is not None else None
+            has_geofence = office is not None and office.latitude is not None and office.longitude is not None
+
+            available_weekdays = min(today.weekday() + 1, 5)
+            num_checkins = rng.choice([0, 1, 1, 2, 3])
+            checkin_days = rng.sample(range(available_weekdays), min(num_checkins, available_weekdays))
+            for day_offset in checkin_days:
+                close_descriptor = [v + rng.uniform(-0.05, 0.05) for v in descriptor]
+                lat = float(office.latitude) if has_geofence else None
+                lng = float(office.longitude) if has_geofence else None
+                check = run_liveness_check(employee=employee, descriptor=close_descriptor, latitude=lat, longitude=lng)
+                checkin_at = timezone.make_aware(datetime.combine(week_start + timedelta(days=day_offset), time(9, 0)))
+                LivenessCheck.objects.filter(pk=check.pk).update(created_at=checkin_at)
+
+        if direct_report is not None:
+            flagged_descriptor = [rng.uniform(-1.0, 1.0) for _ in range(128)]
+            run_liveness_check(employee=direct_report, descriptor=flagged_descriptor)

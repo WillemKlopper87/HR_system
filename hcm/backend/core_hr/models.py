@@ -77,6 +77,11 @@ class Location(TimestampedModel):
     code = models.CharField(max_length=20, unique=True)
     province = models.CharField(max_length=3, choices=Province.choices, blank=True)
     active = models.BooleanField(default=True)
+    # Office geofence centre — optional (Sprint 12b: identity_verification's
+    # office-attendance check needs this to know what "at the office" means
+    # for a given Location; blank until an admin sets it for a site).
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
     history = HistoricalRecords()
 

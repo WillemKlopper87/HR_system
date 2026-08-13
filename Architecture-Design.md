@@ -27,6 +27,7 @@ This document fills in what the baseline left open: framework, auth, history pat
 | ADR-004 | Authentication | **OIDC single sign-on against Microsoft Entra ID** | Sentech is an M365 estate. No local passwords for staff; local break-glass admin only. Entra groups can seed RBAC role assignment |
 | ADR-005 | Hosting | **Docker Compose on a company VM (or Azure equivalent), single node, dev/staging/prod** | Headcount-scale workload (thousands of employees, tens of concurrent users) needs no orchestration platform. Postgres + app + worker + reverse proxy on one host, with tested backups, is the right size. Revisit only if NFRs change |
 | ADR-006 | Pay-data authority | **Payroll/SAP remains master for actual pay; HCM masters pay *bands* and comp *proposals*** | Avoids dual-mastering salary. Approved comp reviews export to payroll via the integration layer (I1); actuals sync back read-only. Confirm direction in Sprint 0 |
+| ADR-007 | Ghost-employee mitigation (identity_verification, unplanned addition) | **Client-side face descriptor matching (no 3rd-party biometric vendor), human-review-required for every non-match** | Same reasoning as ADR-003 extended further: facial recognition has well-documented accuracy/bias limitations, and this system is Employment-Equity-focused, so an automated "this looks like a ghost employee" decision would be irresponsible without a human in the loop. No biometric vendor is under contract (mirrors A4's still-open assessment-provider shortlist), so face detection/descriptor extraction runs entirely in the browser (`@vladmandic/face-api`, TensorFlow.js) — the raw photo/video never reaches the server, only the derived 128-float descriptor. POPIA (s26/27) treats biometric data as "special personal information," gated by its own dedicated consent purpose, separate from this system's generic P/I/S/R tiers |
 
 ## 3. System context
 
@@ -197,6 +198,7 @@ Every column in the data dictionary (Sprint 0) gets one of four tiers; the seria
 | Email / notifications | Microsoft Graph sendMail (falls back to SMTP relay) via the cross-cutting notification service | Gap I2/F9 |
 | DEL (EEA2/EEA4) | File export per official spec; **field layout is versioned configuration** so annual DEL changes are config edits, not code (gap C3) | |
 | SETA (WSP/ATR) | Export from L&D training records (gap C2) | |
+| Biometric/geolocation verification (ADR-007) | No external integration — client-side match (`@vladmandic/face-api`) + browser Geolocation API; backend only receives the derived descriptor and coordinates | If a real biometric vendor is contracted later, it slots in the same way the assessment adapter does — one new adapter, `identity_verification/services.py` untouched |
 
 ## 12. What this changes in the sprint plan
 

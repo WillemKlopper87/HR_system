@@ -19,6 +19,10 @@ hcm/
     assessments/ provider-agnostic assessment adapter, consent-gated assign workflow,
                 HMAC-signed inbound webhook (Sprint 12); applicant_id is an unconstrained
                 reference, not a cross-app FK — see Module rules below
+    identity_verification/ ghost-employee mitigation: client-side face-descriptor
+                enrollment/verification (no biometric vendor — face-api.js runs in the
+                browser) + office-attendance geofence check (Sprint 12c, unplanned
+                addition; see ADR-007 in Architecture-Design.md)
   frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards
     pages/     employee list/detail, org structure, data quality, headcount dashboard
@@ -27,7 +31,11 @@ hcm/
                (Sprint 8 — skills/certs/training live on employee detail, like goals/feedback);
                pay bands, comp proposals, benefits (Sprint 10 — comp_manager/hr_admin only);
                employee assessments (Sprint 12 — ee_manager/hr_admin only; applicant-subject
-               assessments live on ApplicantDetailPage instead, like Offer)
+               assessments live on ApplicantDetailPage instead, like Offer); my-verification
+               (Sprint 12c — every employee) + workforce-integrity (hr_admin's review queue)
+    liveness/  face-api.js wrapper + shared camera-capture component (Sprint 12c);
+               lazy-loaded (React.lazy) since TensorFlow.js is ~1MB and only this
+               one page needs it
     components/ small pieces shared across pages (e.g. the dashboard Breakdown chart)
     api/       fetch client (CSRF-aware) + shared reference-data context
   docker-compose.yml  db + redis + backend + celery worker (ADR-005)
@@ -49,6 +57,12 @@ python -m venv .venv            # NOTE: prefer a venv OUTSIDE OneDrive (see belo
 Demo logins from `seed_demo_data` (password = username + "123"): `hradmin` (HR Admin),
 `manager` (Line Manager), `recruiter` (Recruiter), `compmanager` (Compensation Manager),
 `eemanager` (EE Manager), `employee` (Employee, self-scope only).
+
+`identity_verification`'s face-descriptor model weights are checked into
+`frontend/public/models/` (copied from `node_modules/@vladmandic/face-api/model/` —
+TinyFaceDetector + FaceLandmark68 + FaceRecognition, ~7MB total), so no extra
+download step is needed for local dev. `/my-verification` needs real camera
+(and ideally geolocation) permission in the browser to do anything useful.
 
 Frontend — the Vite dev server proxies `/api` and `/admin` to `localhost:8000`
 (`vite.config.ts`), so run both at once:
@@ -110,6 +124,10 @@ docker compose up --build
   genuinely different access rules, not just a row-scope mismatch, so it skips
   the generic helpers entirely in favour of an explicit permission class
   (`assessments/permissions.py::CanAccessAssessmentAssignment`).
+  `identity_verification` does the same for a different reason: biometric data
+  doesn't fit the generic P/I/S/R tiers at all (POPIA treats it as a stricter
+  category than this system's highest generic tier) — see
+  `identity_verification/permissions.py::IsSelfOrHRAdmin`.
 
 ## CI
 

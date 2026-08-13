@@ -408,6 +408,12 @@ textarea:focus {
   padding: 20px;
 }
 
+.camera-preview {
+  background: #000;
+  border-radius: 8px;
+  max-width: 100%;
+}
+
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

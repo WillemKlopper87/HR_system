@@ -447,3 +447,56 @@ export interface TeamDevelopmentRow {
   active_training_count: number
   completed_training_count: number
 }
+
+export interface BiometricEnrollment {
+  id: number
+  employee: number
+  enrolled_by: number | null
+  created_at: string
+  updated_at: string
+}
+
+export type LivenessOutcome = 'match' | 'no_match' | 'no_face_detected'
+export type LivenessReviewStatus = 'not_required' | 'pending' | 'confirmed_match' | 'confirmed_mismatch'
+export type LivenessTrigger = 'self' | 'hr_requested'
+
+export interface LivenessCheck {
+  id: number
+  employee: number
+  trigger: LivenessTrigger
+  requested_by: number | null
+  match_distance: number | null
+  outcome: LivenessOutcome
+  latitude: number | null
+  longitude: number | null
+  distance_from_office_m: number | null
+  at_office: boolean | null
+  review_status: LivenessReviewStatus
+  reviewed_by: number | null
+  reviewed_at: string | null
+  review_notes: string
+  created_at: string
+}
+
+export interface AttendanceSummaryRow {
+  employee: number
+  employee_number: string
+  employee_name: string
+  week_start: string
+  days_in_office: number
+  required_days: number
+  compliant: boolean
+}
+
+export const LIVENESS_OUTCOME_LABELS: Record<LivenessOutcome, string> = {
+  match: 'Matched enrolled identity',
+  no_match: 'Did not match',
+  no_face_detected: 'No face detected',
+}
+
+export const LIVENESS_REVIEW_STATUS_LABELS: Record<LivenessReviewStatus, string> = {
+  not_required: 'Not required',
+  pending: 'Pending HR review',
+  confirmed_match: 'Confirmed match',
+  confirmed_mismatch: 'Confirmed mismatch — escalated',
+}

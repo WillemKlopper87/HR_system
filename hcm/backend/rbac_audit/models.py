@@ -141,6 +141,7 @@ class ConsentRecord(models.Model):
     class Purpose(models.TextChoices):
         DEMOGRAPHIC_SELF_ID = "demographic_self_id", "Demographic self-identification"
         ASSESSMENT = "assessment", "Psychometric assessment"
+        BIOMETRIC = "biometric", "Biometric identity + attendance-location verification"
         OTHER = "other", "Other"
 
     class LawfulBasis(models.TextChoices):
