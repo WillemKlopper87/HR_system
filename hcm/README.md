@@ -13,7 +13,12 @@ hcm/
                 + Sprint 15 ESS (EmployeeViewSet: PATCH own contact details, consent-gated
                 self-ID via consent/self_identify actions)
     rbac_audit/ shared RBAC + audit + consent layer (Sprint 2); + Sprint 3 session auth;
-                ConsentRecord extended in Sprint 4 to an employee-or-applicant subject
+                ConsentRecord extended in Sprint 4 to an employee-or-applicant subject;
+                + step-up MFA (TOTPDevice/StepUpGrant, stepup.py, unplanned addition,
+                ADR-009) — RFC 6238 TOTP + mandatory business-justification reason,
+                required together, gating compensation.PayBand/CompProposal and
+                ee_reporting.RemunerationRecord specifically (the models
+                Data-Dictionary.md tiers "R")
     recruitment/ requisitions, applicant pipeline, offers, hire automation (Sprint 4)
     performance/ goals, review cycles, self/manager reviews, feedback (Sprint 6)
     learning/  skills, certifications, training records, WSP/ATR export (Sprint 8);
@@ -42,7 +47,11 @@ hcm/
                 embeddings, vector search, or LLM integration exist yet (deliberately
                 deferred — see ADR-008)
   frontend/    React 19 + TypeScript (Vite) + React Router
-    auth/      session login/logout, route guards
+    auth/      session login/logout, route guards; RequirePayrollStepUp.tsx —
+               TOTP enrollment + step-up challenge UI, a children-wrapper (not a
+               route-Outlet guard like RequireRole) around PayBandsPage,
+               CompProposalsPage, and just the remuneration sub-section of
+               EEConfigurationPage
     pages/     employee list/detail, org structure, data quality, headcount dashboard
                (Sprint 3); requisitions, applicants, recruitment dashboard (Sprint 4);
                review cycles, reviews (Sprint 6); skills inventory, team development
@@ -92,6 +101,12 @@ the seed script so there's something real to fill in on first login. Every login
 also reach my-policies; `hradmin` additionally sees the Policy Library and Policy
 Compliance dashboard, seeded with a mix of published (varied acknowledgment %) and
 one draft policy left unpublished for a live demo.
+
+No demo login starts with a TOTP device enrolled (ADR-009) — `pay-bands`,
+`comp-proposals`, and EE Configuration's Remuneration Records section all show a
+live step-up-authentication challenge (enroll → confirm → verify + justify) on
+first visit for `compmanager`/`hradmin`, deliberately, so there's always something
+real to demo for that capability rather than a pre-satisfied gate.
 
 `identity_verification`'s face-descriptor model weights are checked into
 `frontend/public/models/` (copied from `node_modules/@vladmandic/face-api/model/` —
@@ -208,6 +223,17 @@ docker compose up --build
   `PolicyChunk` rows exist and are inspectable (`GET /policies/{id}/chunks/`)
   precisely so that seam is real and tested now, without pretending the
   retrieval/chatbot layer on top of it exists yet.
+- `RequiresPayrollStepUp` (ADR-009) is layered ON TOP OF a module's normal
+  role-based permission class in `permission_classes` — DRF requires every
+  listed class to pass, so this doesn't replace
+  `compensation.IsCompManagerOrHRAdmin`/`ee_reporting.EEReportingPermission`,
+  it adds a second, narrower bar for the three Restricted-tier payroll
+  models specifically. Only apply it to a whole viewset when every field on
+  that model is genuinely payroll data — `recruitment.Offer` is also "R"
+  but mixed with non-pay fields, which is why it's explicitly NOT gated
+  this way (see the sprint plan's own entry for the reasoning); a
+  field-level version of this pattern is the right follow-up there, not a
+  copy-paste of the viewset-level one.
 
 ## CI
 

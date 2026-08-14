@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import { RequirePayrollStepUp } from '../auth/RequirePayrollStepUp'
 import type { EEQuestionnaire, EmployerConfig, RemunerationRecord } from '../api/types'
 import {
   BARRIER_CATEGORIES,
@@ -18,7 +19,6 @@ const CURRENT_YEAR = new Date().getFullYear()
 export function EEConfigurationPage() {
   const [config, setConfig] = useState<EmployerConfig | null>(null)
   const [questionnaire, setQuestionnaire] = useState<EEQuestionnaire | null>(null)
-  const [records, setRecords] = useState<RemunerationRecord[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   function load() {
@@ -26,12 +26,10 @@ export function EEConfigurationPage() {
     Promise.all([
       fetchAllPages<EmployerConfig>('/employer-config/'),
       fetchAllPages<EEQuestionnaire>(`/ee-questionnaires/?report_year=${CURRENT_YEAR}`),
-      fetchAllPages<RemunerationRecord>('/remuneration-records/'),
     ])
-      .then(([configs, questionnaires, remRecords]) => {
+      .then(([configs, questionnaires]) => {
         setConfig(configs[0] ?? null)
         setQuestionnaire(questionnaires[0] ?? null)
-        setRecords(remRecords)
       })
       .catch(() => setError('Failed to load EE configuration.'))
   }
@@ -62,10 +60,33 @@ export function EEConfigurationPage() {
 
       <section className="detail-card">
         <h2>Remuneration Records</h2>
-        <RemunerationSection records={records} onImported={load} />
+        {/* Restricted-tier (Data-Dictionary.md) — gated separately from
+            the rest of this page so a missing step-up grant doesn't break
+            employer config/questionnaire loading above, which aren't
+            payroll data. */}
+        <RequirePayrollStepUp>
+          <RemunerationRecordsLoader />
+        </RequirePayrollStepUp>
       </section>
     </div>
   )
+}
+
+function RemunerationRecordsLoader() {
+  const [records, setRecords] = useState<RemunerationRecord[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  function load() {
+    setError(null)
+    fetchAllPages<RemunerationRecord>('/remuneration-records/')
+      .then(setRecords)
+      .catch(() => setError('Failed to load remuneration records.'))
+  }
+
+  useEffect(load, [])
+
+  if (error) return <p className="form-error">{error}</p>
+  return <RemunerationSection records={records} onImported={load} />
 }
 
 const EMPTY_EMPLOYER_CONFIG: Partial<EmployerConfig> = {

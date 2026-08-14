@@ -2,16 +2,28 @@ from __future__ import annotations
 
 from datetime import date
 
+import pyotp
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rbac_audit.models import Role, RoleAssignment
+from rbac_audit.stepup import confirm_totp_device, enroll_totp_device, request_step_up
 from rest_framework.test import APIClient
 
 from .models import EEQuestionnaire, EEReport, EmployerConfig, RemunerationRecord
 from .services import ee_manager_approve, generate_report, submit_for_review
 
 User = get_user_model()
+
+
+def _grant_payroll_step_up(employee):
+    """remuneration_record is Restricted-tier (Data-Dictionary.md: "imported
+    from SAP payroll") — see RemunerationRecordViewSet's docstring."""
+    device = enroll_totp_device(employee)
+    confirm_totp_device(employee, code=pyotp.TOTP(device.secret).now())
+    request_step_up(
+        employee, code=pyotp.TOTP(device.secret).now(), scope="payroll_data", reason="payroll_processing",
+    )
 
 
 def _seed_reference_data():
@@ -211,6 +223,7 @@ class RemunerationImportApiTests(EEReportingApiTestCase):
             occupational_level=self.level, job_grade=self.grade, location=self.location,
         )
         csv_text = f"employee_number,period_start,period_end,fixed_remuneration,variable_remuneration\n{emp.employee_number},2025-09-01,2026-08-31,300000,50000"
+        _grant_payroll_step_up(self.hr_admin)
         self.client.force_authenticate(user=self.hr_admin.user)
         response = self.client.post("/api/v1/remuneration-records/import_csv/", {"csv": csv_text}, format="json")
         self.assertEqual(response.status_code, 201, response.data)
@@ -221,6 +234,20 @@ class RemunerationImportApiTests(EEReportingApiTestCase):
         self.client.force_authenticate(user=self.ee_manager.user)
         response = self.client.post("/api/v1/remuneration-records/import_csv/", {"csv": "x"}, format="json")
         self.assertEqual(response.status_code, 403)
+
+    def test_hr_admin_without_step_up_grant_is_blocked(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/remuneration-records/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_hr_admin_gains_access_after_step_up_grant(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/remuneration-records/")
+        self.assertEqual(response.status_code, 403)
+
+        _grant_payroll_step_up(self.hr_admin)
+        response = self.client.get("/api/v1/remuneration-records/")
+        self.assertEqual(response.status_code, 200)
 
 
 class EquityDashboardApiTests(EEReportingApiTestCase):

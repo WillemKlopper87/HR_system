@@ -695,3 +695,30 @@ export interface PolicyAcknowledgmentDashboard {
   as_of: string
   policies: PolicyAcknowledgmentDashboardRow[]
 }
+
+// Step-up MFA (Restricted-tier payroll data access)
+
+export interface TOTPStatus {
+  enrolled: boolean
+  pending_confirmation: boolean
+}
+
+export interface TOTPEnrollResponse {
+  secret: string
+  provisioning_uri: string
+}
+
+export type StepUpReason =
+  | 'payroll_processing' | 'employee_query' | 'compliance_reporting' | 'system_troubleshooting' | 'other'
+
+export const STEP_UP_REASON_LABELS: Record<StepUpReason, string> = {
+  payroll_processing: 'Payroll processing or audit',
+  employee_query: 'Employee query or dispute resolution',
+  compliance_reporting: 'Compliance or regulatory reporting',
+  system_troubleshooting: 'System troubleshooting',
+  other: 'Other (specify)',
+}
+
+export interface StepUpStatus {
+  active: boolean
+}

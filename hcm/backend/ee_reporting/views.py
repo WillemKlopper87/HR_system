@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.http import HttpResponse
 from rbac_audit.drf import get_request_employee, int_query_param
 from rbac_audit.permissions import has_role
+from rbac_audit.stepup import RequiresPayrollStepUp
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -97,11 +98,18 @@ class EEQuestionnaireViewSet(viewsets.ModelViewSet):
 
 class RemunerationRecordViewSet(viewsets.ModelViewSet):
     """No PATCH/PUT — records are only ever created via CSV import
-    (import_csv, which upserts) so there's no reason to hand-edit one."""
+    (import_csv, which upserts) so there's no reason to hand-edit one.
+    RequiresPayrollStepUp: unlike EEReport (Sensitive-tier aggregated
+    snapshots), remuneration_record is Data-Dictionary.md's literal
+    per-employee payroll figures ("imported from SAP payroll") — Restricted
+    tier, same step-up bar as compensation.PayBand/CompProposal. Report
+    *generation* (services.py::generate_report) reads this table directly
+    at the ORM layer, not through this viewset, so a signed-off EEA4 isn't
+    blocked by whether anyone currently holds a step-up grant."""
 
     queryset = RemunerationRecord.objects.select_related("employee")
     serializer_class = RemunerationRecordSerializer
-    permission_classes = [EEReportingPermission]
+    permission_classes = [EEReportingPermission, RequiresPayrollStepUp]
     http_method_names = ["get", "post", "head", "options"]
 
     def get_queryset(self):

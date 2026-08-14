@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { LoginPage } from './auth/LoginPage'
 import { RequireAuth, RequireRole } from './auth/RequireAuth'
+import { RequirePayrollStepUp } from './auth/RequirePayrollStepUp'
 import { AppShell } from './layout/AppShell'
 import { ApplicantDetailPage } from './pages/ApplicantDetailPage'
 import { ApplicantsPage } from './pages/ApplicantsPage'
@@ -67,8 +68,14 @@ export default function App() {
             <Route path="/reviews/:id" element={<ReviewDetailPage />} />
             <Route path="/team-development" element={<TeamDevelopmentPage />} />
             <Route element={<RequireRole roles={['comp_manager', 'hr_admin']} />}>
-              <Route path="/pay-bands" element={<PayBandsPage />} />
-              <Route path="/comp-proposals" element={<CompProposalsPage />} />
+              <Route
+                path="/pay-bands"
+                element={<RequirePayrollStepUp><PayBandsPage /></RequirePayrollStepUp>}
+              />
+              <Route
+                path="/comp-proposals"
+                element={<RequirePayrollStepUp><CompProposalsPage /></RequirePayrollStepUp>}
+              />
               <Route path="/benefits" element={<BenefitsPage />} />
             </Route>
             <Route element={<RequireRole roles={['ee_manager', 'hr_admin']} />}>

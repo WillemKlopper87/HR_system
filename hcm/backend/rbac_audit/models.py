@@ -92,6 +92,7 @@ class AuditLogEntry(models.Model):
         EXPORT = "export", "Export"
         LOGIN = "login", "Login"
         PERMISSION_CHANGE = "permission_change", "Permission change"
+        STEP_UP_GRANTED = "step_up_granted", "Step-up authentication granted"
 
     actor = models.ForeignKey(
         "core_hr.Employee",
@@ -176,6 +177,71 @@ class ConsentRecord(models.Model):
         subject = self.employee.employee_number if self.employee_id else f"applicant#{self.applicant_id}"
         status = "active" if self.withdrawn_at is None else "withdrawn"
         return f"{subject}: {self.get_purpose_display()} ({status})"
+
+
+class TOTPDevice(TimestampedModel):
+    """One authenticator-app device per employee (RFC 6238 TOTP), used for
+    step-up authentication before viewing Restricted-tier payroll data
+    (Data-Dictionary.md: compensation.pay_band/comp_proposal and
+    ee_reporting.remuneration_record are all "R") — ordinary session
+    login is not sufficient for that data. Not the same thing as ADR-004's
+    planned Entra ID SSO: that's how you get INTO the app; this is an
+    extra, deliberate step for a narrow set of Restricted-tier endpoints
+    once you're already in, mirroring how re-entering a reason for a
+    disruptive action (e.g. a server shutdown) is a distinct UX moment
+    from the login that got you shell access in the first place."""
+
+    employee = models.OneToOneField(
+        "core_hr.Employee", related_name="totp_device", on_delete=models.CASCADE
+    )
+    # Base32 (pyotp.random_base32()) — not itself a password, but treated
+    # as sensitive: a leaked secret lets someone generate valid codes
+    # without the physical device. No column-level encryption yet, same
+    # documented gap as national_id_number's "protected at rest by disk
+    # encryption (ADR-005); column-level encryption is a follow-up ADR."
+    secret = models.CharField(max_length=64)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        status = "confirmed" if self.confirmed_at else "pending confirmation"
+        return f"{self.employee.employee_number} TOTP device ({status})"
+
+
+class StepUpGrant(TimestampedModel):
+    """A time-boxed unlock of one Restricted-tier scope, obtained by
+    entering a valid TOTP code AND selecting a business-justification
+    reason together — both required in the same request, not two
+    separate steps a client could split and only do one of. Expires after
+    STEPUP_GRANT_MINUTES (services.py) — a new grant (new code, new
+    justification) is required after that, not a silent renewal, so a
+    grant obtained for a specific stated reason can't quietly cover an
+    entire day's unrelated browsing."""
+
+    class Scope(models.TextChoices):
+        PAYROLL_DATA = "payroll_data", "Payroll / compensation data"
+
+    class Reason(models.TextChoices):
+        PAYROLL_PROCESSING = "payroll_processing", "Payroll processing or audit"
+        EMPLOYEE_QUERY = "employee_query", "Employee query or dispute resolution"
+        COMPLIANCE_REPORTING = "compliance_reporting", "Compliance or regulatory reporting"
+        SYSTEM_TROUBLESHOOTING = "system_troubleshooting", "System troubleshooting"
+        OTHER = "other", "Other (specify)"
+
+    employee = models.ForeignKey(
+        "core_hr.Employee", related_name="step_up_grants", on_delete=models.CASCADE
+    )
+    scope = models.CharField(max_length=30, choices=Scope.choices)
+    reason = models.CharField(max_length=30, choices=Reason.choices)
+    reason_detail = models.TextField(blank=True)
+    granted_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-granted_at"]
+        indexes = [models.Index(fields=["employee", "scope", "expires_at"])]
+
+    def __str__(self):
+        return f"{self.employee.employee_number}: {self.scope} until {self.expires_at:%Y-%m-%d %H:%M}"
 
 
 class RetentionRule(TimestampedModel):

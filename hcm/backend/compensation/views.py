@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from rbac_audit.drf import get_request_employee
 from rbac_audit.permissions import has_role
+from rbac_audit.stepup import RequiresPayrollStepUp
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -19,9 +20,16 @@ from .services import ApprovalError, approve_proposal, propose_compensation_chan
 
 
 class PayBandViewSet(viewsets.ModelViewSet):
+    """RequiresPayrollStepUp is layered on top of IsCompManagerOrHRAdmin,
+    not instead of it — Data-Dictionary.md tiers pay_band "R" (Restricted),
+    so holding the comp_manager/hr_admin role is necessary but no longer
+    sufficient on its own; a live TOTP code + stated business
+    justification (rbac_audit.stepup) is required too, time-boxed per
+    STEPUP_GRANT_MINUTES."""
+
     queryset = PayBand.objects.select_related("job_grade", "created_by")
     serializer_class = PayBandSerializer
-    permission_classes = [IsCompManagerOrHRAdmin]
+    permission_classes = [IsCompManagerOrHRAdmin, RequiresPayrollStepUp]
 
     def perform_create(self, serializer):
         serializer.save(created_by=get_request_employee(self.request))
@@ -30,13 +38,14 @@ class PayBandViewSet(viewsets.ModelViewSet):
 class CompProposalViewSet(viewsets.ModelViewSet):
     """No PATCH on core fields — a proposal is created once via 'propose'
     semantics (see perform_create) and thereafter only moves through the
-    approve/reject actions, never edited in place."""
+    approve/reject actions, never edited in place. RequiresPayrollStepUp:
+    see PayBandViewSet's docstring — comp_proposal is also "R"-tier."""
 
     queryset = CompProposal.objects.select_related(
         "employee", "current_job_grade", "proposed_by", "approved_by"
     )
     serializer_class = CompProposalSerializer
-    permission_classes = [IsCompManagerOrHRAdmin]
+    permission_classes = [IsCompManagerOrHRAdmin, RequiresPayrollStepUp]
     http_method_names = ["get", "post", "head", "options"]
 
     def perform_create(self, serializer):

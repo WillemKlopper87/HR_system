@@ -2,15 +2,30 @@ from __future__ import annotations
 
 from datetime import date
 
+import pyotp
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rbac_audit.models import Role, RoleAssignment
+from rbac_audit.stepup import confirm_totp_device, enroll_totp_device, request_step_up
 from rest_framework.test import APIClient
 
 from .models import Benefit, BenefitsElection, CompProposal, PayBand
 
 User = get_user_model()
+
+
+def _grant_payroll_step_up(employee):
+    """PayBand/CompProposal are Restricted-tier (Data-Dictionary.md) and
+    now require an active StepUpGrant on top of the comp_manager/hr_admin
+    role check — every existing test that exercises those endpoints as a
+    legitimately-privileged user needs one, or it 403s for a step-up
+    reason instead of the thing the test actually means to check."""
+    device = enroll_totp_device(employee)
+    confirm_totp_device(employee, code=pyotp.TOTP(device.secret).now())
+    request_step_up(
+        employee, code=pyotp.TOTP(device.secret).now(), scope="payroll_data", reason="payroll_processing",
+    )
 
 
 def _seed_reference_data():
@@ -60,6 +75,9 @@ class CompensationApiTestCase(TestCase):
         self.pay_band = PayBand.objects.create(
             job_grade=self.grade, min_salary=300000, mid_salary=400000, max_salary=500000, valid_from=date(2020, 1, 1)
         )
+
+        _grant_payroll_step_up(self.comp_manager)
+        _grant_payroll_step_up(self.hr_admin)
 
 
 class ModuleWidePermissionTests(CompensationApiTestCase):
@@ -298,3 +316,57 @@ class BenefitsSelfServiceApiTests(CompensationApiTestCase):
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["status"], "waived")
+
+
+class PayrollStepUpGateApiTests(CompensationApiTestCase):
+    """PayBand/CompProposal are Restricted-tier — comp_manager/hr_admin
+    role alone is necessary but no longer sufficient; a live StepUpGrant
+    is required too. A fresh comp_manager (no grant obtained yet, unlike
+    self.comp_manager which setUp() already grants one for) proves the
+    gate actually blocks, not just that the base class's setUp works
+    around it."""
+
+    def setUp(self):
+        super().setUp()
+        self.fresh_comp_manager = Employee.objects.hire(
+            employee_number="C002", first_name="Fresh", last_name="CompManager", date_of_birth=date(1985, 1, 1),
+            work_email="fresh@example.com", hire_date=date(2020, 1, 1), department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location,
+            user=User.objects.create_user(username="freshcompmanager", password="x"),
+        )
+        RoleAssignment.objects.create(employee=self.fresh_comp_manager, role=Role.objects.get(name="comp_manager"))
+
+    def test_comp_manager_without_step_up_grant_is_blocked_from_pay_bands(self):
+        self.client.force_authenticate(user=self.fresh_comp_manager.user)
+        response = self.client.get("/api/v1/pay-bands/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_comp_manager_without_step_up_grant_is_blocked_from_comp_proposals(self):
+        self.client.force_authenticate(user=self.fresh_comp_manager.user)
+        response = self.client.get("/api/v1/comp-proposals/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_comp_manager_gains_access_after_obtaining_step_up_grant(self):
+        self.client.force_authenticate(user=self.fresh_comp_manager.user)
+        response = self.client.get("/api/v1/pay-bands/")
+        self.assertEqual(response.status_code, 403)
+
+        _grant_payroll_step_up(self.fresh_comp_manager)
+        response = self.client.get("/api/v1/pay-bands/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_approve_action_also_requires_step_up(self):
+        proposal = CompProposal.objects.create(
+            employee=self.plain_employee, current_job_grade=self.grade, proposed_annual_salary=350000,
+            requires_override=False, proposed_by=self.comp_manager,
+        )
+        self.client.force_authenticate(user=self.fresh_comp_manager.user)
+        response = self.client.post(f"/api/v1/comp-proposals/{proposal.id}/approve/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_step_up_grant_is_scoped_per_employee_not_global(self):
+        """self.comp_manager's grant (from the base setUp) must not leak
+        access to a different comp_manager who hasn't obtained their own."""
+        self.client.force_authenticate(user=self.fresh_comp_manager.user)
+        response = self.client.get("/api/v1/pay-bands/")
+        self.assertEqual(response.status_code, 403)
