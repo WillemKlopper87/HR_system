@@ -128,6 +128,15 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
         # OIDC/Entra ID auth added per ADR-004 (mock provider in dev)
     ],
+    # Only the credential-bearing endpoints opt in (rbac_audit/throttling.py);
+    # no default throttle on the rest of the API.
+    "DEFAULT_THROTTLE_RATES": {
+        "login_burst": os.environ.get("THROTTLE_LOGIN_BURST", "30/min"),
+        "login_sustained": os.environ.get("THROTTLE_LOGIN_SUSTAINED", "500/hour"),
+        "login_username": os.environ.get("THROTTLE_LOGIN_USERNAME", "10/min"),
+        "totp_burst": os.environ.get("THROTTLE_TOTP_BURST", "5/min"),
+        "totp_sustained": os.environ.get("THROTTLE_TOTP_SUSTAINED", "30/hour"),
+    },
     "DEFAULT_PAGINATION_CLASS": "config.pagination.DefaultCursorPagination",
     "PAGE_SIZE": 50,
 }
@@ -153,6 +162,43 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# --- Cache (throttle counters, later: reference-data caching) -----------------
+# Redis when available so every gunicorn worker/celery process shares one
+# view of the throttle counters; per-process LocMem otherwise (dev/tests).
+if os.environ.get("REDIS_URL"):
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": os.environ["REDIS_URL"],
+            "KEY_PREFIX": "hcm",
+        }
+    }
+else:
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "hcm"}}
+
+# --- Celery (ADR-005: web + worker + beat + Redis) ---------------------------
+# Broker/result backend come from REDIS_URL (docker-compose sets it). With no
+# REDIS_URL — local `runserver`, unit tests, CI's SQLite job — tasks run
+# eagerly in-process so nothing silently queues into a broker that isn't
+# there. Set CELERY_TASK_ALWAYS_EAGER=0 explicitly to force broker mode.
+_REDIS_URL = os.environ.get("REDIS_URL", "")
+CELERY_BROKER_URL = _REDIS_URL or "memory://"
+CELERY_RESULT_BACKEND = _REDIS_URL or "cache+memory://"
+CELERY_TASK_ALWAYS_EAGER = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "0" if _REDIS_URL else "1") == "1"
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 15 * 60
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+# Scheduled jobs. Retention (rbac_audit.RetentionRule executor) is the first;
+# the performance-agreement reminder job (ADR-011) will be the second.
+CELERY_BEAT_SCHEDULE = {
+    "run-retention-daily": {
+        "task": "rbac_audit.tasks.run_retention_task",
+        "schedule": 24 * 60 * 60,  # daily; crontab(hour=2) once beat runs against a real broker
+    },
+}
+
 # HMAC signing secret for the inbound assessment-provider webhook
 # (Architecture-Design.md §6: "HMAC-signature-verified with replay
 # protection"). A real provider integration would use a per-provider
@@ -163,9 +209,14 @@ ASSESSMENT_WEBHOOK_SECRET = os.environ.get(
     "dev-only-insecure-webhook-secret-change-me",
 )
 
-# Security hardening applied whenever DEBUG is off
+# Security hardening applied whenever DEBUG is off. TLS terminates at the
+# edge (nginx / load balancer, ADR-005) and nginx forwards X-Forwarded-Proto —
+# without SECURE_PROXY_SSL_HEADER the SSL redirect below would loop forever
+# because gunicorn only ever sees plain http from the proxy.
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+    SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "1") == "1"
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000

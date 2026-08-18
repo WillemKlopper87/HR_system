@@ -1,5 +1,6 @@
 # Sentech HCM — dev/staging topology per ADR-005:
-# nginx (added at staging) -> Django/gunicorn -> PostgreSQL, plus Celery + Redis.
+# frontend (nginx: SPA + reverse proxy) -> backend (Django/gunicorn) -> PostgreSQL,
+# plus Celery worker + beat on Redis (retention job, ADR-011 reminder job).
 services:
   db:
     image: postgres:17
@@ -17,6 +18,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   backend:
     build: ./backend
@@ -25,10 +31,12 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
-    ports:
-      - "8000:8000"
-    command: sh -c "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+        condition: service_healthy
+    expose:
+      - "8000"
+    volumes:
+      - media:/app/media
+    command: sh -c "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
 
   worker:
     build: ./backend
@@ -37,10 +45,30 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+    volumes:
+      - media:/app/media
     command: celery -A config worker --loglevel=info
-    # celery beat (scheduled jobs: retention, payroll sync) added when
-    # the first scheduled job lands
+
+  beat:
+    build: ./backend
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # CELERY_BEAT_SCHEDULE lives in config/settings.py (retention daily; the
+    # performance-agreement reminder job joins it in PC-1).
+    command: celery -A config beat --loglevel=info --schedule /tmp/celerybeat-schedule
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
 
 volumes:
   pgdata:
+  media:

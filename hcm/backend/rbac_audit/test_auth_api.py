@@ -4,6 +4,7 @@ from datetime import date
 
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -26,6 +27,7 @@ class AuthApiTests(TestCase):
     model, one-to-one linked to core_hr.Employee."""
 
     def setUp(self):
+        cache.clear()  # throttle counters (rbac_audit/throttling.py) live in the cache
         self.client = APIClient()
         dept, level, grade, location = _seed_reference_data()
         self.employee = Employee.objects.hire(

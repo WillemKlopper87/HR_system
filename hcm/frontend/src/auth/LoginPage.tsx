@@ -1,11 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { useAuth } from './AuthContext'
 
 export function LoginPage() {
-  const { login, user } = useAuth()
+  const { login, user, sessionExpired } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = (location.state as { from?: string } | null)?.from
+  // Never bounce back to /login itself; default landing stays /employees.
+  const destination = returnTo && !returnTo.startsWith('/login') ? returnTo : '/employees'
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -16,8 +20,8 @@ export function LoginPage() {
   // real bug here (a stale RequireAuth redirect target could fire the
   // navigation more than once with an outdated destination).
   useEffect(() => {
-    if (user) navigate('/employees', { replace: true })
-  }, [user, navigate])
+    if (user) navigate(destination, { replace: true })
+  }, [user, navigate, destination])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -25,7 +29,7 @@ export function LoginPage() {
     setSubmitting(true)
     try {
       await login(username, password)
-      navigate('/employees', { replace: true })
+      navigate(destination, { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed — please try again.')
     } finally {
@@ -38,6 +42,11 @@ export function LoginPage() {
       <form className="login-card" onSubmit={handleSubmit}>
         <h1>Sentech HCM</h1>
         <p className="login-subtitle">Sign in to continue</p>
+        {sessionExpired && (
+          <p className="form-notice" role="status">
+            Your session expired — please sign in again to continue where you left off.
+          </p>
+        )}
 
         <label className="field">
           <span>Username</span>

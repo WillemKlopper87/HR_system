@@ -1,4 +1,8 @@
-# Sentech HCM backend — ADR-001 (Django + DRF). Scaffolded on Django 5.2 LTS
+# Sentech HCM backend — ADR-001 (Django + DRF). Direct dependencies only;
+# the fully pinned, reproducible set is requirements.lock (pip-compile output —
+# regenerate it whenever this file changes; CI and the Dockerfile install from
+# the lock, `pip install -r requirements.txt` still works for a quick venv).
+#  Scaffolded on Django 5.2 LTS
 # (latest stable release on PyPI as of 2026-08-12; Django 6.x has not been released).
 django>=5.2,<5.3
 djangorestframework>=3.18

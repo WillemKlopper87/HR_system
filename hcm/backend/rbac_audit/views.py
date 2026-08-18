@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from django.contrib.auth import authenticate, login, logout
 from django.middleware.csrf import get_token
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .audit import log_access
 from .drf import get_request_employee
 from .models import AuditLogEntry, StepUpGrant, TOTPDevice
+from .throttling import LOGIN_THROTTLES, TOTP_THROTTLES
 from .permissions import active_roles_for
 from .stepup import (
     StepUpError,
@@ -52,6 +53,7 @@ def csrf(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes(LOGIN_THROTTLES)
 def login_view(request):
     username = request.data.get("username", "")
     password = request.data.get("password", "")
@@ -105,6 +107,7 @@ def totp_enroll(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@throttle_classes(TOTP_THROTTLES)
 def totp_confirm(request):
     employee = get_request_employee(request)
     try:
@@ -127,6 +130,7 @@ def totp_status(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@throttle_classes(TOTP_THROTTLES)
 def step_up_request_view(request):
     """The single call that both verifies the TOTP code AND records the
     business-justification reason — see stepup.py::request_step_up."""

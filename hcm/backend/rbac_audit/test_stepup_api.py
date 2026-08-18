@@ -5,6 +5,7 @@ from datetime import date
 import pyotp
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -24,6 +25,7 @@ def _seed_reference_data():
 
 class TOTPEnrollmentApiTests(TestCase):
     def setUp(self):
+        cache.clear()  # throttle counters (rbac_audit/throttling.py) live in the cache
         self.client = APIClient()
         dept, level, grade, location = _seed_reference_data()
         self.employee = Employee.objects.hire(
@@ -74,6 +76,7 @@ class TOTPEnrollmentApiTests(TestCase):
 
 class StepUpRequestApiTests(TestCase):
     def setUp(self):
+        cache.clear()  # throttle counters (rbac_audit/throttling.py) live in the cache
         self.client = APIClient()
         dept, level, grade, location = _seed_reference_data()
         self.employee = Employee.objects.hire(

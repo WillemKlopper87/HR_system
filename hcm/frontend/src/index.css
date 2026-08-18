@@ -552,3 +552,13 @@ textarea:focus {
     padding: 16px;
   }
 }
+
+/* Informational notice (e.g. "session expired" on the login page) — same shape as .form-error, calmer colour */
+.form-notice {
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  margin: 0 0 8px;
+}

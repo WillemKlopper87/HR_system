@@ -8,7 +8,7 @@ Modular-monolith HCM system. Planning and architecture docs live one level up in
 ```
 hcm/
   backend/     Django 5.2 LTS + DRF (ADR-001) — one Django app per domain module
-    config/    settings, urls, wsgi/asgi
+    config/    settings, urls, wsgi/asgi, celery.py (worker/beat app; CELERY_BEAT_SCHEDULE in settings)
     core_hr/   employees, org structure, lifecycle (Sprint 1); + Sprint 3 dashboards/CRUD;
                 + Sprint 15 ESS (EmployeeViewSet: PATCH own contact details, consent-gated
                 self-ID via consent/self_identify actions)
@@ -18,8 +18,13 @@ hcm/
                 ADR-009) — RFC 6238 TOTP + mandatory business-justification reason,
                 required together, gating compensation.PayBand/CompProposal and
                 ee_reporting.RemunerationRecord specifically (the models
-                Data-Dictionary.md tiers "R")
-    recruitment/ requisitions, applicant pipeline, offers, hire automation (Sprint 4)
+                Data-Dictionary.md tiers "R"); + H1: retention.py (handler
+                registry + executor for RetentionRule, tasks.py Celery task,
+                `manage.py run_retention`), throttling.py (login per-IP +
+                per-username, TOTP per-user rate limits)
+    recruitment/ requisitions, applicant pipeline, offers, hire automation (Sprint 4);
+                + H1 retention.py (rejected-applicant anonymise/delete handler,
+                registered from apps.py)
     performance/ goals, review cycles, self/manager reviews, feedback (Sprint 6)
     learning/  skills, certifications, training records, WSP/ATR export (Sprint 8);
                 + Sprint 15 ESS (TrainingRecord.Status.REQUESTED — self-submitted
@@ -75,7 +80,8 @@ hcm/
                table renderer used by the EE config/reports/dashboard pages (Sprint 13-14)
     components/ small pieces shared across pages (e.g. the dashboard Breakdown chart)
     api/       fetch client (CSRF-aware) + shared reference-data context
-  docker-compose.yml  db + redis + backend + celery worker (ADR-005)
+  docker-compose.yml  db + redis + backend + celery worker + beat + frontend (nginx SPA +
+                reverse proxy, port 8080) (ADR-005); frontend/Dockerfile + nginx.conf
 ```
 
 ## Local development
@@ -133,12 +139,18 @@ If the backend runs on a different origin than `localhost:5173`/`127.0.0.1:5173`
 set `DJANGO_CSRF_TRUSTED_ORIGINS` (see `.env.example`) or mutating requests
 (login excepted) will 403 with a CSRF Origin-check failure.
 
-Full stack via Docker (PostgreSQL + Redis + worker):
+Full stack via Docker (PostgreSQL + Redis + worker + beat + nginx frontend on http://localhost:8080):
 
 ```powershell
-copy .env.example .env   # then edit secrets
+copy .env.example .env   # then edit secrets (DJANGO_SECURE_SSL_REDIRECT=0 for plain-http LAN use)
 docker compose up --build
+docker compose exec backend python manage.py seed_demo_data
 ```
+
+Backend Python deps are pinned in `backend/requirements.lock` (pip-compile output of
+`requirements.txt`; regenerate with `pip-compile --strip-extras --output-file requirements.lock requirements.txt`
+after editing `requirements.txt`). Retention rules run daily via Celery beat; `manage.py run_retention --dry-run`
+shows what they would do.
 
 > **OneDrive note:** this folder syncs to OneDrive. Keep `node_modules/` and
 > Python venvs out of it where possible (both are gitignored, but OneDrive
@@ -166,9 +178,26 @@ docker compose up --build
   own named example of how the "no peer imports" rule is meant to be satisfied.
 - All API access goes through the shared RBAC permission classes + field-tier
   serializer mixin from `rbac_audit` (Sprint 2). No per-module access control.
-- Slow work (imports, report generation, webhooks) runs in Celery, never in-request.
+- Background/scheduled work runs in Celery (`config/celery.py`; worker + beat
+  services in docker-compose; eager in-process when `REDIS_URL` is unset so
+  dev/tests need no broker). Scheduled jobs live in `CELERY_BEAT_SCHEDULE`
+  (`config/settings.py`) and task modules in `<app>/tasks.py` — first one is
+  `rbac_audit.tasks.run_retention_task` (H1). Report generation, exports and
+  document extraction still run in-request today; move them to tasks when
+  their runtime warrants it, not before.
 - Sensitive fields (race, gender, disability, pay, ratings, assessment results)
-  are tiered per `Data-Dictionary.md` — hard constraint from the sprint plan.
+  are classified per `Data-Dictionary.md` — hard constraint from the sprint plan.
+  **How that is enforced differs by model, and you must check which applies
+  before adding a field:** `rbac_audit/tiers.py::FIELD_TIERS` (per-field
+  redaction through `TieredModelSerializer`) covers `core_hr.Employee`/
+  `EmployeeVersion`, `recruitment.Applicant`, `performance.Goal` and the
+  `learning` models only. `performance.Review`/`Feedback` ratings,
+  `recruitment.Offer` pay fields, all of `compensation`, `assessments`
+  results, `identity_verification` biometrics and `ee_reporting.
+  RemunerationRecord` are gated at the *endpoint* level by row-scope or an
+  explicit permission class instead (reasons per case below) — a new field on
+  one of those models is NOT protected by the tier map, only by that
+  endpoint's gate.
 - A role's field-tier grant only applies within that role's own row-scope
   (`can_access_tier_for_target`) — the base self-scope `employee` role granting
   Sensitive-tier read for one's own record must never leak onto records reached

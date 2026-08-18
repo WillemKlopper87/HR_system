@@ -16,6 +16,34 @@ export class ApiError extends Error {
   }
 }
 
+/** Global "session is gone" hook (brief D3). DRF's SessionAuthentication
+ * answers a dead/expired session with **403** ("Authentication credentials
+ * were not provided"), not 401 — the same status a real permission denial
+ * uses. So: a 401 is always treated as session-lost; a 403 triggers one
+ * cheap re-probe of /auth/me/ (deduplicated across concurrent requests) and
+ * only if *that* fails do we declare the session gone. The AuthProvider
+ * then clears the user and RequireAuth bounces to /login once, instead of
+ * every page showing its own "Failed to load …". Login/me/csrf themselves
+ * are exempt — there, an auth failure just means "not signed in yet". */
+type UnauthorizedHandler = (info: { path: string }) => void
+let unauthorizedHandler: UnauthorizedHandler | null = null
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler
+}
+const UNAUTHORIZED_EXEMPT = ['/auth/login/', '/auth/me/', '/auth/csrf/']
+let sessionProbe: Promise<boolean> | null = null
+function probeSessionAlive(): Promise<boolean> {
+  if (!sessionProbe) {
+    sessionProbe = fetch(`${API_BASE}/auth/me/`, { credentials: 'same-origin' })
+      .then((r) => r.ok)
+      .catch(() => false)
+      .finally(() => {
+        sessionProbe = null
+      })
+  }
+  return sessionProbe
+}
+
 let csrfCookieEnsured = false
 
 async function ensureCsrfCookie(): Promise<void> {
@@ -60,6 +88,14 @@ async function request<T>(pathOrUrl: string, options: RequestInit = {}): Promise
   const contentType = response.headers.get('content-type') ?? ''
   const body = contentType.includes('application/json') ? await response.json() : await response.text()
 
+  if (
+    (response.status === 401 || response.status === 403) &&
+    unauthorizedHandler &&
+    !UNAUTHORIZED_EXEMPT.some((p) => path.endsWith(p))
+  ) {
+    const gone = response.status === 401 ? true : !(await probeSessionAlive())
+    if (gone) unauthorizedHandler({ path })
+  }
   if (!response.ok) throw new ApiError(response.status, body)
   return body as T
 }

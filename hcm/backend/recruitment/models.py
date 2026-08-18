@@ -76,6 +76,10 @@ class Applicant(TimestampedModel):
     date_of_birth = models.DateField()
     current_stage = models.CharField(max_length=20, choices=Stage.choices, default=Stage.APPLIED)
     rejected_reason = models.CharField(max_length=200, blank=True)
+    # Set by recruitment/retention.py when a rejected applicant is anonymised
+    # per RetentionRule; identifying fields are blanked, the row is kept for
+    # aggregate reporting. Never set by the API.
+    anonymised_at = models.DateTimeField(null=True, blank=True)
 
     # Sensitive-tier, consent-gated (Data-Dictionary.md: "applicant (S —
     # demographics, consent-gated)"; RBAC-Roles.md recruiter note). Reuses

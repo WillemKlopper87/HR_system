@@ -77,8 +77,9 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
     # deliberately NOT registered here — line_manager's generic S-tier
     # grant is closed (aggregate-only, for demographics) yet RBAC-Roles.md
     # says line_manager individually "sees own team's reviews/goals".
-    # performance/permissions.py gates these by row-scope alone, the same
-    # exception pattern as recruitment.Offer's pay fields.
+    # performance/views.py gates these by row-scope alone (RowScopePermission —
+    # there is no performance/permissions.py), the same exception pattern as
+    # recruitment.Offer's pay fields.
     "learning.EmployeeSkill": {
         "proficiency": FieldTier.INTERNAL,
         "acquired_date": FieldTier.INTERNAL,
