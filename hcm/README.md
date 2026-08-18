@@ -25,7 +25,13 @@ hcm/
     recruitment/ requisitions, applicant pipeline, offers, hire automation (Sprint 4);
                 + H1 retention.py (rejected-applicant anonymise/delete handler,
                 registered from apps.py)
-    performance/ goals, review cycles, self/manager reviews, feedback (Sprint 6)
+    performance/ goals, review cycles, self/manager reviews, feedback (Sprint 6);
+                + PC-1 KPI contracting (ADR-010): models/ and services/ are packages
+                (cycles.py = Sprint 6-7, agreements.py = periods/phases/templates/
+                agreements/signatures/delegation/ReminderLog), pdf.py (the signed
+                scorecard grid — its bytes are what a signature's sha256 commits to),
+                reminders.py + tasks.py + `manage.py run_performance_reminders`
+                (daily offsets -> collab to-dos/digests/announcements, idempotent)
     learning/  skills, certifications, training records, WSP/ATR export (Sprint 8);
                 + Sprint 15 ESS (TrainingRecord.Status.REQUESTED — self-submitted
                 enrollment requests, forced status/field restrictions)
@@ -263,6 +269,20 @@ shows what they would do.
   `PolicyChunk` rows exist and are inspectable (`GET /policies/{id}/chunks/`)
   precisely so that seam is real and tested now, without pretending the
   retrieval/chatbot layer on top of it exists yet.
+- Performance agreements (PC-1) use an explicit permission class
+  (`performance/permissions.py`), like `assessments`/`ee_reporting`: the Head
+  is *snapshotted* on the agreement and may be substituted by an active
+  `SigningDelegation`, neither of which is expressible as a row-scope rule.
+  Two rules worth keeping in mind when extending it: a **detail** route must
+  not pre-filter the queryset (the object permission decides — pre-filtering
+  ran a reporting-chain walk per row and stalled the UI), and a request for
+  someone else's agreement answers **404, not 403**, so it doesn't confirm the
+  record exists.
+- `integrations` is **shared infrastructure**, not a domain app: any module may
+  import it (the module-boundary test lists it in SHARED_KERNEL), on the
+  condition that it stays domain-agnostic — it knows about work items and
+  announcements, never about agreements. PC-1's reminder job composes the
+  titles, external refs and deep links; the adapter just delivers them.
 - `RequiresPayrollStepUp` (ADR-009) is layered ON TOP OF a module's normal
   role-based permission class in `permission_classes` — DRF requires every
   listed class to pass, so this doesn't replace
