@@ -331,6 +331,107 @@
 
 ---
 
+## Backlog additions 2026-08-18 — hardening split, KPI contracting, capabilities
+*(Sequencing, dependencies and reasoning live in `ROADMAP-2026-08.md`; the review that produced them in
+`NEXT_AGENT_BRIEF.md`; the KPI design in `docs/superpowers/specs/2026-08-18-kpi-contracting-design.md`, ADR-010/011.
+Sprint 16–17 above is superseded by H1–H3 + UAT-1 below.)*
+
+### H1 — Platform foundations
+**Goal:** unblock everything later; close the HIGH defects.
+- [ ] Wire Celery for real: `config/celery.py`, beat, worker/beat services in compose; first task = `RetentionRule` executor
+- [ ] DRF throttling on login + TOTP enroll/confirm/step-up challenge; tests asserting 429
+- [ ] Postgres service job in `hcm-ci.yml` running the full suite; keep SQLite job for speed
+- [ ] `requirements.lock` (pip-compile) used by Dockerfile + CI
+- [ ] Global 401 handling in `api/client.ts` → clear auth state, redirect to `/login`
+- [ ] docker-compose: `frontend` (nginx serving `dist/`, `/api` proxy); media only via authenticated download
+- [ ] `adr/ADR-007..009` files; fix `rbac_audit/tiers.py:80` comment; reword README tiering rule; real `hcm/frontend/README.md`
+**Exit:** worker starts and runs the retention job; 429s proven; CI green on Postgres + SQLite; expired session bounces to login.
+
+### H2 — Test harness + frontend consolidation
+- [ ] Playwright suite `hcm/frontend/e2e/` (one spec per module, seeded logins), `npm test`, CI job
+- [ ] Shared `useApiQuery`/`useMutation` hook; migrate list/detail pages; dedupe `Field`, `formatZAR`, nav config
+- [ ] Exhaustive RBAC matrix test (viewset × role × CRUD ↔ `RBAC-Roles.md`)
+- [ ] Import-boundary check ("no peer imports") with test carve-out
+- [ ] Policy upload: content sniff + clean 400; ZAP Low/Info triage
+**Exit:** `npm test` green in CI; matrix test green; ≥1000 lines removed from pages.
+
+### X0 — Collab platform integration surface (other repo: `internal-collaboration-platform`)
+- [ ] Service-account / API-key auth for machine callers
+- [ ] `WorkItem.external_ref` + `source` (unique per source), `GET /work-items?external_ref=`, upsert semantics
+- [ ] Announcements creatable/publishable by the service account; identity lookup by work email
+- [ ] (optional) outbound webhook on work-item status change; fix that repo's CI so this ships green
+
+### PC-0 — HR → collab adapter (ADR-011)
+- [ ] `integrations/collab.py` (work items create/close, announcements, retry/backoff), `COLLAB_ENABLED` flag
+- [ ] `Employee.collab_user_id` + lookup-by-email management command; contract tests against recorded responses
+- [ ] Celery task wrapper; `ReminderLog` model
+
+### PC-1 — Performance periods, templates, contracting, reminders, delegation (ADR-010)
+- [ ] `PerformancePeriod` (rename `ReviewCycle`; FY 1 Apr–31 Mar) + `PeriodPhase` (contracting/midyear/final; opens/due/reminder offsets); clone-from-previous
+- [ ] `AgreementTemplate`/`TemplateSection`/`TemplateElement` (versioned, targeted, `level_descriptors {1..5}`, `metric`, `evidence_required`, `signature_method`)
+- [ ] `PerformanceAgreement`/`AgreementElement`/`PDPItem`; Σ weight = 1.00 + descriptors validation on submit; revision counter; `HistoricalRecords`
+- [ ] State machine draft→submitted→returned/approved→employee_signed→head_signed(agreed), strict order (409 otherwise)
+- [ ] Signing: password re-auth (or ADR-009 TOTP per template); immutable `AgreementSignature` with PDF sha256; audit-logged
+- [ ] `SigningDelegation` (Head or hr_admin creates; delegate signs "acting for"; reminders mirrored)
+- [ ] `AgreementDocument` PDF reproducing the scorecard grid (reportlab)
+- [ ] Beat job `run_reminders`: outstanding-per-phase → collab work items (priority by offset), Head digest, critical announcement at open/overdue; idempotent
+- [ ] Frontend `/my-performance`, `/team-performance`, `/performance/periods`, `/performance/templates`; hr_admin completion dashboard
+- [ ] Seed: FY 2026/27 template mirroring the extracted scorecard structure (generic content), period, agreements per state
+**Exit:** browser-verified full contracting flow employee→Head→(delegate)→HR view; reminders visible in collab dev instance (or logged when `COLLAB_ENABLED=0`).
+
+### PC-2 — Reviews, evidence, scoring
+- [ ] Q2 stage (target note, employee/Head comments, sign) and Q4 stage (rating 1–5 per KPI, score = weight×rating, Σ final score, comments, sign)
+- [ ] `EvidenceItem` per KPI × stage: file (sniffed, 20 MB, hashed, authenticated download) or https link; "no evidence" marker; `evidence_required` enforcement; "added after sign-off" stamp; no hard delete post-sign
+- [ ] Amendments → revision+1, re-sign; `hr_attention` when final (or per-KPI, configurable) < 3 or overdue
+- [ ] Derive legacy `Review` ratings from agreements; Q2/Q4 reminders reuse PC-1 engine
+**Exit:** one employee's full year simulated in the browser across employee/Head/delegate/hr_admin/auditor.
+
+### PC-3 — Archive, dashboards, outcomes
+- [ ] Period close/archive: final signed PDF + evidence manifest per agreement; auditor can pull any PDF + signature trail
+- [ ] Dashboards: completion by division, rating distribution (small-cell suppression as EE); Head team view
+- [ ] `ImprovementPlan` stub behind `hr_attention` (owner, reasons, actions, review dates, outcome)
+- [ ] Optional: final band → `compensation.CompProposal` draft; PDP → `learning.TrainingRecord(REQUESTED)`
+- [ ] Hide/retire legacy Reviews pages
+**Exit:** a period archived end-to-end; auditor trail verified.
+
+### H3 — Cross-cutting HR platform
+- [ ] Email adapter + `Notification` model + in-app bell; consumers: PC reminders, comp approvals, review launch, policy publish, liveness flag, EE sign-off
+- [ ] Audit-log API + viewer for `auditor` (filters, CSV)
+- [ ] Org-wide data-quality run + fixes; EEA export cell-by-cell validation vs `EEA-Form-Spec-Notes.md`
+- [ ] `LOGGING`, Sentry hook, `/readyz`; backup/restore runbook (Postgres + media)
+- [ ] `drf-spectacular` OpenAPI + generated TS types replacing hand-written `api/types.ts`
+- [ ] Docs: reconcile Sprint 0 checkboxes; split per-sprint notes into `docs/sprints/*.md`
+**Exit:** notifications delivered for every consumer in the browser; auditor page verified; DQ + EEA validation reports committed.
+
+### UAT-1 — Rolling gate (needs people)
+- [ ] Walkthrough script from the verification paragraphs; HR/talent/EE stakeholder UAT; security/compliance sign-off; fix sprint from findings
+
+### C1 — Establishment & lifecycle
+- [ ] `Position` (approved vs filled, post number, vacancy rate); requisitions tied to vacant posts
+- [ ] `contract_end_date` / `probation_end_date` + reminders; onboarding/offboarding checklists with termination cascades
+
+### C2 — Employee documents & POPIA rights
+- [ ] `EmployeeDocument` (tiered, consent-aware, authenticated download); qualifications → WSP/ATR + EE
+- [ ] Dependants / emergency contacts; data-subject export/erasure workflow; retention scopes for documents/evidence
+
+### C3 — Identity & integrations
+- [ ] OIDC/Entra SSO (ADR-004), single-IdP identity mapping with collab
+- [ ] SAP payroll read-only pull (ADR-006/A10); leave read-only mirror; field-level step-up for `recruitment.Offer` pay fields
+
+### C4 — Generic delegation & approvals
+- [ ] Generalise `SigningDelegation` → `Delegation(scope)` honoured by `has_row_access`; "my approvals" inbox
+
+### C5 — Labour relations
+- [ ] Disciplinary & grievance cases (warnings, hearings, outcomes, CCMA), linked to `ImprovementPlan`, feeding EEA2 movements
+
+### C6 — Talent depth (per demand)
+- [ ] Succession/talent pools; interview scheduling + external careers portal; calibration/360; mandatory-training compliance + catalogue; salary-review/bonus cycles + total-rewards; EE plan + consultation records; real assessment-provider adapter
+
+### C7 — UX / NFR
+- [ ] Responsive + accessibility pass (ESS, liveness first); server-side pagination/search; broader bulk import/export; report builder + scheduled emails
+
+---
+
 ## Summary Timeline
 | Sprints | Module | Duration |
 |---|---|---|
