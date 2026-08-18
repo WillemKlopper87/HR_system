@@ -722,3 +722,195 @@ export const STEP_UP_REASON_LABELS: Record<StepUpReason, string> = {
 export interface StepUpStatus {
   active: boolean
 }
+
+// --- Performance agreements / KPI contracting (PC-1, ADR-010) ---------------
+
+export type PerformancePeriodStatus =
+  | 'draft' | 'contracting' | 'active' | 'midyear' | 'final' | 'closed' | 'archived'
+
+export type PhaseStage = 'contracting' | 'midyear' | 'final'
+
+export const PHASE_STAGE_LABELS: Record<PhaseStage, string> = {
+  contracting: 'Contracting',
+  midyear: 'Mid-year review (Q2)',
+  final: 'Final assessment (Q4)',
+}
+
+export interface PeriodPhase {
+  id: number
+  period: number
+  stage: PhaseStage
+  stage_display: string
+  opens_on: string
+  due_on: string
+  reminder_offsets_days: number[]
+  overdue_every_days: number
+}
+
+export interface PerformancePeriod {
+  id: number
+  name: string
+  start_date: string
+  end_date: string
+  status: PerformancePeriodStatus
+  status_display: string
+  phases: PeriodPhase[]
+  attention_threshold: string
+  agreement_count: number
+  created_by: number | null
+}
+
+export type AgreementStatus =
+  | 'draft' | 'submitted' | 'returned' | 'approved' | 'employee_signed' | 'agreed'
+  | 'midyear_open' | 'midyear_employee_signed' | 'midyear_signed'
+  | 'final_open' | 'final_employee_signed' | 'final_signed' | 'archived'
+
+export interface AgreementElement {
+  id: number
+  agreement: number
+  section_title: string
+  section_order: number
+  kpa_description: string
+  kpi_title: string
+  metric: string
+  weight: string
+  level_descriptors: Record<string, string>
+  order: number
+  locked: boolean
+  q2_target_note: string
+  q2_employee_comment: string
+  q2_head_comment: string
+  final_rating: number | null
+  final_employee_comment: string
+  final_head_comment: string
+  score: string | null
+}
+
+export interface PDPItem {
+  id: number
+  agreement: number
+  business_process: string
+  course_or_training: string
+  order: number
+  training_record_id: number | null
+}
+
+export interface AgreementSignature {
+  id: number
+  agreement: number
+  stage: PhaseStage
+  revision: number
+  role: 'employee' | 'head'
+  role_display: string
+  signer: number
+  signer_name: string
+  acting_for: number | null
+  acting_for_name: string | null
+  signed_at: string
+  method: 'password_reauth' | 'totp_stepup'
+  method_display: string
+  document: number
+  document_sha256: string
+}
+
+export interface AgreementDocument {
+  id: number
+  agreement: number
+  stage: PhaseStage
+  revision: number
+  sha256: string
+  generated_at: string
+  download_url: string
+}
+
+export interface PerformanceAgreement {
+  id: number
+  period: number
+  period_name: string
+  employee: number
+  employee_name: string
+  head: number | null
+  head_name: string | null
+  template: number
+  template_version: number
+  revision: number
+  status: AgreementStatus
+  status_display: string
+  return_reason: string
+  amendment_reason: string
+  final_score: string | null
+  hr_attention: boolean
+  hr_attention_reason: string
+  submitted_at: string | null
+  agreed_at: string | null
+  total_weight: string
+  current_stage: PhaseStage
+  is_editable: boolean
+  elements: AgreementElement[]
+  pdp_items: PDPItem[]
+  signatures: AgreementSignature[]
+  documents: AgreementDocument[]
+}
+
+export interface CanSignResponse {
+  as_employee: boolean
+  as_head: boolean
+  employee_signed: boolean
+  acting_for_head: boolean
+  method: 'password_reauth' | 'totp_stepup'
+  blocked_reason: string
+}
+
+export interface AgreementTemplateSummary {
+  id: number
+  name: string
+  version: number
+  status: 'draft' | 'published' | 'retired'
+  status_display: string
+  period: number | null
+  rating_scale: Record<string, string>
+  evidence_required: boolean
+  signature_method: 'password_reauth' | 'totp_stepup'
+  total_default_weight: string
+  published_at: string | null
+  sections: {
+    id: number
+    title: string
+    order: number
+    locked: boolean
+    elements: {
+      id: number
+      kpa_description: string
+      kpi_title: string
+      metric: string
+      default_weight: string
+      level_descriptors: Record<string, string>
+      order: number
+      locked: boolean
+    }[]
+  }[]
+}
+
+export interface SigningDelegation {
+  id: number
+  delegator: number
+  delegator_name: string
+  delegate: number
+  delegate_name: string
+  start_date: string
+  end_date: string
+  reason: string
+  created_by: number | null
+  revoked_at: string | null
+  is_active: boolean
+}
+
+export interface PeriodCompletion {
+  period: string
+  status: string
+  total: number
+  signed: number
+  outstanding: number
+  completion_pct: number
+  by_division: { division: string; total: number; signed: number; completion_pct: number }[]
+}

@@ -221,6 +221,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "rbac_audit.tasks.run_retention_task",
         "schedule": 24 * 60 * 60,  # daily; crontab(hour=2) once beat runs against a real broker
     },
+    # Performance-contracting reminders (PC-1/ADR-011): works out which offset
+    # falls today for the open phase and pushes to-dos/digests/announcements.
+    # Idempotent (ReminderLog), so a double run is harmless.
+    "run-performance-reminders-daily": {
+        "task": "performance.tasks.run_performance_reminders_task",
+        "schedule": 24 * 60 * 60,  # daily 07:00 SAST once beat has a real broker (crontab)
+    },
 }
 
 # HMAC signing secret for the inbound assessment-provider webhook

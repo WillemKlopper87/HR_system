@@ -26,6 +26,23 @@ from ee_reporting.constants import BARRIER_CATEGORIES
 from ee_reporting.constants import OCCUPATIONAL_LEVEL_CODES as EE_LEVEL_CODES
 from ee_reporting.models import EEPlan, EEQuestionnaire, EmployerConfig, RemunerationRecord
 from ee_reporting.services import ee_manager_approve, generate_report, sign_off, submit_for_review
+from performance.models import (
+    AgreementTemplate,
+    PerformanceAgreement,
+    PerformancePeriod,
+    PeriodPhase,
+    TemplateElement,
+    TemplateSection,
+)
+from performance.services import (
+    approve_agreement,
+    create_agreement,
+    generate_agreements_for_period,
+    open_phase,
+    publish_template,
+    sign_agreement,
+    submit_agreement,
+)
 from identity_verification.models import LivenessCheck
 from identity_verification.services import enroll_employee, run_liveness_check
 from learning.models import Certification, EmployeeSkill, Skill, TrainingRecord
@@ -255,6 +272,7 @@ class Command(BaseCommand):
             )
             self._seed_ess_demo_data(direct_report=staff)
             self._seed_policies_demo_data(hr_admin=hr_head, direct_report=staff, rng=rng)
+            self._seed_performance_agreements_demo_data(hr_admin=hr_head, head=eng_head, staff=staff, rng=rng)
 
         run_data_quality_checks()
 
@@ -806,3 +824,137 @@ class Command(BaseCommand):
                 acknowledge_policy(popia, employee=employee)
         # `leave` is left with zero acknowledgments — freshly published,
         # nobody's gotten to it yet; a third realistic completion state.
+
+    # --- Performance agreements / KPI contracting (PC-1, ADR-010) -----------
+
+    def _seed_performance_agreements_demo_data(self, *, hr_admin, head, staff, rng):
+        """A live FY 2026/27 contracting round, mid-flight on purpose:
+
+        the period is OPEN (so the reminder job has something to do), one
+        published template shaped like the real Sentech scorecard (three
+        corporate objectives -> KPA -> weighted KPIs whose weights total
+        100%, each with all five target descriptors), an agreement for every
+        employee, and a deliberate spread of states — most still in draft
+        (the realistic "nobody has done it yet" starting point the whole
+        reminder feature exists for), a few submitted/approved awaiting
+        signature, a few fully agreed — so every dashboard number and every
+        button has a real case behind it. The `employee` demo login's own
+        agreement is left in DRAFT so a demo can walk the whole flow.
+        """
+        period = PerformancePeriod.objects.create(
+            name="2026/27", start_date=date(2026, 4, 1), end_date=date(2027, 3, 31), created_by=hr_admin,
+        )
+        # The FY windows the user described: contract in April, review at Q2,
+        # assess after year end.
+        PeriodPhase.objects.create(
+            period=period, stage=PeriodPhase.Stage.CONTRACTING, opens_on=date(2026, 4, 1),
+            due_on=date(2026, 4, 30), reminder_offsets_days=[28, 14, 7, 1], overdue_every_days=7,
+        )
+        PeriodPhase.objects.create(
+            period=period, stage=PeriodPhase.Stage.MIDYEAR, opens_on=date(2026, 9, 1),
+            due_on=date(2026, 9, 30), reminder_offsets_days=[14, 7, 1], overdue_every_days=7,
+        )
+        PeriodPhase.objects.create(
+            period=period, stage=PeriodPhase.Stage.FINAL, opens_on=date(2027, 4, 1),
+            due_on=date(2027, 4, 30), reminder_offsets_days=[14, 7, 1], overdue_every_days=7,
+        )
+
+        template = AgreementTemplate.objects.create(
+            name="Sentech Individual Scorecard", version=1, period=period, created_by=hr_admin,
+        )
+        # Objectives are the corporate strategy of the year (they changed between
+        # the two real workbooks — hence versioned templates).
+        scorecard = [
+            ("DRIVE SUSTAINABLE GROWTH", [
+                ("Financial Sustainability", "Diversified (new) revenue growth", "ZAR", Decimal("0.20"), [
+                    "No new revenue", "Less than R1m", "R1m", "R1.5m", "R2m",
+                ]),
+                ("Cost efficiency", "Operating cost variance against budget", "%", Decimal("0.10"), [
+                    "Over budget by >10%", "Over budget by up to 10%", "On budget",
+                    "Under budget by up to 5%", "Under budget by more than 5%",
+                ]),
+            ]),
+            ("DELIVER RELIABLE CUSTOMER-CENTRIC SERVICES", [
+                ("Enabling new offerings", "Handover of commercially ready services to the business unit",
+                 "Deadline", Decimal("0.20"), [
+                     "Not handed over", "Handover by March 2027", "Handover by December 2026",
+                     "Handed over by November 2026", "Handed over by September 2026",
+                 ]),
+                ("Service availability", "Network availability against SLA", "%", Decimal("0.15"), [
+                    "Below 99.0%", "99.0%", "99.5%", "99.8%", "99.9%+",
+                ]),
+            ]),
+            ("BUILD FUTURE-READY AND TRUSTED ORGANISATION", [
+                ("Innovation & AI delivery", "Hybrid broadband-broadcast platform and services",
+                 "Feasibility studies / pilots", Decimal("0.20"), [
+                     "Conceptualisation and planning started", "Device and platform partner onboarded",
+                     "Demo deployment of platform and services", "Commercialisation model approved",
+                     "100 customers onboarded",
+                 ]),
+                ("People development", "Training and development plan achieved", "Quantitative",
+                 Decimal("0.15"), [
+                     "No training done", "One training initiative completed", "Two completed",
+                     "Three completed", "More than three completed",
+                 ]),
+            ]),
+        ]
+        for section_order, (title, elements) in enumerate(scorecard):
+            section = TemplateSection.objects.create(template=template, title=title, order=section_order)
+            for order, (kpa, kpi, metric, weight, descriptors) in enumerate(elements):
+                TemplateElement.objects.create(
+                    template=template, section=section, kpa_description=kpa, kpi_title=kpi, metric=metric,
+                    default_weight=weight, order=order,
+                    level_descriptors={str(i + 1): text for i, text in enumerate(descriptors)},
+                )
+        publish_template(template, actor=hr_admin)
+
+        open_phase(period, PeriodPhase.Stage.CONTRACTING, actor=hr_admin)
+        result = generate_agreements_for_period(period, actor=hr_admin)
+
+        # Spread the states. Everything else stays in draft — which is exactly
+        # the situation the reminder engine is built for.
+        agreements = list(
+            PerformanceAgreement.objects.filter(period=period)
+            .exclude(employee=staff)
+            .exclude(head__isnull=True)
+            .select_related("employee", "head")[:24]
+        )
+        rng.shuffle(agreements)
+        # Only demo *logins* can actually sign (signing re-authenticates a
+        # password); bulk-generated employees have no user account, so put the
+        # pairs that can complete the whole flow at the front.
+        agreements.sort(key=lambda a: (a.employee.user_id is None or a.head.user_id is None))
+        for agreement in agreements[:8]:
+            try:
+                submit_agreement(agreement, actor=agreement.employee)
+            except Exception:  # noqa: BLE001 - demo data only; a missing head just stays draft
+                continue
+        for agreement in agreements[:5]:
+            try:
+                approve_agreement(agreement, actor=agreement.head)
+            except Exception:  # noqa: BLE001
+                continue
+        # Fully agreed ones need real signatures, so the demo has genuine
+        # signed PDFs (hash and all), not fabricated status rows.
+        for agreement in agreements[:3]:
+            try:
+                sign_agreement(agreement, actor=agreement.employee, role="employee",
+                               password=self._password_for(agreement.employee))
+                sign_agreement(agreement, actor=agreement.head, role="head",
+                               password=self._password_for(agreement.head))
+            except Exception:  # noqa: BLE001
+                continue
+
+        self.stdout.write(
+            f"Seeded performance period {period.name}: {result['created']} agreements "
+            f"({PerformanceAgreement.objects.filter(period=period, status='agreed').count()} signed, "
+            f"{PerformanceAgreement.objects.filter(period=period, status='draft').count()} still to do)."
+        )
+
+    @staticmethod
+    def _password_for(employee):
+        """Demo logins are `username` + '123' (see the login banner); employees
+        generated in bulk have no user account, so signing them is skipped."""
+        if employee.user is None:
+            return None
+        return f"{employee.user.get_username()}123"

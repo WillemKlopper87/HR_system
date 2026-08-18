@@ -19,10 +19,15 @@ from django.test import SimpleTestCase
 BACKEND = Path(settings.BASE_DIR)
 DOMAIN_APPS = [
     "core_hr", "rbac_audit", "recruitment", "performance", "learning", "compensation",
-    "assessments", "identity_verification", "ee_reporting", "policies",
-    "integrations",  # outbound adapters (ADR-011); may import core_hr/rbac_audit only, like any app
+    "assessments", "identity_verification", "ee_reporting", "policies", "integrations",
 ]
-SHARED_KERNEL = {"core_hr", "rbac_audit"}
+# Shared infrastructure every module may import. `integrations` joined in PC-0:
+# it is an outbound *adapter* layer (ADR-011), deliberately domain-agnostic —
+# it knows about work items and announcements, never about agreements or
+# employees-as-a-domain — so the same rule that lets any app use rbac_audit
+# lets any app push through it. The kernel test below is what keeps that true:
+# infrastructure may not import a domain app back.
+SHARED_KERNEL = {"core_hr", "rbac_audit", "integrations"}
 EXEMPT_FILES = {BACKEND / "core_hr" / "management" / "commands" / "seed_demo_data.py"}
 
 

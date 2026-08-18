@@ -20,6 +20,9 @@ import { HeadcountDashboardPage } from './pages/HeadcountDashboardPage'
 import { MyBenefitsPage } from './pages/MyBenefitsPage'
 import { MyLearningPage } from './pages/MyLearningPage'
 import { MyProfilePage } from './pages/MyProfilePage'
+import { MyPerformancePage } from './pages/MyPerformancePage'
+import { PerformancePeriodsPage } from './pages/PerformancePeriodsPage'
+import { TeamPerformancePage } from './pages/TeamPerformancePage'
 import { MyPoliciesPage } from './pages/MyPoliciesPage'
 import { OrgStructurePage } from './pages/OrgStructurePage'
 import { PayBandsPage } from './pages/PayBandsPage'
@@ -101,9 +104,12 @@ export default function App() {
               <Route path="/dashboards/equity" element={<EquityDashboardPage />} />
             </Route>
             <Route path="/my-policies" element={<MyPoliciesPage />} />
+            <Route path="/my-performance" element={<MyPerformancePage />} />
+            <Route path="/team-performance" element={<TeamPerformancePage />} />
             <Route element={<RequireRole roles={['hr_admin']} />}>
               <Route path="/policies" element={<PolicyLibraryPage />} />
               <Route path="/dashboards/policy-acknowledgment" element={<PolicyComplianceDashboardPage />} />
+              <Route path="/performance-periods" element={<PerformancePeriodsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/employees" replace />} />
           </Route>

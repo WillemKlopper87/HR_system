@@ -10,6 +10,7 @@ export interface NavItem {
 }
 
 const HR = ['hr_admin'] as const
+const MANAGER = ['line_manager', 'hr_admin'] as const
 const RECRUIT = ['recruiter', 'hr_admin'] as const
 const COMP = ['comp_manager', 'hr_admin'] as const
 const ASSESS = ['ee_manager', 'hr_admin'] as const
@@ -36,6 +37,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: '/my-benefits', label: 'My Benefits', roles: [] },
   { to: '/my-learning', label: 'My Learning', roles: [] },
   { to: '/my-policies', label: 'My Policies', roles: [] },
+  { to: '/my-performance', label: 'My Performance', roles: [] },
+  { to: '/team-performance', label: 'Team Performance', roles: MANAGER },
+  { to: '/performance-periods', label: 'Performance Periods', roles: HR },
   { to: '/policies', label: 'Policy Library', roles: HR },
   { to: '/dashboards/policy-acknowledgment', label: 'Policy Compliance', roles: HR },
   { to: '/workforce-integrity', label: 'Workforce Integrity', roles: HR },

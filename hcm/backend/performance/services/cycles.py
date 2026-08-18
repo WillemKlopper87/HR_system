@@ -6,7 +6,7 @@ from rbac_audit.permissions import is_in_reporting_chain
 
 from core_hr.models import Employee
 
-from .models import Feedback, Review, ReviewCycle
+from ..models import Feedback, Review, ReviewCycle
 
 
 @transaction.atomic
