@@ -2,13 +2,18 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 
 export function RequireAuth() {
-  const { user, loading } = useAuth()
+  const { user, loading, explicitLogout } = useAuth()
   const location = useLocation()
 
   if (loading) return <div className="page-loading">Loading…</div>
   // Remember where the user was so login can return them there — matters
-  // most after a session expiry mid-task (see AuthContext.sessionExpired).
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+  // most after a session expiry mid-task (see AuthContext.sessionExpired) —
+  // but not after an explicit Sign out: then the next login starts at home.
+  if (!user) {
+    return (
+      <Navigate to="/login" replace state={explicitLogout ? undefined : { from: location.pathname + location.search }} />
+    )
+  }
   return <Outlet />
 }
 

@@ -8,6 +8,11 @@ interface AuthContextValue {
   /** True after the server answered 401 to an authenticated request —
    * i.e. the session expired or was revoked. Cleared by the next login. */
   sessionExpired: boolean
+  /** True after the user clicked Sign out (as opposed to being bounced by an
+   * expired session) — RequireAuth then sends them to a plain /login with no
+   * return-to path, so the next person to sign in on that browser lands on
+   * the home page, not wherever the previous user was. */
+  explicitLogout: boolean
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
   hasRole: (role: string) => boolean
@@ -19,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<MeResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [sessionExpired, setSessionExpired] = useState(false)
+  const [explicitLogout, setExplicitLogout] = useState(false)
 
   useEffect(() => {
     api
@@ -44,10 +50,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(username: string, password: string) {
     const me = await api.post<MeResponse>('/auth/login/', { username, password })
     setSessionExpired(false)
+    setExplicitLogout(false)
     setUser(me)
   }
 
   async function logout() {
+    setExplicitLogout(true)
     try {
       await api.post('/auth/logout/')
     } finally {
@@ -60,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return user?.roles.includes(role) ?? false
   }
 
-  return <AuthContext.Provider value={{ user, loading, sessionExpired, login, logout, hasRole }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, loading, sessionExpired, explicitLogout, login, logout, hasRole }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth(): AuthContextValue {

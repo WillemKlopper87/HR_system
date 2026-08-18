@@ -107,7 +107,9 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+            # SQLITE_PATH lets the Playwright e2e runner use its own throwaway
+            # database (frontend/e2e/backend-server.mjs) instead of the dev one.
+            "NAME": os.environ.get("SQLITE_PATH") or (BASE_DIR / "db.sqlite3"),
         }
     }
 

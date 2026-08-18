@@ -1,0 +1,59 @@
+import { expect, test } from '@playwright/test'
+import { expectHeading, login, settled } from './helpers'
+
+test.describe('EE reporting (Sprint 13-14)', () => {
+  test('ee_manager: configuration sections, reports list, equity dashboard', async ({ page }) => {
+    await login(page, 'eemanager')
+    await page.goto('/ee-configuration')
+    await expectHeading(page, 'EE Reporting Configuration')
+    await settled(page)
+    await expect(page.getByRole('heading', { name: 'Employer Configuration (Section A)' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /EE Questionnaire/ })).toBeVisible()
+    // Remuneration Records is the one Restricted-tier section: step-up gate, not data
+    await expect(page.getByRole('heading', { name: 'Remuneration Records' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Step-up authentication required' })).toBeVisible()
+
+    await page.goto('/ee-reports')
+    await expectHeading(page, 'EEA2 / EEA4 Reports')
+    await settled(page)
+    await expect(page.locator('table thead')).toContainText('Form')
+
+    await page.goto('/dashboards/equity')
+    await expectHeading(page, 'Equity Dashboard')
+    await settled(page)
+    await expect(page.getByRole('heading', { name: 'Workforce profile' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Target vs. actual (percentage-point gap)' })).toBeVisible()
+  })
+
+  test('accounting officer reaches reports (sign-off role); line manager does not', async ({ page }) => {
+    await login(page, 'accountingofficer')
+    await page.goto('/ee-reports')
+    await expectHeading(page, 'EEA2 / EEA4 Reports')
+    await page.getByRole('button', { name: 'Sign out' }).click()
+    await page.waitForURL(/\/login$/)
+    await login(page, 'manager')
+    await page.goto('/ee-reports')
+    await page.waitForURL(/\/employees$/)
+  })
+})
+
+test.describe('workforce integrity (Sprint 12c)', () => {
+  test('hr_admin review queue + attendance; employee self-service check-in page', async ({ page }) => {
+    await login(page, 'hradmin')
+    await page.goto('/workforce-integrity')
+    await expectHeading(page, 'Workforce Integrity')
+    await settled(page)
+    await expect(page.getByRole('heading', { name: /Flagged for review/ })).toBeVisible()
+    await page.getByRole('button', { name: 'Sign out' }).click()
+    await page.waitForURL(/\/login$/)
+
+    await login(page, 'employee')
+    await page.goto('/my-verification')
+    await expectHeading(page, 'My Identity Verification')
+    await settled(page)
+    await expect(page.getByRole('heading', { name: "This week's office attendance" })).toBeVisible()
+    // the HR queue is not reachable for a plain employee
+    await page.goto('/workforce-integrity')
+    await page.waitForURL(/\/employees$/)
+  })
+})

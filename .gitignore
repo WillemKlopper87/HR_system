@@ -22,3 +22,9 @@ Thumbs.db
 # Personal scorecards / downloads dropped in for analysis — never commit (POPIA)
 /*.xlsx
 /*.zip
+
+# Playwright e2e (hcm/frontend/e2e)
+hcm/backend/e2e.sqlite3
+hcm/frontend/test-results/
+hcm/frontend/playwright-report/
+hcm/frontend/blob-report/
