@@ -1,18 +1,10 @@
-import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import { Breakdown } from '../components/Breakdown'
 import { STAGE_LABELS, type RecruitmentDashboard } from '../api/types'
 
 export function RecruitmentDashboardPage() {
-  const [data, setData] = useState<RecruitmentDashboard | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    api
-      .get<RecruitmentDashboard>('/dashboards/recruitment/')
-      .then(setData)
-      .catch(() => setError('Failed to load the recruitment dashboard.'))
-  }, [])
+  const { data, error } = useApiQuery(() => api.get<RecruitmentDashboard>('/dashboards/recruitment/'), [], { errorMessage: 'Failed to load the recruitment dashboard.' })
 
   return (
     <div className="page">

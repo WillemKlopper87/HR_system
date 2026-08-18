@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Field } from '../components/Field'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useReferenceData } from '../api/ReferenceDataContext'
@@ -22,27 +23,6 @@ const NEXT_STAGES: Record<ApplicantStage, ApplicantStage[]> = {
   offer: ['hired', 'rejected'],
   hired: [],
   rejected: [],
-}
-
-function Field({ label, obj, field }: { label: string; obj: object; field: string }) {
-  const present = field in obj
-  const value = (obj as Record<string, unknown>)[field]
-  return (
-    <div className="detail-field">
-      <dt>{label}</dt>
-      <dd>
-        {!present ? (
-          <span className="restricted-badge" title="Not visible to your role">
-            Restricted
-          </span>
-        ) : value === '' || value === null || value === undefined ? (
-          '—'
-        ) : (
-          String(value)
-        )}
-      </dd>
-    </div>
-  )
 }
 
 export function ApplicantDetailPage() {

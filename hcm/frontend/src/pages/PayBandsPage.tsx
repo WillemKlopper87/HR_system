@@ -1,11 +1,9 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { api, ApiError, fetchAllPages } from '../api/client'
+import { useState, type FormEvent } from 'react'
+import { formatZAR } from '../lib/format'
+import { api, ApiError } from '../api/client'
+import { useAllPages } from '../api/hooks'
 import { useReferenceData } from '../api/ReferenceDataContext'
 import type { PayBand } from '../api/types'
-
-function formatZAR(value: string): string {
-  return `R ${Number(value).toLocaleString()}`
-}
 
 function isCurrent(band: PayBand): boolean {
   const today = new Date().toISOString().slice(0, 10)
@@ -13,19 +11,9 @@ function isCurrent(band: PayBand): boolean {
 }
 
 export function PayBandsPage() {
-  const [bands, setBands] = useState<PayBand[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { data: bands, error: loadError, reload: load } = useAllPages<PayBand>('/pay-bands/', [], 'Failed to load pay bands.')
   const [showForm, setShowForm] = useState(false)
   const ref = useReferenceData()
-
-  function load() {
-    setError(null)
-    fetchAllPages<PayBand>('/pay-bands/')
-      .then(setBands)
-      .catch(() => setError('Failed to load pay bands.'))
-  }
-
-  useEffect(load, [])
 
   return (
     <div className="page">
@@ -36,7 +24,7 @@ export function PayBandsPage() {
         </button>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
 
       {showForm && (
         <NewPayBandForm

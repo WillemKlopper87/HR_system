@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import {
   BENEFIT_CATEGORY_LABELS,
   BENEFITS_ELECTION_STATUS_LABELS,
@@ -14,29 +15,23 @@ const CATEGORY_OPTIONS = Object.entries(BENEFIT_CATEGORY_LABELS) as [BenefitCate
 const ELECTION_STATUS_OPTIONS = Object.entries(BENEFITS_ELECTION_STATUS_LABELS) as [BenefitsElectionStatus, string][]
 
 export function BenefitsPage() {
-  const [benefits, setBenefits] = useState<Benefit[] | null>(null)
-  const [elections, setElections] = useState<BenefitsElection[] | null>(null)
-  const [employees, setEmployees] = useState<Employee[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [showBenefitForm, setShowBenefitForm] = useState(false)
   const [showElectionForm, setShowElectionForm] = useState(false)
 
-  function load() {
-    setError(null)
-    Promise.all([
-      fetchAllPages<Benefit>('/benefits/'),
-      fetchAllPages<BenefitsElection>('/benefits-elections/'),
-      fetchAllPages<Employee>('/employees/'),
-    ])
-      .then(([b, el, e]) => {
-        setBenefits(b)
-        setElections(el)
-        setEmployees(e)
-      })
-      .catch(() => setError('Failed to load benefits.'))
-  }
+  const { data, error: loadError, reload: load } = useApiQuery(
+    () =>
+      Promise.all([
+        fetchAllPages<Benefit>('/benefits/'),
+        fetchAllPages<BenefitsElection>('/benefits-elections/'),
+        fetchAllPages<Employee>('/employees/'),
+      ]).then(([benefits, elections, employees]) => ({ benefits, elections, employees })),
+    [],
+    { errorMessage: 'Failed to load benefits.' },
+  )
+  const benefits = data?.benefits ?? null
+  const elections = data?.elections ?? null
+  const employees = data?.employees ?? null
 
-  useEffect(load, [])
 
   const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
   const benefitById = useMemo(() => new Map((benefits ?? []).map((b) => [b.id, b])), [benefits])
@@ -47,7 +42,7 @@ export function BenefitsPage() {
         <h1>Benefits</h1>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
 
       <section className="detail-card">
         <div className="page-header">

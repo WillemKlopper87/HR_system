@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 import { RequirePayrollStepUp } from '../auth/RequirePayrollStepUp'
 import type { EEQuestionnaire, EmployerConfig, RemunerationRecord } from '../api/types'
 import {
@@ -17,6 +18,11 @@ import {
 const CURRENT_YEAR = new Date().getFullYear()
 
 export function EEConfigurationPage() {
+  const { hasRole } = useAuth()
+  // Raw remuneration is Restricted payroll data: hr_admin (import/read) and
+  // auditor (read) only — ee_manager/accounting_officer work from the generated
+  // report, never the per-employee rows (RemunerationRecordPermission).
+  const canSeeRemuneration = hasRole('hr_admin') || hasRole('auditor')
   const [config, setConfig] = useState<EmployerConfig | null>(null)
   const [questionnaire, setQuestionnaire] = useState<EEQuestionnaire | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -58,16 +64,18 @@ export function EEConfigurationPage() {
         <QuestionnaireForm questionnaire={questionnaire} reportYear={CURRENT_YEAR} onSaved={load} />
       </section>
 
-      <section className="detail-card">
-        <h2>Remuneration Records</h2>
-        {/* Restricted-tier (Data-Dictionary.md) — gated separately from
-            the rest of this page so a missing step-up grant doesn't break
-            employer config/questionnaire loading above, which aren't
-            payroll data. */}
-        <RequirePayrollStepUp>
-          <RemunerationRecordsLoader />
-        </RequirePayrollStepUp>
-      </section>
+      {canSeeRemuneration && (
+        <section className="detail-card">
+          <h2>Remuneration Records</h2>
+          {/* Restricted-tier (Data-Dictionary.md) — gated separately from
+              the rest of this page so a missing step-up grant doesn't break
+              employer config/questionnaire loading above, which aren't
+              payroll data. */}
+          <RequirePayrollStepUp>
+            <RemunerationRecordsLoader />
+          </RequirePayrollStepUp>
+        </section>
+      )}
     </div>
   )
 }

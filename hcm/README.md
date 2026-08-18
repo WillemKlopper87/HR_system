@@ -79,7 +79,13 @@ hcm/
                auto-synced) + MatrixTable.tsx, the shared level x demographic-column
                table renderer used by the EE config/reports/dashboard pages (Sprint 13-14)
     components/ small pieces shared across pages (e.g. the dashboard Breakdown chart)
-    api/       fetch client (CSRF-aware) + shared reference-data context
+    api/       fetch client (CSRF-aware, global session-expiry handling) + shared
+               reference-data context; hooks.ts — useApiQuery/useAllPages/useMutation
+               (H2: the one place loading/error/stale-response state lives)
+    layout/    AppShell + navConfig.ts (nav as data with role gates)
+    lib/       small pure helpers (formatZAR)
+  frontend/e2e/ Playwright suite (H2): 23 real-browser tests over a throwaway seeded
+               Django (e2e/backend-server.mjs) + Vite dev server — `npm test`
   docker-compose.yml  db + redis + backend + celery worker + beat + frontend (nginx SPA +
                 reverse proxy, port 8080) (ADR-005); frontend/Dockerfile + nginx.conf
 ```
@@ -266,6 +272,10 @@ shows what they would do.
 
 ## CI
 
-`.github/workflows/hcm-ci.yml` (repo root): Django checks + missing-migration
-guard + tests; frontend typecheck/lint/build. The Sprint 2 RBAC regression
-suite becomes the baseline every module sprint extends.
+`.github/workflows/hcm-ci.yml` (repo root): backend job (SQLite: checks +
+missing-migration guard + Celery smoke + tests), backend-postgres job (Postgres 17:
+migrate + seed_demo_data + tests), frontend job (typecheck/lint/build), e2e job
+(Playwright against seeded Django + Vite, report artifact). Backend guard-rail
+tests worth knowing: `rbac_audit/test_access_matrix.py` (golden role x endpoint
+matrix — a deliberate permission change means editing `EXPECTED` and saying why)
+and `rbac_audit/test_module_boundaries.py` (the "no peer imports" rule, enforced).

@@ -1,18 +1,14 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import type { TeamDevelopmentRow } from '../api/types'
 
 export function TeamDevelopmentPage() {
-  const [rows, setRows] = useState<TeamDevelopmentRow[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    api
-      .get<{ employees: TeamDevelopmentRow[] }>('/dashboards/learning/team-development/')
-      .then((res) => setRows(res.employees))
-      .catch(() => setError('Failed to load team development data.'))
-  }, [])
+  const { data: rows, error } = useApiQuery(
+    () => api.get<{ employees: TeamDevelopmentRow[] }>('/dashboards/learning/team-development/').then((res) => res.employees),
+    [],
+    { errorMessage: 'Failed to load team development data.' },
+  )
 
   return (
     <div className="page">

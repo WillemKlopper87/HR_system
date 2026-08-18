@@ -1,21 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { api, ApiError, fetchAllPages } from '../api/client'
+import { api, ApiError } from '../api/client'
+import { useAllPages } from '../api/hooks'
 import { POLICY_CATEGORY_LABELS, POLICY_STATUS_LABELS, type Policy, type PolicyCategory } from '../api/types'
 
 export function PolicyLibraryPage() {
-  const [policies, setPolicies] = useState<Policy[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { data: policies, error: loadError, reload: load } = useAllPages<Policy>('/policies/', [], 'Failed to load the policy library.')
   const [showForm, setShowForm] = useState(false)
   const [expanded, setExpanded] = useState<number | null>(null)
-
-  function load() {
-    setError(null)
-    fetchAllPages<Policy>('/policies/')
-      .then(setPolicies)
-      .catch(() => setError('Failed to load the policy library.'))
-  }
-
-  useEffect(load, [])
 
   return (
     <div className="page">
@@ -30,7 +21,7 @@ export function PolicyLibraryPage() {
         Publishing a new version auto-archives whichever version was previously published under the same policy.
       </p>
 
-      {error && <p className="form-error">{error}</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
 
       {showForm && (
         <NewPolicyForm

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import {
   ASSESSMENT_STATUS_LABELS,
   ASSESSMENT_TYPE_LABELS,
@@ -9,22 +10,23 @@ import {
 } from '../api/types'
 
 export function AssessmentsPage() {
-  const [assignments, setAssignments] = useState<AssessmentAssignment[] | null>(null)
-  const [employees, setEmployees] = useState<Employee[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
 
-  function load() {
-    setError(null)
-    Promise.all([fetchAllPages<AssessmentAssignment>('/assessment-assignments/'), fetchAllPages<Employee>('/employees/')])
-      .then(([a, e]) => {
-        setAssignments(a.filter((row) => row.employee !== null))
-        setEmployees(e)
-      })
-      .catch(() => setError('Failed to load assessment assignments.'))
-  }
+  const { data, error: loadError, reload: load } = useApiQuery(
+    () =>
+      Promise.all([
+        fetchAllPages<AssessmentAssignment>('/assessment-assignments/'),
+        fetchAllPages<Employee>('/employees/'),
+      ]).then(([assignments, employees]) => {
+        assignments = assignments.filter((row) => row.employee !== null)
+        return { assignments, employees }
+      }),
+    [],
+    { errorMessage: 'Failed to load assessment assignments.' },
+  )
+  const assignments = data?.assignments ?? null
+  const employees = data?.employees ?? null
 
-  useEffect(load, [])
 
   const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
 
@@ -43,7 +45,7 @@ export function AssessmentsPage() {
         sandbox adapter that fulfils the same assign/status/result interface a real one would.
       </p>
 
-      {error && <p className="form-error">{error}</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
 
       {showForm && (
         <NewAssignmentForm

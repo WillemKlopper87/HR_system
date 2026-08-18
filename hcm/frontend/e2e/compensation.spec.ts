@@ -56,7 +56,7 @@ test.describe('compensation (Sprint 10-11) + step-up MFA (ADR-009)', () => {
 
   test('line manager: comp module hidden and blocked', async ({ page }) => {
     await login(page, 'manager')
-    await expect(page.getByRole('link', { name: 'Compensation Proposals' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Comp Proposals' })).toHaveCount(0)
     await page.goto('/comp-proposals')
     await page.waitForURL(/\/employees$/)
   })

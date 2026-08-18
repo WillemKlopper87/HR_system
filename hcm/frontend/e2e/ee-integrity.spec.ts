@@ -9,9 +9,9 @@ test.describe('EE reporting (Sprint 13-14)', () => {
     await settled(page)
     await expect(page.getByRole('heading', { name: 'Employer Configuration (Section A)' })).toBeVisible()
     await expect(page.getByRole('heading', { name: /EE Questionnaire/ })).toBeVisible()
-    // Remuneration Records is the one Restricted-tier section: step-up gate, not data
-    await expect(page.getByRole('heading', { name: 'Remuneration Records' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Step-up authentication required' })).toBeVisible()
+    // Raw remuneration is Restricted payroll data — not shown to ee_manager at all
+    // (RBAC-Roles.md: "no pay access"); hr_admin sees it behind the step-up gate.
+    await expect(page.getByRole('heading', { name: 'Remuneration Records' })).toHaveCount(0)
 
     await page.goto('/ee-reports')
     await expectHeading(page, 'EEA2 / EEA4 Reports')
@@ -23,6 +23,14 @@ test.describe('EE reporting (Sprint 13-14)', () => {
     await settled(page)
     await expect(page.getByRole('heading', { name: 'Workforce profile' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Target vs. actual (percentage-point gap)' })).toBeVisible()
+  })
+
+  test('hr_admin sees the Remuneration Records section behind the step-up gate', async ({ page }) => {
+    await login(page, 'hradmin')
+    await page.goto('/ee-configuration')
+    await settled(page)
+    await expect(page.getByRole('heading', { name: 'Remuneration Records' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Step-up authentication required' })).toBeVisible()
   })
 
   test('accounting officer reaches reports (sign-off role); line manager does not', async ({ page }) => {

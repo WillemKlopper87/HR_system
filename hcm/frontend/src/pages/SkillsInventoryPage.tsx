@@ -1,19 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import { Breakdown } from '../components/Breakdown'
 import type { SkillsInventoryRow } from '../api/types'
 
 export function SkillsInventoryPage() {
-  const [skills, setSkills] = useState<SkillsInventoryRow[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { data: skills, error } = useApiQuery(
+    () => api.get<{ skills: SkillsInventoryRow[] }>('/dashboards/learning/skills-inventory/').then((res) => res.skills),
+    [],
+    { errorMessage: 'Failed to load skills inventory.' },
+  )
   const [year, setYear] = useState('')
-
-  useEffect(() => {
-    api
-      .get<{ skills: SkillsInventoryRow[] }>('/dashboards/learning/skills-inventory/')
-      .then((res) => setSkills(res.skills))
-      .catch(() => setError('Failed to load skills inventory.'))
-  }, [])
 
   return (
     <div className="page">

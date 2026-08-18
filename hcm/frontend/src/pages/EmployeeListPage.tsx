@@ -1,35 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchAllPages } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import { useReferenceData } from '../api/ReferenceDataContext'
 import type { Employee, EmployeeVersion } from '../api/types'
 
 export function EmployeeListPage() {
-  const [employees, setEmployees] = useState<Employee[] | null>(null)
-  const [versions, setVersions] = useState<EmployeeVersion[] | null>(null)
   const [search, setSearch] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const { departments, occupationalLevels } = useReferenceData()
-
-  useEffect(() => {
-    let cancelled = false
-    setEmployees(null)
-    setError(null)
-    const query = search ? `?search=${encodeURIComponent(search)}` : ''
-    Promise.all([
-      fetchAllPages<Employee>(`/employees/${query}`),
-      fetchAllPages<EmployeeVersion>('/employee-versions/?current=true'),
-    ])
-      .then(([emps, vers]) => {
-        if (cancelled) return
-        setEmployees(emps)
-        setVersions(vers)
-      })
-      .catch(() => !cancelled && setError('Failed to load employees.'))
-    return () => {
-      cancelled = true
-    }
-  }, [search])
+  // useApiQuery's stale-response guard replaces the hand-rolled `cancelled` flag this page used to carry.
+  const { data, error } = useApiQuery(
+    () => {
+      const query = search ? `?search=${encodeURIComponent(search)}` : ''
+      return Promise.all([
+        fetchAllPages<Employee>(`/employees/${query}`),
+        fetchAllPages<EmployeeVersion>('/employee-versions/?current=true'),
+      ]).then(([employees, versions]) => ({ employees, versions }))
+    },
+    [search],
+    { errorMessage: 'Failed to load employees.' },
+  )
+  const employees = data?.employees ?? null
+  const versions = data?.versions ?? null
 
   const versionByEmployee = useMemo(() => {
     const map = new Map<number, EmployeeVersion>()

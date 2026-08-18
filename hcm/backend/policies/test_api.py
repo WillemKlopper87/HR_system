@@ -232,6 +232,36 @@ class PolicyDocumentUploadApiTests(PolicyApiTestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def _upload(self, name, content, content_type="application/octet-stream"):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        return self.client.post(
+            "/api/v1/policies/",
+            {"title": "Sniffed", "category": "other", "source_file": SimpleUploadedFile(name, content, content_type=content_type)},
+            format="multipart",
+        )
+
+    def test_a_pdf_that_is_not_a_pdf_is_a_clean_400_not_a_500(self):
+        # H2 (brief D4): the extension used to be trusted, so pypdf blew up on
+        # this with a 500. Content is sniffed first now.
+        response = self._upload("policy.pdf", b"this is really just text pretending", "application/pdf")
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("does not look like a PDF", str(response.data))
+
+    def test_a_docx_that_is_not_a_zip_is_a_clean_400(self):
+        response = self._upload("policy.docx", b"not a zip archive at all")
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("does not look like a Word", str(response.data))
+
+    def test_a_corrupt_pdf_with_the_right_magic_is_a_clean_400(self):
+        response = self._upload("policy.pdf", b"%PDF-1.7\n garbage that pypdf cannot parse", "application/pdf")
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("could not be read", str(response.data))
+
+    def test_binary_masquerading_as_txt_is_rejected(self):
+        response = self._upload("policy.txt", b"MZ\x00\x00\x01\x02 binary payload \x00", "text/plain")
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("not a text file", str(response.data))
+
     def test_chunks_action_returns_generated_passages(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="Paragraph one.\n\nParagraph two.")
         self.client.force_authenticate(user=self.hr_admin.user)

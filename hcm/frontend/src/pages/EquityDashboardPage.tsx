@@ -1,19 +1,11 @@
-import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import type { EquityDashboard } from '../api/types'
 import { DEMOGRAPHIC_COLUMNS } from '../ee-reporting/constants'
 import { MatrixTable } from '../ee-reporting/MatrixTable'
 
 export function EquityDashboardPage() {
-  const [dashboard, setDashboard] = useState<EquityDashboard | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    api
-      .get<EquityDashboard>('/dashboards/equity/')
-      .then(setDashboard)
-      .catch(() => setError('Failed to load the equity dashboard.'))
-  }, [])
+  const { data: dashboard, error } = useApiQuery(() => api.get<EquityDashboard>('/dashboards/equity/'), [], { errorMessage: 'Failed to load the equity dashboard.' })
 
   if (error) return <p className="form-error">{error}</p>
   if (!dashboard) return <p className="empty-state">Loading…</p>

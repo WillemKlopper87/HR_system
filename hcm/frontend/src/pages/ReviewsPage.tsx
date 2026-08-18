@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo} from 'react'
 import { Link } from 'react-router-dom'
 import { fetchAllPages } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import type { Employee, Review, ReviewCycle } from '../api/types'
 
 const STATUS_LABELS: Record<Review['completion_status'], string> = {
@@ -11,24 +12,19 @@ const STATUS_LABELS: Record<Review['completion_status'], string> = {
 }
 
 export function ReviewsPage() {
-  const [reviews, setReviews] = useState<Review[] | null>(null)
-  const [cycles, setCycles] = useState<ReviewCycle[] | null>(null)
-  const [employees, setEmployees] = useState<Employee[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    Promise.all([
-      fetchAllPages<Review>('/reviews/'),
-      fetchAllPages<ReviewCycle>('/review-cycles/'),
-      fetchAllPages<Employee>('/employees/'),
-    ])
-      .then(([r, c, e]) => {
-        setReviews(r)
-        setCycles(c)
-        setEmployees(e)
-      })
-      .catch(() => setError('Failed to load reviews.'))
-  }, [])
+  const { data, error } = useApiQuery(
+    () =>
+      Promise.all([
+        fetchAllPages<Review>('/reviews/'),
+        fetchAllPages<ReviewCycle>('/review-cycles/'),
+        fetchAllPages<Employee>('/employees/'),
+      ]).then(([reviews, cycles, employees]) => ({ reviews, cycles, employees })),
+    [],
+    { errorMessage: 'Failed to load reviews.' },
+  )
+  const reviews = data?.reviews ?? null
+  const cycles = data?.cycles ?? null
+  const employees = data?.employees ?? null
 
   const cycleById = useMemo(() => new Map((cycles ?? []).map((c) => [c.id, c])), [cycles])
   const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import {
   LIVENESS_OUTCOME_LABELS,
   type AttendanceSummaryRow,
@@ -8,27 +9,21 @@ import {
 } from '../api/types'
 
 export function WorkforceIntegrityPage() {
-  const [attendance, setAttendance] = useState<AttendanceSummaryRow[] | null>(null)
-  const [checks, setChecks] = useState<LivenessCheck[] | null>(null)
-  const [employees, setEmployees] = useState<Employee[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
-  function load() {
-    setError(null)
-    Promise.all([
-      api.get<AttendanceSummaryRow[]>('/dashboards/attendance/'),
-      fetchAllPages<LivenessCheck>('/liveness-checks/'),
-      fetchAllPages<Employee>('/employees/'),
-    ])
-      .then(([a, c, e]) => {
-        setAttendance(a)
-        setChecks(c)
-        setEmployees(e)
-      })
-      .catch(() => setError('Failed to load workforce integrity data.'))
-  }
+  const { data, error: loadError, reload: load } = useApiQuery(
+    () =>
+      Promise.all([
+        api.get<AttendanceSummaryRow[]>('/dashboards/attendance/'),
+        fetchAllPages<LivenessCheck>('/liveness-checks/'),
+        fetchAllPages<Employee>('/employees/'),
+      ]).then(([attendance, checks, employees]) => ({ attendance, checks, employees })),
+    [],
+    { errorMessage: 'Failed to load workforce integrity data.' },
+  )
+  const attendance = data?.attendance ?? null
+  const checks = data?.checks ?? null
+  const employees = data?.employees ?? null
 
-  useEffect(load, [])
 
   const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
   const pendingChecks = useMemo(() => (checks ?? []).filter((c) => c.review_status === 'pending'), [checks])
@@ -45,7 +40,7 @@ export function WorkforceIntegrityPage() {
         flagged checks always need a human hr_admin review before any action is taken.
       </p>
 
-      {error && <p className="form-error">{error}</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
 
       <section className="detail-card">
         <h2>Flagged for review ({pendingChecks.length})</h2>

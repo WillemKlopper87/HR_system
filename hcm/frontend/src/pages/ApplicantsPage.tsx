@@ -1,26 +1,25 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import { STAGE_LABELS, type Applicant, type ApplicantStage, type Requisition } from '../api/types'
 
 export function ApplicantsPage() {
-  const [applicants, setApplicants] = useState<Applicant[] | null>(null)
-  const [requisitions, setRequisitions] = useState<Requisition[] | null>(null)
   const [stageFilter, setStageFilter] = useState<ApplicantStage | ''>('')
   const [showForm, setShowForm] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  function load() {
-    setError(null)
-    Promise.all([fetchAllPages<Applicant>('/applicants/'), fetchAllPages<Requisition>('/requisitions/')])
-      .then(([apps, reqs]) => {
-        setApplicants(apps)
-        setRequisitions(reqs)
-      })
-      .catch(() => setError('Failed to load applicants.'))
-  }
+  const { data, error: loadError, reload: load } = useApiQuery(
+    () =>
+      Promise.all([
+        fetchAllPages<Applicant>('/applicants/'),
+        fetchAllPages<Requisition>('/requisitions/'),
+      ]).then(([applicants, requisitions]) => ({ applicants, requisitions })),
+    [],
+    { errorMessage: 'Failed to load applicants.' },
+  )
+  const applicants = data?.applicants ?? null
+  const requisitions = data?.requisitions ?? null
 
-  useEffect(load, [])
 
   const requisitionById = useMemo(() => new Map((requisitions ?? []).map((r) => [r.id, r])), [requisitions])
   const filtered = applicants?.filter((a) => !stageFilter || a.current_stage === stageFilter) ?? null
@@ -44,7 +43,7 @@ export function ApplicantsPage() {
         </div>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
 
       {showForm && requisitions && (
         <NewApplicantForm

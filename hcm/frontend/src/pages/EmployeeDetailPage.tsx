@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Field } from '../components/Field'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useReferenceData } from '../api/ReferenceDataContext'
@@ -11,27 +12,6 @@ import type { Certification, Employee, EmployeeSkill, EmployeeVersion, Feedback,
  * when the key is present. This is what "RBAC-aware field visibility"
  * means in practice: the UI reflects exactly what the server decided to
  * send, it doesn't re-implement the access decision. */
-function Field({ label, obj, field }: { label: string; obj: object; field: string }) {
-  const present = field in obj
-  const value = (obj as Record<string, unknown>)[field]
-  return (
-    <div className="detail-field">
-      <dt>{label}</dt>
-      <dd>
-        {!present ? (
-          <span className="restricted-badge" title="Not visible to your role">
-            Restricted
-          </span>
-        ) : value === '' || value === null || value === undefined ? (
-          '—'
-        ) : (
-          String(value)
-        )}
-      </dd>
-    </div>
-  )
-}
-
 export function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [employee, setEmployee] = useState<Employee | null>(null)

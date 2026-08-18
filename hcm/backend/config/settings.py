@@ -110,6 +110,14 @@ else:
             # SQLITE_PATH lets the Playwright e2e runner use its own throwaway
             # database (frontend/e2e/backend-server.mjs) instead of the dev one.
             "NAME": os.environ.get("SQLITE_PATH") or (BASE_DIR / "db.sqlite3"),
+            # The threaded dev server + a browser firing parallel requests hit
+            # SQLite's classic "database is locked": a DEFERRED transaction that
+            # has already read cannot wait to upgrade to a write lock and fails
+            # immediately, ignoring the busy timeout. IMMEDIATE takes the write
+            # lock up front (and then honours the timeout). Surfaced by the H2
+            # Playwright suite as an intermittent 500 on TOTP enrolment; Postgres
+            # (production) is unaffected.
+            "OPTIONS": {"transaction_mode": "IMMEDIATE", "timeout": 20},
         }
     }
 

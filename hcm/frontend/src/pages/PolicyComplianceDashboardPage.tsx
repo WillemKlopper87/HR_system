@@ -1,17 +1,9 @@
-import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import { POLICY_CATEGORY_LABELS, type PolicyAcknowledgmentDashboard } from '../api/types'
 
 export function PolicyComplianceDashboardPage() {
-  const [dashboard, setDashboard] = useState<PolicyAcknowledgmentDashboard | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    api
-      .get<PolicyAcknowledgmentDashboard>('/dashboards/policy-acknowledgment/')
-      .then(setDashboard)
-      .catch(() => setError('Failed to load the policy acknowledgment dashboard.'))
-  }, [])
+  const { data: dashboard, error } = useApiQuery(() => api.get<PolicyAcknowledgmentDashboard>('/dashboards/policy-acknowledgment/'), [], { errorMessage: 'Failed to load the policy acknowledgment dashboard.' })
 
   if (error) return <p className="form-error">{error}</p>
   if (!dashboard) return <p className="empty-state">Loading…</p>

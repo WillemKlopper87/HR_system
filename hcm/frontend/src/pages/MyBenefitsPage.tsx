@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import { BENEFIT_CATEGORY_LABELS, BENEFITS_ELECTION_STATUS_LABELS, type Benefit, type BenefitsElection } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 
@@ -7,25 +8,24 @@ export function MyBenefitsPage() {
   const { user } = useAuth()
   const employeeId = user?.employee_id ?? null
 
-  const [benefits, setBenefits] = useState<Benefit[] | null>(null)
-  const [elections, setElections] = useState<BenefitsElection[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busyBenefitId, setBusyBenefitId] = useState<number | null>(null)
 
-  function load() {
-    setError(null)
-    Promise.all([
-      fetchAllPages<Benefit>('/benefits/'),
-      fetchAllPages<BenefitsElection>('/benefits-elections/'),
-    ])
-      .then(([benefitRows, electionRows]) => {
-        setBenefits(benefitRows.filter((b) => b.active))
-        setElections(electionRows)
-      })
-      .catch(() => setError('Failed to load your benefits.'))
-  }
+  const { data, error: loadError, reload: load } = useApiQuery(
+    () =>
+      Promise.all([
+        fetchAllPages<Benefit>('/benefits/'),
+        fetchAllPages<BenefitsElection>('/benefits-elections/'),
+      ]).then(([benefits, elections]) => {
+        benefits = benefits.filter((b) => b.active)
+        return { benefits, elections }
+      }),
+    [employeeId],
+    { errorMessage: 'Failed to load your benefits.' },
+  )
+  const benefits = data?.benefits ?? null
+  const elections = data?.elections ?? null
 
-  useEffect(load, [employeeId])
 
   async function setElection(benefit: Benefit, status: 'enrolled' | 'waived') {
     if (!employeeId) return
@@ -57,6 +57,7 @@ export function MyBenefitsPage() {
       </div>
       <p className="hint-text">Elect or waive each benefit below. Changes take effect from today.</p>
 
+      {loadError && <p className="form-error">{loadError}</p>}
       {error && <p className="form-error">{error}</p>}
 
       {benefits.length === 0 ? (

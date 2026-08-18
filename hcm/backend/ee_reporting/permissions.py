@@ -33,3 +33,18 @@ class EEReportingPermission(permissions.BasePermission):
             return False
         roles = self.READ_ROLES if request.method in permissions.SAFE_METHODS else self.WRITE_ROLES
         return any(has_role(employee, r) for r in roles)
+
+
+class RemunerationRecordPermission(EEReportingPermission):
+    """Raw per-employee remuneration is Restricted-tier payroll data
+    (Data-Dictionary.md), not an EE *document*: RBAC-Roles.md gives
+    ee_manager "no pay access" and accounting_officer no standing S/R access
+    outside the sign-off action. So this endpoint is narrower than the rest
+    of the module — hr_admin reads and imports, auditor reads (R column = R,
+    every read audited), nobody else. EEA4 generation reads the table at the
+    ORM layer (services.py::generate_report), so ee_manager's review and the
+    Accounting Officer's sign-off are unaffected. RequiresPayrollStepUp
+    (ADR-009) still layers on top. Found by the H2 access-matrix sweep."""
+
+    READ_ROLES = ("hr_admin", "auditor")
+    WRITE_ROLES = ("hr_admin",)

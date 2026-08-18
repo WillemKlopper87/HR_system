@@ -11,7 +11,7 @@ from rest_framework.response import Response
 
 from . import export
 from .models import EEPlan, EEQuestionnaire, EEReport, EmployerConfig, RemunerationRecord
-from .permissions import EEReportingPermission
+from .permissions import EEReportingPermission, RemunerationRecordPermission
 from .serializers import (
     EEPlanSerializer,
     EEQuestionnaireSerializer,
@@ -109,7 +109,7 @@ class RemunerationRecordViewSet(viewsets.ModelViewSet):
 
     queryset = RemunerationRecord.objects.select_related("employee")
     serializer_class = RemunerationRecordSerializer
-    permission_classes = [EEReportingPermission, RequiresPayrollStepUp]
+    permission_classes = [RemunerationRecordPermission, RequiresPayrollStepUp]
     http_method_names = ["get", "post", "head", "options"]
 
     def get_queryset(self):
@@ -147,6 +147,13 @@ class EEReportViewSet(viewsets.ModelViewSet):
     serializer_class = EEReportSerializer
     permission_classes = [EEReportingPermission]
     http_method_names = ["get", "post", "head", "options"]
+
+    def create(self, request, *args, **kwargs):
+        # "post" stays in http_method_names for the named actions below, so
+        # the base create() must be shut explicitly — otherwise an empty POST
+        # reaches an all-read-only serializer and crashes with a 500
+        # IntegrityError (found by the H2 access-matrix sweep).
+        return Response({"detail": 'Method "POST" not allowed — use /generate/.'}, status=405)
 
     def get_queryset(self):
         qs = super().get_queryset()

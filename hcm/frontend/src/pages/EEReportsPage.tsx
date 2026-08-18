@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { api, ApiError, fetchAllPages } from '../api/client'
+import { useState, type FormEvent } from 'react'
+import { api, ApiError } from '../api/client'
+import { useAllPages } from '../api/hooks'
 import {
   EE_FORM_TYPE_LABELS,
   EE_REPORT_STATUS_LABELS,
@@ -22,19 +23,9 @@ const EEA2_SECTIONS: [string, string, string[]][] = [
 
 export function EEReportsPage() {
   const { hasRole } = useAuth()
-  const [reports, setReports] = useState<EEReport[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { data: reports, error: loadError, reload: load } = useAllPages<EEReport>('/ee-reports/', [], 'Failed to load EE reports.')
   const [showForm, setShowForm] = useState(false)
   const [expanded, setExpanded] = useState<number | null>(null)
-
-  function load() {
-    setError(null)
-    fetchAllPages<EEReport>('/ee-reports/')
-      .then(setReports)
-      .catch(() => setError('Failed to load EE reports.'))
-  }
-
-  useEffect(load, [])
 
   const canGenerate = hasRole('hr_admin')
 
@@ -55,7 +46,7 @@ export function EEReportsPage() {
         signs off last, per EEA-Form-Spec-Notes.md.
       </p>
 
-      {error && <p className="form-error">{error}</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
 
       {showForm && (
         <GenerateReportForm

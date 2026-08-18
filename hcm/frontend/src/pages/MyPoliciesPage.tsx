@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import { POLICY_CATEGORY_LABELS, type Policy, type PolicyAcknowledgment } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 
@@ -7,25 +8,20 @@ export function MyPoliciesPage() {
   const { user } = useAuth()
   const employeeId = user?.employee_id ?? null
 
-  const [policies, setPolicies] = useState<Policy[] | null>(null)
-  const [acknowledgments, setAcknowledgments] = useState<PolicyAcknowledgment[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<number | null>(null)
 
-  function load() {
-    setError(null)
-    Promise.all([
-      fetchAllPages<Policy>('/policies/?status=published'),
-      fetchAllPages<PolicyAcknowledgment>('/policy-acknowledgments/'),
-    ])
-      .then(([policyRows, ackRows]) => {
-        setPolicies(policyRows)
-        setAcknowledgments(ackRows)
-      })
-      .catch(() => setError('Failed to load policies.'))
-  }
+  const { data, error: loadError, reload: load } = useApiQuery(
+    () =>
+      Promise.all([
+        fetchAllPages<Policy>('/policies/?status=published'),
+        fetchAllPages<PolicyAcknowledgment>('/policy-acknowledgments/'),
+      ]).then(([policies, acknowledgments]) => ({ policies, acknowledgments })),
+    [employeeId],
+    { errorMessage: 'Failed to load policies.' },
+  )
+  const policies = data?.policies ?? null
+  const acknowledgments = data?.acknowledgments ?? null
 
-  useEffect(load, [employeeId])
 
   if (!employeeId || policies === null || acknowledgments === null) return <p className="empty-state">Loading…</p>
 
@@ -41,7 +37,7 @@ export function MyPoliciesPage() {
         yourself only, and are tracked per exact version.
       </p>
 
-      {error && <p className="form-error">{error}</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
 
       {policies.length === 0 ? (
         <p className="empty-state">No published policies yet.</p>

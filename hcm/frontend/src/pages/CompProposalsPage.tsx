@@ -1,28 +1,24 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
+import { formatZAR } from '../lib/format'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import { COMP_PROPOSAL_STATUS_LABELS, type CompProposal, type Employee } from '../api/types'
 
-function formatZAR(value: string): string {
-  return `R ${Number(value).toLocaleString()}`
-}
-
 export function CompProposalsPage() {
-  const [proposals, setProposals] = useState<CompProposal[] | null>(null)
-  const [employees, setEmployees] = useState<Employee[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
 
-  function load() {
-    setError(null)
-    Promise.all([fetchAllPages<CompProposal>('/comp-proposals/'), fetchAllPages<Employee>('/employees/')])
-      .then(([p, e]) => {
-        setProposals(p)
-        setEmployees(e)
-      })
-      .catch(() => setError('Failed to load compensation proposals.'))
-  }
+  const { data, error: loadError, reload: load } = useApiQuery(
+    () =>
+      Promise.all([
+        fetchAllPages<CompProposal>('/comp-proposals/'),
+        fetchAllPages<Employee>('/employees/'),
+      ]).then(([proposals, employees]) => ({ proposals, employees })),
+    [],
+    { errorMessage: 'Failed to load compensation proposals.' },
+  )
+  const proposals = data?.proposals ?? null
+  const employees = data?.employees ?? null
 
-  useEffect(load, [])
 
   const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
 
@@ -35,7 +31,7 @@ export function CompProposalsPage() {
         </button>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {loadError && <p className="form-error">{loadError}</p>}
 
       {showForm && (
         <NewProposalForm

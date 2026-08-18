@@ -1,24 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { api, ApiError, fetchAllPages } from '../api/client'
+import { useState, type FormEvent } from 'react'
+import { api, ApiError } from '../api/client'
+import { useAllPages } from '../api/hooks'
 import { useReferenceData } from '../api/ReferenceDataContext'
 import { REQUISITION_STATUS_LABELS, type Requisition, type RequisitionStatus } from '../api/types'
 
 const STATUS_OPTIONS = Object.entries(REQUISITION_STATUS_LABELS) as [RequisitionStatus, string][]
 
 export function RequisitionsPage() {
-  const [requisitions, setRequisitions] = useState<Requisition[] | null>(null)
+  const { data: requisitions, error: loadError, reload: load, setData: setRequisitions } = useAllPages<Requisition>('/requisitions/', [], 'Failed to load requisitions.')
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const ref = useReferenceData()
-
-  function load() {
-    setError(null)
-    fetchAllPages<Requisition>('/requisitions/')
-      .then(setRequisitions)
-      .catch(() => setError('Failed to load requisitions.'))
-  }
-
-  useEffect(load, [])
 
   async function handleStatusChange(req: Requisition, status: RequisitionStatus) {
     setError(null)
@@ -39,6 +31,7 @@ export function RequisitionsPage() {
         </button>
       </div>
 
+      {loadError && <p className="form-error">{loadError}</p>}
       {error && <p className="form-error">{error}</p>}
 
       {showForm && (

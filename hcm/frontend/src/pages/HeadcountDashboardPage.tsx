@@ -1,18 +1,10 @@
-import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import { Breakdown } from '../components/Breakdown'
 import type { HeadcountDashboard } from '../api/types'
 
 export function HeadcountDashboardPage() {
-  const [data, setData] = useState<HeadcountDashboard | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    api
-      .get<HeadcountDashboard>('/dashboards/headcount/')
-      .then(setData)
-      .catch(() => setError('Failed to load the headcount dashboard.'))
-  }, [])
+  const { data, error } = useApiQuery(() => api.get<HeadcountDashboard>('/dashboards/headcount/'), [], { errorMessage: 'Failed to load the headcount dashboard.' })
 
   return (
     <div className="page">
