@@ -44,6 +44,11 @@ hcm/
                 verbatim from the official form documents into constants.py; reads
                 learning data via learning/queries.py, not a direct model import —
                 see Module rules below
+    integrations/ outbound adapters (ADR-011): collab.py (httpx client to the collab
+                platform's /integrations surface — work-item upsert/close, announcements,
+                identity lookups; retries; None when COLLAB_ENABLED is off), sync.py +
+                `manage.py sync_collab_ids` (Employee.collab_user_id / Department.
+                collab_department_id by email/name), tasks.py. Imports core_hr only.
     policies/  HR policy document library + versioning + acknowledgment tracking
                 (Policy section, unplanned addition, ADR-008); document upload with
                 PDF/DOCX/TXT text extraction (extraction.py) and a deterministic

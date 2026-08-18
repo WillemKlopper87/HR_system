@@ -20,6 +20,7 @@ BACKEND = Path(settings.BASE_DIR)
 DOMAIN_APPS = [
     "core_hr", "rbac_audit", "recruitment", "performance", "learning", "compensation",
     "assessments", "identity_verification", "ee_reporting", "policies",
+    "integrations",  # outbound adapters (ADR-011); may import core_hr/rbac_audit only, like any app
 ]
 SHARED_KERNEL = {"core_hr", "rbac_audit"}
 EXEMPT_FILES = {BACKEND / "core_hr" / "management" / "commands" / "seed_demo_data.py"}

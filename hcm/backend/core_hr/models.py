@@ -15,6 +15,10 @@ class Department(TimestampedModel):
         "self", null=True, blank=True, related_name="children", on_delete=models.PROTECT
     )
     active = models.BooleanField(default=True)
+    # The matching department in the collab platform (ADR-011), resolved by
+    # `manage.py sync_collab_ids` (name match) or set by hand; blank = not
+    # mapped, so reminders for this department stay HCM-only.
+    collab_department_id = models.CharField(max_length=64, blank=True)
 
     history = HistoricalRecords()
 
@@ -190,6 +194,10 @@ class Employee(TimestampedModel):
     passport_number = models.CharField(max_length=30, blank=True)
     date_of_birth = models.DateField()
     work_email = models.EmailField(unique=True)
+    # The same person's user id in the collab platform (ADR-011), resolved by
+    # work email via `manage.py sync_collab_ids`; blank = no collab account, so
+    # this employee gets no pushed reminders (HCM-only).
+    collab_user_id = models.CharField(max_length=64, blank=True)
     personal_email = models.EmailField(blank=True)
     phone = models.CharField(max_length=30, blank=True)
     hire_date = models.DateField()

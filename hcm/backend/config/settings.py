@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "identity_verification",
     "ee_reporting",
     "policies",
+    "integrations",
 ]
 
 MIDDLEWARE = [
@@ -185,6 +186,19 @@ if os.environ.get("REDIS_URL"):
     }
 else:
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "hcm"}}
+
+# --- Collab platform integration (ADR-011) -----------------------------------
+# Outbound only, best-effort: the HCM pushes per-employee to-dos and critical
+# announcements to the internal collaboration platform (integrations/collab.py).
+# Off unless COLLAB_ENABLED=1 *and* both URL and key are set; the code path
+# then degrades to "log and continue" if the platform is unreachable.
+COLLAB_ENABLED = os.environ.get("COLLAB_ENABLED", "0") == "1"
+COLLAB_BASE_URL = os.environ.get("COLLAB_BASE_URL", "")
+COLLAB_API_KEY = os.environ.get("COLLAB_API_KEY", "")
+COLLAB_TIMEOUT_SECONDS = float(os.environ.get("COLLAB_TIMEOUT_SECONDS", "10"))
+# Absolute base URL of *this* SPA, used for deep links inside pushed items
+# (e.g. https://hcm.sentech.local/my-performance).
+HCM_PUBLIC_URL = os.environ.get("HCM_PUBLIC_URL", "http://localhost:5173").rstrip("/")
 
 # --- Celery (ADR-005: web + worker + beat + Redis) ---------------------------
 # Broker/result backend come from REDIS_URL (docker-compose sets it). With no

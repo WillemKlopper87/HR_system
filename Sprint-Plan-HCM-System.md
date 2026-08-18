@@ -388,15 +388,29 @@ Sprint 16–17 above is superseded by H1–H3 + UAT-1 below.)*
 **Exit:** `npm test` green in CI; matrix test green; ≥1000 lines removed from pages.
 
 ### X0 — Collab platform integration surface (other repo: `internal-collaboration-platform`)
-- [ ] Service-account / API-key auth for machine callers
-- [ ] `WorkItem.external_ref` + `source` (unique per source), `GET /work-items?external_ref=`, upsert semantics
-- [ ] Announcements creatable/publishable by the service account; identity lookup by work email
-- [ ] (optional) outbound webhook on work-item status change; fix that repo's CI so this ships green
+**Status: done** (2026-08-18, collab repo commit `23d4f05`) — API-key auth → service user, `WorkItem.source/external_ref` (alembic 0010), `/integrations` router (upsert/read by external ref, ensure project, create+publish announcement with `dedupe_key`), `create_service_account` script, 8 tests, CI LiveKit env fix. Outbound webhook (item 4) left optional — the HCM polls by external_ref.
+- [x] Service-account / API-key auth for machine callers
+- [x] `WorkItem.external_ref` + `source` (unique per source), `GET /work-items?external_ref=`, upsert semantics
+- [x] Announcements creatable/publishable by the service account; identity lookup by work email
+- [ ] (optional) outbound webhook on work-item status change · [x] fix that repo's CI so this ships green
 
 ### PC-0 — HR → collab adapter (ADR-011)
-- [ ] `integrations/collab.py` (work items create/close, announcements, retry/backoff), `COLLAB_ENABLED` flag
-- [ ] `Employee.collab_user_id` + lookup-by-email management command; contract tests against recorded responses
-- [ ] Celery task wrapper; `ReminderLog` model
+
+**Status: done** (2026-08-18) — see `hcm/backend/integrations/` (new app: `collab.py` client, `sync.py`, `tasks.py`, `management/commands/sync_collab_ids.py`, `test_collab.py`), `core_hr` migration `0004_collab_ids` (`Employee.collab_user_id`, `Department.collab_department_id`), `COLLAB_*`/`HCM_PUBLIC_URL` settings. The other half of the contract is the collab repo's X0 (`app/integrations/router.py`, commit `23d4f05` there).
+
+**Implementation notes:**
+- `integrations.collab.CollabClient` (httpx, sync) — `lookup_user_id(email)`, `list_departments()`, `ensure_project()`, `upsert_work_item(external_ref, …)` / `close_work_item()` / `get_work_item()`, `publish_announcement(dedupe_key=…)`. Every call retries connection errors/5xx/429 with exponential backoff (3 attempts) then raises `CollabError(status, body)`; 4xx other than 429 fail fast (a 401 means the key is wrong — retrying would only hide it). `get_client()` returns **None** when `COLLAB_ENABLED` is off or URL/key are missing, so every caller has one honest branch: "collab off → log and continue". Outbound only by design (ADR-011): nothing read from collab drives HCM state.
+- Identity mapping: employees by **work email**, departments by **name** (case-insensitive) — `manage.py sync_collab_ids [--dry-run] [--all]` and the `integrations.tasks.sync_collab_ids_task` Celery task write `Employee.collab_user_id` / `Department.collab_department_id`; unmatched rows stay blank and are listed, never guessed. A shared IdP subject (C3) is the better key later.
+- New `integrations` app is a plain Django app (imports `core_hr` only — added to the module-boundary test's app list); `httpx` added to `requirements.txt` + lock.
+- **Contract tests both sides:** `integrations/test_collab.py` plays the collab platform with `httpx.MockTransport` (keyed upserts, dedupe'd announcements, users by email, department list, injected 5xx/401/connection failures) — 13 tests: idempotent upsert/close/get, announcement dedupe, retry-with-backoff (sleeps asserted `[0.01, 0.02]`), exhausted retries → `CollabError` with status, 401 fails fast without retry, disabled/unconfigured → `get_client() is None`, sync maps/reports/dry-runs/only-missing. The collab repo's `app/tests/test_integrations.py` (8 tests) is the mirror.
+- **Proven live, not just mocked:** started the real collab API container, created its service account (`create_service_account`), seeded it, then from the HCM: `sync_collab_ids --dry-run` (Finance matched by name; the two demo datasets share no emails, as expected) and a `CollabClient` round-trip — ensure project in Finance → lookup `thandi@example.com` → upsert `hcm:smoke:1:contracting` (todo/high) → re-upsert (same id, urgent) → close (done) → publish critical department announcement twice (`created` True then False, same id).
+
+**Architecture / design tension:** the adapter is deliberately *dumb* — no HCM domain knowledge (no "agreement", no "phase"); PC-1's reminder job composes titles, refs (`hcm:agreement:{id}:{stage}`) and deep links (`HCM_PUBLIC_URL`) and decides what to send. That keeps the collab dependency at one file and lets a future email/Teams channel sit beside it behind the same job.
+
+**Verification:** `manage.py check`, `makemigrations --check`, `manage.py test` — **448/448** (435 prior + 13). Live cross-repo smoke as above. Frontend untouched.
+- [x] `integrations/collab.py` (work items create/close, announcements, retry/backoff), `COLLAB_ENABLED` flag
+- [x] `Employee.collab_user_id` + lookup-by-email management command; contract tests against recorded responses
+- [x] Celery task wrapper (`sync_collab_ids_task`) · [ ] `ReminderLog` model → PC-1 (it belongs to the reminder job)
 
 ### PC-1 — Performance periods, templates, contracting, reminders, delegation (ADR-010)
 - [ ] `PerformancePeriod` (rename `ReviewCycle`; FY 1 Apr–31 Mar) + `PeriodPhase` (contracting/midyear/final; opens/due/reminder offsets); clone-from-previous
