@@ -405,6 +405,13 @@ class DataQualityException(TimestampedModel):
         MISSING_GRADE = "missing_grade", "Missing job grade"
         MISSING_DEMOGRAPHICS = "missing_demographics", "Missing demographics"
         ORPHAN_RECORD = "orphan_record", "Orphan record (no version history)"
+        # H3: org-wide checks registered from other apps' AppConfig.ready()
+        # (data_quality.py's registry — same shape as rbac_audit/retention.py).
+        # New types are added here, the shared-kernel model, rather than each
+        # app owning its own choices set, the same way every log_access()
+        # caller across the app writes AuditLogEntry.Action from one shared list.
+        PERFORMANCE_OVERDUE = "performance_overdue", "Overdue performance stage"
+        COMP_PROPOSAL_STALE = "comp_proposal_stale", "Compensation proposal awaiting review too long"
 
     employee = models.ForeignKey(
         Employee, related_name="data_quality_exceptions", on_delete=models.CASCADE
