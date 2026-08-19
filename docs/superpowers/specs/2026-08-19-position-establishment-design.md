@@ -25,8 +25,8 @@ job-board recruitment posting idea raised mid-session (parked separately, see
 ## 2. Domain — new app `establishment/`
 
 Joins `SHARED_KERNEL` in `rbac_audit/test_module_boundaries.py` (same reasoning as `notifications` in H3): both
-`core_hr` (`EmployeeVersion.position`) and `recruitment` (`Requisition.position`) need a direct FK into it, not a
-`queries.py` read seam — a seam only works for read-only derived data, not a real foreign key.
+`core_hr` (`EmployeeVersion.position`) and `recruitment` (`Requisition.positions`) need a direct relationship into
+it, not a `queries.py` read seam — a seam only works for read-only derived data, not a real foreign key/M2M.
 
 ### 2.1 `Position(TimestampedModel)`
 - `post_number` (`CharField`, unique, auto-assigned sequentially at creation — `P-00001`, `P-00002`, …)
@@ -81,8 +81,8 @@ backfilled Position copies that employee's current department/occupational_level
 already-real employment, not a new proposal going through review; the migration sets `status=approved` directly.
 
 Historical `Requisition` rows are also backfilled where possible: a `CLOSED`/`FILLED` requisition whose
-`resulting_employee` now has a backfilled Position gets `requisition.position` set to it. `OPEN`/`DRAFT`/`ON_HOLD`
-requisitions with no resulting hire predate establishment control and stay unlinked.
+`resulting_employee` now has a backfilled Position gets that Position added to `requisition.positions` (§4.2).
+`OPEN`/`DRAFT`/`ON_HOLD` requisitions with no resulting hire predate establishment control and stay unlinked.
 
 ## 4. Integration
 
@@ -93,21 +93,39 @@ own FKs (§2.1); a direct import the other way would be circular. String referen
 for this exact situation and are resolved lazily via the app registry — this also means `core_hr` needs no new
 production import of `establishment` at all, only `recruitment` does (§4.2).
 
-### 4.2 `Requisition` (recruitment)
-Gains `position` (FK → `establishment.Position`, nullable at the DB level for the historical rows in §3, but
-enforced as **required** by serializer/service validation on any *newly created* requisition). Creating or updating
-a requisition to reference a Position validates `position.status == "approved"` and the Position is currently
-vacant (no current occupant) — otherwise a 400 with a clear message. This is the one place `recruitment` gets a real
-production import of `establishment` (list/validate positions), which is why `establishment` must be in
-`SHARED_KERNEL`.
+### 4.2 `Requisition` (recruitment) — one requisition, N positions
+
+`Requisition.headcount` (existing since Sprint 4-5) can already be `>1` — one requisition representing several
+identical hires. Tying it to a *single* `Position` would silently break that (or force a recruiter to open 5
+near-identical requisitions for 5 identical vacant seats). So `Requisition` gains `positions` — a
+`ManyToManyField("establishment.Position", related_name="requisitions", blank=True)` — not a single FK. `recruitment`
+already needs a real production import of `establishment` for this (list/validate positions), which is why
+`establishment` must be in `SHARED_KERNEL`; no circular-import concern here (`establishment` never imports
+`recruitment` back), so a plain model import is fine (contrast §4.1, where the *other* direction genuinely is
+circular).
+
+**Validation** (service-layer, in `recruitment/services.py`, run when a requisition is created/updated and again
+before it can move to `OPEN`):
+- every linked `Position` is `status == "approved"` and currently vacant (no current occupant);
+- no linked `Position` is already linked to a *different* requisition that isn't `CLOSED`/`FILLED` — a vacant
+  approved post can be claimed by only one active requisition at a time;
+- `len(positions) == headcount` — the existing field stays as the stored, authoritative count (cheaper than
+  removing a column other code already reads), and this check keeps it from ever silently drifting out of sync with
+  what's actually linked.
 
 ### 4.3 Hire flow
-`recruitment/services.py::_complete_hire` already builds its `Employee.objects.hire(...)` call from
-`requisition.department/occupational_level/job_grade/location` — it gains `position=requisition.position`.
-`Employee.objects.hire()` gains a matching optional `position=None` kwarg, set onto the new `EmployeeVersion`.
-Backward-compatible: every existing caller (bulk import, seed data, tests) keeps working unchanged since the
-parameter defaults to `None`. The instant that `EmployeeVersion` exists, the Position reads as filled — no separate
-"mark filled" step, since occupancy is derived (§2.1).
+
+`_complete_hire` currently builds its `Employee.objects.hire(...)` call from
+`requisition.department/occupational_level/job_grade/location`. It now also resolves the specific `Position` for
+*this* hire: the requisition's linked positions that are still vacant, ordered by `post_number`, first one wins —
+positions grouped into one requisition are by definition interchangeable for this purpose (if they weren't, they
+belong in separate requisitions). `Employee.objects.hire()` gains a matching optional `position=None` kwarg, set
+onto the new `EmployeeVersion`. Backward-compatible: every existing caller (bulk import, seed data, tests) keeps
+working unchanged since the parameter defaults to `None`. The instant that `EmployeeVersion` exists, that Position
+reads as filled — no separate "mark filled" step, occupancy is derived (§2.1). `recruitment/services.py` already
+auto-transitions a requisition to `FILLED` once `hired_count >= headcount` (existing logic, untouched) — since
+§4.2's validation keeps `len(positions) == headcount`, "all linked positions occupied" is the same fact as
+"`hired_count >= headcount`" by construction, so that transition stays correct with no changes needed.
 
 ### 4.4 Termination
 No new Position-side code needed: the moment a termination closes the current `EmployeeVersion` (`valid_to` set),
@@ -131,7 +149,8 @@ department, status, current incumbent or "Vacant"), a summary stat row (approved
 %), a "Propose position" form (hr_admin), and per-row Approve/Reject buttons that render only for whoever's role
 matches `POSITION_APPROVAL_CHAIN[position.current_step]` — so the UI adapts automatically if a deployment's chain
 setting changes, no frontend code change needed for a different chain shape. `RequisitionForm`'s create flow gains a
-position picker scoped to `status=approved` and currently vacant.
+**multi-select** position picker (scoped to `status=approved` and currently vacant), pre-filtered to the chosen
+department/level/grade to keep the list short; the count selected must equal `headcount` before the form submits.
 
 Nav entry in `navConfig.ts`: visible to hr_admin/comp_manager/accounting_officer/auditor (read)/recruiter
 (read, approved-only), matching §5.
@@ -144,24 +163,52 @@ Nav entry in `navConfig.ts`: visible to hr_admin/comp_manager/accounting_officer
   and monotonic assignment. A **settings-override test** (`@override_settings(POSITION_APPROVAL_CHAIN=[...])`)
   proving a *different* chain — different length, different roles — is honored by `decide_step` with zero code
   changes; this is the test that actually proves "configurable" holds, not just the default shape.
-- **`recruitment`**: creating a requisition without an approved+vacant position is rejected; against an
-  already-filled or non-approved position is rejected; the position-picker endpoint returns approved+vacant only.
-- **`core_hr`**: completing a hire against a requisition with a linked position sets `EmployeeVersion.position`; the
-  position no longer appears in the vacant list afterward.
+- **`recruitment`**: creating a requisition with zero linked positions, or a count not matching `headcount`, is
+  rejected; linking an already-filled, non-approved, or already-claimed-by-another-open-requisition position is
+  rejected; the position-picker endpoint returns approved+vacant only. A **multi-position happy path**: a
+  `headcount=3` requisition linked to 3 vacant positions, three sequential hires through it each auto-consume the
+  next still-vacant linked position (by `post_number`), and the requisition auto-transitions to `FILLED` after the
+  third.
+- **`core_hr`**: completing a hire against a requisition sets `EmployeeVersion.position` to whichever specific linked
+  position was assigned; that position no longer appears in the vacant list afterward, while the requisition's
+  *other* still-vacant linked positions remain open.
 - **Backfill**: a migration-correctness test — exactly one `approved` Position per currently-employed
   `EmployeeVersion`, no duplicates, all `post_number`s unique; historical closed requisitions with a resulting hire
-  get linked, open ones don't.
+  get their position added to `requisition.positions`, open ones don't.
 - **`rbac_audit/test_module_boundaries.py`**: `establishment` added to `DOMAIN_APPS` and `SHARED_KERNEL` — existing
   test suite confirms the wiring, no new test needed.
 - **Browser-verified**: hr_admin proposes a position → submits → comp_manager approves their step (own login) →
-  accounting_officer approves the final step (own login) → position shows approved + vacant → a recruiter sees it
-  in the requisition's position picker.
+  accounting_officer approves the final step (own login) → position shows approved + vacant → a recruiter selects it
+  (among others) in the requisition's multi-select position picker.
 
 ## 8. Rollout
 
 Ship as one slice: migrations (schema + backfill data migration) → `establishment` app + services + views →
-`recruitment`/`core_hr` integration → frontend. The backfill migration must run before the `Requisition.position`
+`recruitment`/`core_hr` integration → frontend. The backfill migration must run before the `Requisition.positions`
 validation becomes enforced in application code, so existing environments never hit a chicken-and-egg state where
 no approved positions exist yet for a brand-new requisition to reference. `manage.py check` and
 `makemigrations --check --dry-run` clean, full backend + e2e suites green, same verification bar as every other H-
 and C-series slice this project has shipped.
+
+## 9. Known flexibility boundaries
+
+Sentech has no existing system for this — this v1 is meant to give HR something real to react to, not a guess at
+their final process. Three things were designed so a post-demo workflow change doesn't mean a rebuild, plus one
+honest limit that would be genuine rework if it's ever asked for:
+
+- **The approval chain's shape (who approves, how many steps)** is a deployment-time setting, not hardcoded — and
+  because `PositionApprovalStep` snapshots each decision's required role rather than referencing settings live,
+  upgrading later to a database-backed, admin-editable chain is an additive migration (add a table, swap where
+  `decide_step` reads the chain from) — no rewrite, no loss of prior approval history.
+- **New states** (e.g. `on_hold` to freeze a vacant post, `abolished` to permanently retire one) are non-breaking to
+  add — `TextChoices` values are additive; only the transition logic in `services.py` needs a new branch, existing
+  rows and data are untouched.
+- **Numbered/persistent posts vs. pooled headcount** — HR may decide post-demo that individual post continuity
+  doesn't matter for high-turnover roles and they just want counts. The schema already supports that without a
+  migration: create several identical `Position` rows for a pooled role and stop caring which specific one an
+  incumbent holds. §4.2's multi-position requisitions were built for exactly this shape.
+- **Honest limit, not a planned gap**: the chain is an *ordered list of roles* — it can reorder, lengthen, shorten,
+  or swap roles, but it cannot express conditional logic ("skip comp_manager below grade X") or parallel approval.
+  That would need an actual small workflow engine. Deliberately not built now — it would be speculative complexity
+  against a system HR hasn't seen yet — but worth knowing the boundary if that specific request comes back after
+  the demo.
