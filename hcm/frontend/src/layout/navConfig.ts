@@ -15,6 +15,7 @@ const RECRUIT = ['recruiter', 'hr_admin'] as const
 const COMP = ['comp_manager', 'hr_admin'] as const
 const ASSESS = ['ee_manager', 'hr_admin'] as const
 const EE = ['hr_admin', 'ee_manager', 'accounting_officer', 'auditor'] as const
+const AUDIT_PERFORMANCE = ['hr_admin', 'auditor'] as const
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { to: '/employees', label: 'Employees', roles: [] },
@@ -24,8 +25,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: '/requisitions', label: 'Requisitions', roles: RECRUIT },
   { to: '/applicants', label: 'Applicants', roles: RECRUIT },
   { to: '/dashboards/recruitment', label: 'Recruitment', roles: RECRUIT },
-  { to: '/reviews', label: 'Reviews', roles: [] },
-  { to: '/review-cycles', label: 'Review Cycles', roles: HR },
   { to: '/team-development', label: 'Team Development', roles: [] },
   { to: '/pay-bands', label: 'Pay Bands', roles: COMP },
   { to: '/comp-proposals', label: 'Comp Proposals', roles: COMP },
@@ -40,6 +39,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: '/my-performance', label: 'My Performance', roles: [] },
   { to: '/team-performance', label: 'Team Performance', roles: MANAGER },
   { to: '/performance-periods', label: 'Performance Periods', roles: HR },
+  { to: '/performance-records', label: 'Performance Records', roles: AUDIT_PERFORMANCE },
   { to: '/policies', label: 'Policy Library', roles: HR },
   { to: '/dashboards/policy-acknowledgment', label: 'Policy Compliance', roles: HR },
   { to: '/workforce-integrity', label: 'Workforce Integrity', roles: HR },

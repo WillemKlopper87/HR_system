@@ -4,8 +4,10 @@ import { useApiQuery, useMutation } from '../api/hooks'
 import {
   PHASE_STAGE_LABELS,
   type AgreementTemplateSummary,
+  type ArchiveResult,
   type PeriodCompletion,
   type PerformancePeriod,
+  type RatingDistribution,
 } from '../api/types'
 
 /** hr_admin: performance periods (the FY, its phase windows and the reminder
@@ -102,6 +104,20 @@ function PeriodCard({ period, onChanged }: { period: PerformancePeriod; onChange
     () => api.get<PeriodCompletion>(`/performance-periods/${period.id}/completion/`),
     [period.id, period.status, period.agreement_count],
   )
+  const { data: distribution } = useApiQuery<RatingDistribution>(
+    () => api.get<RatingDistribution>(`/performance-periods/${period.id}/rating-distribution/`),
+    [period.id, period.status, period.agreement_count],
+  )
+  const archive = useMutation(
+    () => api.post<ArchiveResult>(`/performance-periods/${period.id}/archive/`),
+    {
+      onSuccess: (result) => {
+        window.alert(`Archived ${result.archived} agreement(s); ${result.outstanding} left outstanding.`)
+        onChanged()
+      },
+      errorMessage: 'The period could not be archived.',
+    },
+  )
 
   return (
     <section className="detail-card">
@@ -177,7 +193,22 @@ function PeriodCard({ period, onChanged }: { period: PerformancePeriod; onChange
         >
           Clone to next year
         </button>
+        {period.status !== 'archived' && (
+          <button
+            type="button"
+            className="btn-link"
+            disabled={archive.busy}
+            onClick={() => {
+              if (window.confirm(`Archive ${period.name}? Every final-signed agreement moves to Archived.`)) {
+                void archive.run()
+              }
+            }}
+          >
+            {archive.busy ? 'Archiving…' : 'Archive period'}
+          </button>
+        )}
       </div>
+      {archive.error && <p className="form-error">{archive.error}</p>}
 
       {completion && completion.total > 0 && (
         <>
@@ -203,6 +234,39 @@ function PeriodCard({ period, onChanged }: { period: PerformancePeriod; onChange
                     <td>{row.signed}</td>
                     <td>{row.total}</td>
                     <td>{row.completion_pct}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {distribution && Object.keys(distribution.by_division).length > 0 && (
+        <>
+          <h2>Rating distribution</h2>
+          {distribution.small_cell_suppression_applied && (
+            <p className="hint-text">Small cells (n &lt; 5) are suppressed for your role.</p>
+          )}
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Division</th>
+                  <th>1</th>
+                  <th>2</th>
+                  <th>3</th>
+                  <th>4</th>
+                  <th>5</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(distribution.by_division).map(([division, ratings]) => (
+                  <tr key={division}>
+                    <td>{division}</td>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <td key={n}>{ratings[String(n)] ?? 0}</td>
+                    ))}
                   </tr>
                 ))}
               </tbody>

@@ -630,6 +630,32 @@ def open_phase(period: PerformancePeriod, stage: str, *, actor=None) -> Performa
     return period
 
 
+def archive_period(period: PerformancePeriod, *, actor=None) -> dict:
+    """Close out a financial year (PC-3). Deliberately permissive rather than
+    all-or-nothing: whichever agreements genuinely finished the year
+    (FINAL_SIGNED) move to ARCHIVED; anyone who never got there (a straggler,
+    a late joiner) is left exactly where they are and counted as
+    `outstanding` in the response, the same "report, don't block" shape as
+    `generate_agreements_for_period`. The period itself always moves to
+    ARCHIVED -- a real FY doesn't stay open forever waiting for one holdout,
+    and `current_stage`/`stage_is_signed` already treat ARCHIVED as terminal."""
+    archived = PerformanceAgreement.objects.filter(
+        period=period, status=PerformanceAgreement.Status.FINAL_SIGNED
+    ).update(status=PerformanceAgreement.Status.ARCHIVED)
+    outstanding = period.agreements.exclude(
+        status__in=[PerformanceAgreement.Status.FINAL_SIGNED, PerformanceAgreement.Status.ARCHIVED]
+    ).count()
+    period.status = PerformancePeriod.Status.ARCHIVED
+    period.save(update_fields=["status"])
+    if actor is not None:
+        log_access(
+            actor=actor, action=AuditLogEntry.Action.UPDATE, entity_type="performance.PerformancePeriod",
+            entity_id=period.pk, field_tier=FieldTier.INTERNAL,
+            fields_touched=f"archived: {archived} agreement(s) archived, {outstanding} left outstanding",
+        )
+    return {"archived": archived, "outstanding": outstanding}
+
+
 def phase_deadline(period: PerformancePeriod, stage: str) -> date | None:
     phase = period.phase(stage)
     return phase.due_on if phase else None
@@ -655,6 +681,7 @@ __all__ = [
     "add_days",
     "amend_agreement",
     "approve_agreement",
+    "archive_period",
     "clone_period",
     "create_agreement",
     "days_until",

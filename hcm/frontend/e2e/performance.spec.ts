@@ -285,11 +285,14 @@ test.describe('performance reviews: mid-year and final (PC-2)', () => {
     const ratingSelects = page.locator('select[aria-label^="Rating for"]')
     const count = await ratingSelects.count()
     expect(count).toBeGreaterThan(0)
+    // Rated below the attention threshold (default 3.00) on purpose — PC-3's
+    // improvement-plan flow and rating-distribution dashboard need a genuine
+    // hr_attention case to exercise, not a synthetic one built separately.
     for (let i = 0; i < count; i++) {
-      await ratingSelects.nth(i).selectOption('4')
+      await ratingSelects.nth(i).selectOption('2')
     }
     const commentBoxes = page.locator('textarea[aria-label="final_employee_comment"]')
-    await commentBoxes.first().fill('Consistently on target this quarter')
+    await commentBoxes.first().fill('Fell short of target this quarter')
     await commentBoxes.first().blur()
 
     // attach a link to the first KPI's evidence panel
@@ -316,7 +319,8 @@ test.describe('performance reviews: mid-year and final (PC-2)', () => {
     await page.getByLabel('Confirm your password to sign').fill('manager123')
     await page.getByRole('button', { name: /^Sign as Head$/ }).click()
     await expect(page.locator('.status-badge').filter({ hasText: 'Final assessment signed' }).first()).toBeVisible()
-    await expect(page.locator('.detail-field', { hasText: 'Final score' })).toBeVisible()
+    await expect(page.locator('.detail-field', { hasText: 'Final score' })).toContainText('2.00')
+    await expect(page.getByText('Flagged for HR attention').first()).toBeVisible()
 
     // both the mid-year and the final signed PDFs are real, downloadable PDFs
     const pdfLinks = page.getByRole('link', { name: /Download (midyear|final) PDF/ })
@@ -362,5 +366,100 @@ test.describe('performance reviews: mid-year and final (PC-2)', () => {
     const download = await page.request.get(body.download_url)
     expect(download.status()).toBe(200)
     expect(await download.text()).toBe('Q4 evidence content')
+  })
+})
+
+/** PC-3: improvement plans, period archive, and the new hr_admin/auditor
+ * records page. Deliberately the third describe block in this same file,
+ * after PC-1 and PC-2 above, for the same shared-demo-login/state-ordering
+ * reason PC-2's comment explains -- it reuses the agreement PC-2's flow just
+ * finished (final_signed, hr_attention=True since that flow rates every KPI
+ * a 2, below the default 3.00 threshold) rather than building its own. */
+test.describe('PC-3: improvement plans, archive, records', () => {
+  test('an improvement plan is opened by the Head, its outcome updated, and read-only for the employee', async ({
+    page,
+  }) => {
+    await login(page, 'manager')
+    await page.goto('/team-performance')
+    await expectHeading(page, 'Team Performance')
+    await settled(page)
+    const flaggedRow = page.locator('table tbody tr').filter({ hasText: 'Flagged' }).first()
+    await expect(flaggedRow).toBeVisible()
+    await flaggedRow.getByRole('button', { name: 'Open' }).click()
+    await settled(page)
+
+    await expect(page.getByRole('heading', { name: 'Improvement plan' })).toBeVisible()
+    await expect(page.getByText('No improvement plan opened yet.')).toBeVisible()
+    await page.getByRole('button', { name: '+ New plan' }).click()
+    await page.getByLabel('Reasons').fill('Missed revenue target this quarter.')
+    await page.getByLabel('Actions').fill('Weekly pipeline review with the Head; shadow a senior AE.')
+    await page.getByLabel('Review date').fill('2026-10-01')
+    await page.getByRole('button', { name: 'Open plan' }).click()
+    await expect(page.getByText('Missed revenue target this quarter.')).toBeVisible()
+
+    await page.getByRole('combobox', { name: 'Outcome', exact: true }).selectOption('resolved')
+    await page.getByLabel('Outcome notes').fill('Back on target for two consecutive months.')
+    await page.getByRole('button', { name: 'Save outcome' }).click()
+    await expect(page.locator('.form-error')).toHaveCount(0)
+    await logout(page)
+
+    await login(page, 'employee')
+    await page.goto('/my-performance')
+    await expectHeading(page, 'My Performance')
+    await settled(page)
+    await expect(page.getByRole('heading', { name: 'Improvement plan' })).toBeVisible()
+    await expect(page.getByText(/Outcome:\s*Resolved/)).toBeVisible()
+    // read-only: the employee it's about never gets the create/edit controls
+    await expect(page.getByRole('button', { name: '+ New plan' })).toHaveCount(0)
+    await expect(page.getByRole('combobox', { name: 'Outcome', exact: true })).toHaveCount(0)
+  })
+
+  test('hr_admin archives the period; the signed PDF and evidence manifest are visible to hr_admin and auditor', async ({
+    page,
+  }) => {
+    await login(page, 'hradmin')
+    await page.goto('/performance-periods')
+    await expectHeading(page, 'Performance Periods')
+    await settled(page)
+    await expect(page.getByRole('heading', { name: 'Rating distribution' })).toBeVisible()
+
+    page.on('dialog', (dialog) => dialog.accept())
+    await page.getByRole('button', { name: 'Archive period' }).first().click()
+    await expect(page.getByRole('button', { name: 'Archive period' })).toHaveCount(0)
+    await logout(page)
+
+    await login(page, 'hradmin')
+    await page.goto('/performance-records')
+    await expectHeading(page, 'Performance Records')
+    await settled(page)
+    const archivedRow = page.locator('table tbody tr').filter({ hasText: 'Archived' }).first()
+    await expect(archivedRow).toBeVisible()
+    await archivedRow.getByRole('button', { name: 'Open' }).click()
+    await expect(page.getByRole('heading', { name: 'Signed documents' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Evidence manifest' })).toBeVisible()
+    const pdfLinks = page.getByRole('link', { name: 'Download PDF' })
+    expect(await pdfLinks.count()).toBeGreaterThan(0)
+    const href = await pdfLinks.first().getAttribute('href')
+    const pdf = await page.request.get(href!)
+    expect(pdf.status()).toBe(200)
+    expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-')
+    await logout(page)
+
+    // the auditor never had a way to reach performance data before PC-3 —
+    // this is the first browser proof that the read-only pull actually works
+    await login(page, 'auditor')
+    await page.goto('/performance-records')
+    await expectHeading(page, 'Performance Records')
+    await settled(page)
+    await expect(page.getByRole('link', { name: 'Performance Periods' })).toHaveCount(0)
+    const auditorRow = page.locator('table tbody tr').filter({ hasText: 'Archived' }).first()
+    await expect(auditorRow).toBeVisible()
+    await auditorRow.getByRole('button', { name: 'Open' }).click()
+    const auditorPdfLink = page.getByRole('link', { name: 'Download PDF' }).first()
+    const auditorHref = await auditorPdfLink.getAttribute('href')
+    const auditorPdf = await page.request.get(auditorHref!)
+    expect(auditorPdf.status()).toBe(200)
+    await page.goto('/performance-periods')
+    await page.waitForURL(/\/employees$/)
   })
 })

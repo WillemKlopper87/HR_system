@@ -8,6 +8,7 @@ from .agreements import (  # noqa: F401
     AgreementSignature,
     AgreementTemplate,
     EvidenceItem,
+    ImprovementPlan,
     PDPItem,
     PerformanceAgreement,
     PerformancePeriod,

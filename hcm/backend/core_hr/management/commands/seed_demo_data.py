@@ -188,6 +188,12 @@ class Command(BaseCommand):
                 return employee
 
             ceo = hire(department=exec_dept, level=top_level, location=locations[0], manager=None, hire_date=date(2015, 1, 1))
+            # Independent oversight function, reports to nobody in the org
+            # chart on purpose (same as the CEO) -- an auditor's read access
+            # spans every department, so it isn't scoped under one.
+            auditor_employee = hire(
+                department=exec_dept, level=senior_level, location=locations[0], manager=None, hire_date=date(2019, 1, 1)
+            )
 
             dept_heads = []
             for dept in other_depts:
@@ -252,6 +258,11 @@ class Command(BaseCommand):
             ceo.user = User.objects.create_user(username="accountingofficer", password="accountingofficer123")
             ceo.save(update_fields=["user"])
 
+            auditor_role = Role.objects.get(name="auditor")
+            RoleAssignment.objects.create(employee=auditor_employee, role=auditor_role)
+            auditor_employee.user = User.objects.create_user(username="auditor", password="auditor123")
+            auditor_employee.save(update_fields=["user"])
+
             self._seed_recruitment_demo_data(
                 departments=departments, levels=levels, grades_by_level=grades_by_level,
                 locations=locations, recruiter=slm_head, rng=rng,
@@ -281,7 +292,7 @@ class Command(BaseCommand):
             "Demo logins — hradmin/hradmin123 (HR Admin), manager/manager123 (Line Manager), "
             "recruiter/recruiter123 (Recruiter), compmanager/compmanager123 (Comp Manager), "
             "eemanager/eemanager123 (EE Manager), accountingofficer/accountingofficer123 (Accounting Officer), "
-            "employee/employee123 (Employee). Local development only."
+            "auditor/auditor123 (Auditor), employee/employee123 (Employee). Local development only."
         )
 
     def _seed_recruitment_demo_data(self, *, departments, levels, grades_by_level, locations, recruiter, rng):

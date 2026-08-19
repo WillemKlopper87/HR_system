@@ -24,6 +24,7 @@ from .models import (
     AgreementSignature,
     AgreementTemplate,
     EvidenceItem,
+    ImprovementPlan,
     PDPItem,
     PerformanceAgreement,
     PerformancePeriod,
@@ -209,6 +210,32 @@ class PDPItemSerializer(serializers.ModelSerializer):
         fields = ["id", "agreement", "business_process", "course_or_training", "order", "training_record_id"]
 
 
+class ImprovementPlanSerializer(serializers.ModelSerializer):
+    owner_name = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    outcome_display = serializers.CharField(source="get_outcome_display", read_only=True)
+
+    class Meta:
+        model = ImprovementPlan
+        fields = ["id", "agreement", "owner", "owner_name", "reasons", "actions", "review_date",
+                  "outcome", "outcome_display", "outcome_notes", "created_by", "created_by_name", "created_at"]
+        read_only_fields = ["created_by", "created_at"]
+
+    def get_owner_name(self, obj) -> str:
+        return f"{obj.owner.first_name} {obj.owner.last_name}"
+
+    def get_created_by_name(self, obj) -> str | None:
+        return f"{obj.created_by.first_name} {obj.created_by.last_name}" if obj.created_by_id else None
+
+    def validate(self, attrs):
+        agreement = attrs.get("agreement", getattr(self.instance, "agreement", None))
+        if agreement is not None and not agreement.hr_attention:
+            raise serializers.ValidationError(
+                "An improvement plan can only be created for an agreement flagged for HR attention."
+            )
+        return attrs
+
+
 class AgreementSignatureSerializer(serializers.ModelSerializer):
     signer_name = serializers.SerializerMethodField()
     acting_for_name = serializers.SerializerMethodField()
@@ -242,6 +269,7 @@ class AgreementDocumentSerializer(serializers.ModelSerializer):
 class PerformanceAgreementSerializer(serializers.ModelSerializer):
     elements = AgreementElementSerializer(many=True, read_only=True)
     pdp_items = PDPItemSerializer(many=True, read_only=True)
+    improvement_plans = ImprovementPlanSerializer(many=True, read_only=True)
     signatures = AgreementSignatureSerializer(many=True, read_only=True)
     documents = AgreementDocumentSerializer(many=True, read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
@@ -258,7 +286,7 @@ class PerformanceAgreementSerializer(serializers.ModelSerializer):
                   "template", "template_version", "revision", "status", "status_display",
                   "return_reason", "amendment_reason", "final_score", "hr_attention", "hr_attention_reason",
                   "submitted_at", "agreed_at", "total_weight", "current_stage", "is_editable",
-                  "elements", "pdp_items", "signatures", "documents"]
+                  "elements", "pdp_items", "improvement_plans", "signatures", "documents"]
         read_only_fields = fields  # every mutation goes through a named action
 
     def get_employee_name(self, obj) -> str:

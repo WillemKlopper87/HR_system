@@ -9,6 +9,7 @@ export const USERS = {
   compmanager: 'compmanager',
   eemanager: 'eemanager',
   accountingofficer: 'accountingofficer',
+  auditor: 'auditor',
   employee: 'employee',
 } as const
 export type DemoUser = keyof typeof USERS

@@ -842,6 +842,24 @@ export interface AgreementDocument {
   download_url: string
 }
 
+export type ImprovementPlanOutcome = 'open' | 'resolved' | 'escalated' | 'cancelled'
+
+export interface ImprovementPlan {
+  id: number
+  agreement: number
+  owner: number
+  owner_name: string
+  reasons: string
+  actions: string
+  review_date: string
+  outcome: ImprovementPlanOutcome
+  outcome_display: string
+  outcome_notes: string
+  created_by: number | null
+  created_by_name: string | null
+  created_at: string
+}
+
 export interface PerformanceAgreement {
   id: number
   period: number
@@ -867,6 +885,7 @@ export interface PerformanceAgreement {
   is_editable: boolean
   elements: AgreementElement[]
   pdp_items: PDPItem[]
+  improvement_plans: ImprovementPlan[]
   signatures: AgreementSignature[]
   documents: AgreementDocument[]
 }
@@ -932,4 +951,15 @@ export interface PeriodCompletion {
   outstanding: number
   completion_pct: number
   by_division: { division: string; total: number; signed: number; completion_pct: number }[]
+}
+
+export interface RatingDistribution {
+  period: string
+  small_cell_suppression_applied: boolean
+  by_division: Record<string, Record<string, number | string>>
+}
+
+export interface ArchiveResult {
+  archived: number
+  outstanding: number
 }

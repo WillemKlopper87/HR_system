@@ -17,6 +17,7 @@ from django.utils import timezone
 from rbac_audit.audit import log_access
 from rbac_audit.drf import get_request_employee, int_query_param, row_scoped_queryset
 from rbac_audit.models import AuditLogEntry
+from rbac_audit.permissions import can_see_unsuppressed_aggregates
 from rbac_audit.tiers import FieldTier
 from rest_framework import mixins, viewsets
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -28,6 +29,7 @@ from .models import (
     AgreementElement,
     AgreementTemplate,
     EvidenceItem,
+    ImprovementPlan,
     PDPItem,
     PerformanceAgreement,
     PerformancePeriod,
@@ -51,6 +53,7 @@ from .serializers_agreements import (
     AgreementElementSerializer,
     AgreementTemplateSerializer,
     EvidenceItemSerializer,
+    ImprovementPlanSerializer,
     PDPItemSerializer,
     PerformanceAgreementSerializer,
     PerformancePeriodSerializer,
@@ -67,6 +70,7 @@ from .services import (
     active_stage_for,
     amend_agreement,
     approve_agreement,
+    archive_period,
     clone_period,
     create_agreement,
     generate_agreements_for_period,
@@ -77,7 +81,12 @@ from .services import (
     stage_is_signed,
     submit_agreement,
 )
+from .models.agreements import RATING_MAX, RATING_MIN
 from .services.agreements import may_sign_as_head
+
+# Same threshold/gate as ee_reporting's equity dashboard and core_hr's
+# headcount dashboard (RBAC-Roles.md standing rule 1 / gap C6).
+SMALL_CELL_THRESHOLD = 5
 
 
 def _error(exc: AgreementWorkflowError) -> Response:
@@ -159,6 +168,48 @@ class PerformancePeriodViewSet(viewsets.ModelViewSet):
             "outstanding": outstanding,
             "completion_pct": round(100 * signed / total, 1) if total else 0.0,
             "by_division": sorted(by_division.values(), key=lambda b: b["division"]),
+        })
+
+    @action(detail=True, methods=["post"])
+    def archive(self, request, pk=None):
+        """Close out the FY (PC-3): every FINAL_SIGNED agreement moves to
+        ARCHIVED, the period follows, stragglers are reported not blocked."""
+        if not is_admin(get_request_employee(request)):
+            return Response({"detail": "Only hr_admin can archive a period."}, status=403)
+        result = archive_period(self.get_object(), actor=get_request_employee(request))
+        return Response(result)
+
+    @action(detail=True, methods=["get"], url_path="rating-distribution")
+    def rating_distribution(self, request, pk=None):
+        """Rating distribution by division for the hr_admin/auditor dashboard
+        (PC-3) -- crossing a rating with a small division can point back at
+        one individual, so this is small-cell suppressed exactly like
+        ee_reporting's equity dashboard (same SENSITIVE-tier gate, same
+        `f"<{THRESHOLD}"` replacement, just a division x rating matrix
+        instead of a level x demographic one)."""
+        period = self.get_object()
+        employee = get_request_employee(request)
+        can_see_unsuppressed = can_see_unsuppressed_aggregates(employee, FieldTier.SENSITIVE)
+        elements = AgreementElement.objects.filter(
+            agreement__period=period, final_rating__isnull=False
+        ).select_related("agreement__employee")
+        matrix: dict[str, dict[str, int]] = {}
+        for element in elements:
+            version = element.agreement.employee.current_version
+            division = getattr(version.department, "name", "Unassigned") if version else "Unassigned"
+            row = matrix.setdefault(division, {str(n): 0 for n in range(RATING_MIN, RATING_MAX + 1)})
+            row[str(element.final_rating)] += 1
+        suppressed = {
+            division: {
+                rating: (f"<{SMALL_CELL_THRESHOLD}" if 0 < count < SMALL_CELL_THRESHOLD else count)
+                for rating, count in row.items()
+            }
+            for division, row in matrix.items()
+        }
+        return Response({
+            "period": period.name,
+            "small_cell_suppression_applied": not can_see_unsuppressed,
+            "by_division": suppressed if not can_see_unsuppressed else matrix,
         })
 
 
@@ -589,6 +640,68 @@ class PDPItemViewSet(_HideForbiddenAsNotFound, viewsets.ModelViewSet):
 
     def check_object_permissions(self, request, obj):
         super().check_object_permissions(request, obj.agreement)
+
+
+class ImprovementPlanViewSet(_HideForbiddenAsNotFound, viewsets.ModelViewSet):
+    """Corrective-action stub behind `hr_attention` (PC-3). Read follows
+    `can_view_agreement` (same as everything else on the agreement); write is
+    narrower than `can_act_on_agreement` -- the Head or hr_admin drives this,
+    never the employee it's about."""
+
+    queryset = ImprovementPlan.objects.select_related(
+        "agreement", "agreement__employee", "agreement__head", "owner", "created_by"
+    ).all()
+    serializer_class = ImprovementPlanSerializer
+    permission_classes = [PerformanceAgreementPermission]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        employee = get_request_employee(self.request)
+        if employee is None:
+            return qs.none()
+        agreement_id = int_query_param(self.request, "agreement")
+        if agreement_id is not None:
+            qs = qs.filter(agreement_id=agreement_id)
+        if can_read_all(employee):
+            return qs
+        if self.action != "list":
+            return qs  # object permission decides; see PerformanceAgreementViewSet.get_queryset
+        visible = PerformanceAgreement.objects.filter(
+            pk__in=row_scoped_queryset(PerformanceAgreement.objects.all(), employee).values("pk")
+        ) | PerformanceAgreement.objects.filter(employee=employee)
+        return qs.filter(agreement__in=visible.distinct())
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj.agreement)
+
+    def _assert_can_drive(self, actor, agreement):
+        if not (is_admin(actor) or is_head_of(agreement, actor)):
+            raise PermissionDenied("Only the Head or hr_admin can manage an improvement plan.")
+
+    def perform_create(self, serializer):
+        actor = get_request_employee(self.request)
+        agreement = serializer.validated_data["agreement"]
+        self._assert_can_drive(actor, agreement)
+        item = serializer.save(created_by=actor)
+        log_access(
+            actor=actor, action=AuditLogEntry.Action.CREATE, entity_type="performance.ImprovementPlan",
+            entity_id=item.pk, field_tier=FieldTier.SENSITIVE,
+            fields_touched=f"improvement plan opened for agreement {agreement.pk}",
+        )
+
+    def perform_update(self, serializer):
+        actor = get_request_employee(self.request)
+        self._assert_can_drive(actor, serializer.instance.agreement)
+        item = serializer.save()
+        log_access(
+            actor=actor, action=AuditLogEntry.Action.UPDATE, entity_type="performance.ImprovementPlan",
+            entity_id=item.pk, field_tier=FieldTier.SENSITIVE,
+            fields_touched=f"outcome={item.outcome}",
+        )
+
+    def perform_destroy(self, instance):
+        self._assert_can_drive(get_request_employee(self.request), instance.agreement)
+        instance.delete()
 
 
 class SigningDelegationViewSet(viewsets.ModelViewSet):

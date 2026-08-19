@@ -42,7 +42,16 @@ hcm/
                 https link; "added after sign-off" stamped, never hard-deleted
                 once its stage is signed), final score = Σ(weight × rating) +
                 `hr_attention` computed in `_finalize_scoring`, legacy `Review`
-                derived via `sync_legacy_review` when `period.legacy_cycle` is set
+                derived via `sync_legacy_review` when `period.legacy_cycle` is set;
+                + PC-3 archive_period (permissive: FINAL_SIGNED -> ARCHIVED per
+                agreement, period follows regardless of stragglers, reports
+                {archived, outstanding}), rating-distribution dashboard (small-cell
+                suppressed exactly like ee_reporting/core_hr's dashboards),
+                `ImprovementPlan` stub behind `hr_attention` (Head/hr_admin drive
+                it, never the employee it's about) — see `hcm/frontend/src/pages/
+                PerformanceRecordsPage.tsx` (new, hr_admin+auditor, org-wide,
+                the evidence manifest is the already-nested agreement data
+                flattened, not a new model)
     learning/  skills, certifications, training records, WSP/ATR export (Sprint 8);
                 + Sprint 15 ESS (TrainingRecord.Status.REQUESTED — self-submitted
                 enrollment requests, forced status/field restrictions)
@@ -128,7 +137,9 @@ python -m venv .venv            # NOTE: prefer a venv OUTSIDE OneDrive (see belo
 Demo logins from `seed_demo_data` (password = username + "123"): `hradmin` (HR Admin),
 `manager` (Line Manager), `recruiter` (Recruiter), `compmanager` (Compensation Manager),
 `eemanager` (EE Manager), `accountingofficer` (Accounting Officer/CEO, EEA2/EEA4
-sign-off only — Sprint 13-14), `employee` (Employee, self-scope only). Every login can
+sign-off only — Sprint 13-14), `auditor` (Auditor, read-only everywhere — added PC-3;
+reports to nobody in the org chart, same as the CEO, since an auditor's read access
+spans every department), `employee` (Employee, self-scope only). Every login can
 reach the Sprint 15 self-service pages (my-profile/my-benefits/my-learning) for their
 own record — `employee`'s own contact details/self-ID are left deliberately unset by
 the seed script so there's something real to fill in on first login. Every login can

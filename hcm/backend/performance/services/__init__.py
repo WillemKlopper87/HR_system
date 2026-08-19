@@ -9,6 +9,7 @@ from .agreements import (  # noqa: F401
     active_stage_for,
     amend_agreement,
     approve_agreement,
+    archive_period,
     clone_period,
     create_agreement,
     generate_agreements_for_period,

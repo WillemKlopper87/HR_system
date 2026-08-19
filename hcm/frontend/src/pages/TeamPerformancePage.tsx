@@ -53,13 +53,14 @@ export function TeamPerformancePage() {
                 <th>Status</th>
                 <th>Weights</th>
                 <th>Signed</th>
+                <th>Final score</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {agreements.length === 0 && (
                 <tr>
-                  <td colSpan={6}>Nobody reports to you for this period yet.</td>
+                  <td colSpan={7}>Nobody reports to you for this period yet.</td>
                 </tr>
               )}
               {agreements.map((a) => (
@@ -71,6 +72,10 @@ export function TeamPerformancePage() {
                   </td>
                   <td>{(Number(a.total_weight) * 100).toFixed(0)}%</td>
                   <td>{a.signatures.filter((s) => s.revision === a.revision).length} of 2</td>
+                  <td>
+                    {a.final_score ?? '—'}
+                    {a.hr_attention && <span className="status-badge"> Flagged</span>}
+                  </td>
                   <td>
                     <button type="button" className="btn-link" onClick={() => setOpenId(openId === a.id ? null : a.id)}>
                       {openId === a.id ? 'Close' : 'Open'}

@@ -323,6 +323,39 @@ class PDPItem(TimestampedModel):
         ordering = ["agreement", "order", "id"]
 
 
+class ImprovementPlan(TimestampedModel):
+    """Corrective-action stub behind the `hr_attention` flag (PC-3).
+    Deliberately minimal -- a structured record of what was agreed (owner,
+    why, what, by when) and its eventual outcome, not a workflow of its own
+    like the signed agreement above; the Head or hr_admin drives it and
+    updates `outcome`/`outcome_notes` by hand once the review date passes."""
+
+    class Outcome(models.TextChoices):
+        OPEN = "open", "Open"
+        RESOLVED = "resolved", "Resolved"
+        ESCALATED = "escalated", "Escalated"
+        CANCELLED = "cancelled", "Cancelled"
+
+    agreement = models.ForeignKey(PerformanceAgreement, on_delete=models.CASCADE, related_name="improvement_plans")
+    # Who is accountable for driving the plan -- normally the Head, defaults
+    # there at creation, but left editable (e.g. handed to a delegate).
+    owner = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="improvement_plans_owned")
+    reasons = models.TextField()
+    actions = models.TextField()
+    review_date = models.DateField()
+    outcome = models.CharField(max_length=20, choices=Outcome.choices, default=Outcome.OPEN)
+    outcome_notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name="improvement_plans_created"
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Improvement plan for {self.agreement.employee.employee_number} ({self.get_outcome_display()})"
+
+
 class EvidenceItem(TimestampedModel):
     """Portfolio of evidence for one KPI at one review stage (PC-2).
 
