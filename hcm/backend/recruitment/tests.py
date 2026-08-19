@@ -194,3 +194,45 @@ class ValidateRequisitionPositionsTests(TestCase):
             occupational_level=self.level, job_grade=self.grade, location=self.location, position=position,
         )
         validate_requisition_positions([position], headcount=1, requisition=requisition)  # must not raise
+
+
+class HireAssignsPositionTests(TestCase):
+    def setUp(self):
+        self.dept, self.level, self.grade, self.location = _seed_reference_data()
+        self.p1 = _approved_position("P-00001", self.dept, self.level, self.grade, self.location)
+        self.p2 = _approved_position("P-00002", self.dept, self.level, self.grade, self.location)
+        self.requisition = Requisition.objects.create(
+            title="Agent", department=self.dept, occupational_level=self.level, job_grade=self.grade,
+            location=self.location, headcount=2, status=Requisition.Status.OPEN,
+        )
+        self.requisition.positions.set([self.p1, self.p2])
+
+    def _applicant(self, number):
+        return Applicant.objects.create(
+            requisition=self.requisition, first_name="App", last_name=number, email=f"{number}@example.com",
+            date_of_birth=date(1995, 1, 1), current_stage=Applicant.Stage.OFFER,
+        )
+
+    def test_first_hire_takes_the_lowest_post_number(self):
+        applicant = self._applicant("A")
+        transition_applicant(applicant, to_stage=Applicant.Stage.HIRED, hire_date=date(2026, 1, 1))
+        applicant.refresh_from_db()
+        self.assertEqual(applicant.resulting_employee.current_version.position_id, self.p1.id)
+
+    def test_second_sequential_hire_takes_the_next_still_vacant_position(self):
+        first = self._applicant("A")
+        transition_applicant(first, to_stage=Applicant.Stage.HIRED, hire_date=date(2026, 1, 1))
+
+        second = self._applicant("B")
+        transition_applicant(second, to_stage=Applicant.Stage.HIRED, hire_date=date(2026, 1, 2))
+        second.refresh_from_db()
+        self.assertEqual(second.resulting_employee.current_version.position_id, self.p2.id)
+
+    def test_requisition_auto_fills_once_every_linked_position_is_occupied(self):
+        first = self._applicant("A")
+        transition_applicant(first, to_stage=Applicant.Stage.HIRED, hire_date=date(2026, 1, 1))
+        second = self._applicant("B")
+        transition_applicant(second, to_stage=Applicant.Stage.HIRED, hire_date=date(2026, 1, 2))
+
+        self.requisition.refresh_from_db()
+        self.assertEqual(self.requisition.status, Requisition.Status.FILLED)

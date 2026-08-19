@@ -93,6 +93,18 @@ def _complete_hire(applicant: Applicant, *, hire_date) -> Employee:
     if Employee.objects.filter(work_email=applicant.email).exists():
         raise ValueError(f"An employee with work email '{applicant.email}' already exists — cannot complete hire.")
 
+    # Which specific linked position does THIS hire consume? The
+    # requisition's still-vacant linked positions, lowest post_number
+    # first -- positions grouped into one requisition are by definition
+    # interchangeable for this purpose (if they weren't, they'd belong in
+    # separate requisitions). None for requisitions predating C1 (no
+    # linked positions at all).
+    position = (
+        requisition.positions.filter(id__in=Position.objects.vacant().values("id"))
+        .order_by("post_number")
+        .first()
+    )
+
     employee = None
     for _attempt in range(5):
         employee_number = _next_employee_number()
@@ -110,6 +122,7 @@ def _complete_hire(applicant: Applicant, *, hire_date) -> Employee:
                     job_grade=requisition.job_grade,
                     location=requisition.location,
                     manager=requisition.hiring_manager,
+                    position=position,
                     race=applicant.race,
                     gender=applicant.gender,
                     disability_status=applicant.disability_status,
