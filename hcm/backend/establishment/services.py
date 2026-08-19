@@ -57,6 +57,8 @@ def decide_step(position: Position, *, actor=None, decision: str, comment: str =
     chain = settings.POSITION_APPROVAL_CHAIN
     if position.current_step >= len(chain):
         raise ApprovalError(f"Position {position.post_number} has no more approval steps configured.")
+    if decision not in (PositionApprovalStep.Decision.APPROVED, PositionApprovalStep.Decision.REJECTED):
+        raise ApprovalError(f"'{decision}' is not a valid decision (must be 'approved' or 'rejected').")
 
     role = chain[position.current_step]
     PositionApprovalStep.objects.create(

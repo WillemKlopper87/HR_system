@@ -217,3 +217,13 @@ class ApprovalChainTests(TestCase):
         position = self._propose()
         with self.assertRaises(ApprovalError):
             revise_and_resubmit(position, title="New title")
+
+    def test_decide_step_with_an_invalid_decision_value_raises(self):
+        position = self._propose()
+        submit_for_approval(position)
+        with self.assertRaises(ApprovalError):
+            decide_step(position, decision="not_a_real_decision")
+        position.refresh_from_db()
+        self.assertEqual(position.status, Position.Status.IN_REVIEW)
+        self.assertEqual(position.current_step, 0)
+        self.assertEqual(position.approval_steps.count(), 0)
