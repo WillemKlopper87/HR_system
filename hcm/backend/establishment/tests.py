@@ -6,7 +6,14 @@ from core_hr.models import Department, Employee, JobGrade, Location, Occupationa
 from django.test import TestCase, override_settings
 
 from .models import Position, PositionApprovalStep
-from .services import ApprovalError, decide_step, propose_position, revise_and_resubmit, submit_for_approval
+from .services import (
+    ApprovalError,
+    backfill_positions_for_current_employees,
+    decide_step,
+    propose_position,
+    revise_and_resubmit,
+    submit_for_approval,
+)
 
 
 def _seed_reference_data():
@@ -227,3 +234,58 @@ class ApprovalChainTests(TestCase):
         self.assertEqual(position.status, Position.Status.IN_REVIEW)
         self.assertEqual(position.current_step, 0)
         self.assertEqual(position.approval_steps.count(), 0)
+
+
+class BackfillTests(TestCase):
+    def setUp(self):
+        self.dept, self.level, self.grade, self.location = _seed_reference_data()
+
+    def _hire(self, number):
+        return Employee.objects.hire(
+            employee_number=number, first_name="Backfill", last_name="Case", date_of_birth=date(1990, 1, 1),
+            work_email=f"{number.lower()}@example.com", hire_date=date(2020, 1, 1), department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location,
+        )
+
+    def test_creates_one_approved_position_per_current_employee(self):
+        e1 = self._hire("E0060")
+        e2 = self._hire("E0061")
+
+        created = backfill_positions_for_current_employees()
+
+        self.assertEqual(created, 2)
+        self.assertEqual(Position.objects.count(), 2)
+        e1.refresh_from_db()
+        e2.refresh_from_db()
+        self.assertIsNotNone(e1.current_version.position_id)
+        self.assertIsNotNone(e2.current_version.position_id)
+        self.assertNotEqual(e1.current_version.position_id, e2.current_version.position_id)
+        for position in Position.objects.all():
+            self.assertEqual(position.status, Position.Status.APPROVED)
+            self.assertEqual(position.approval_steps.count(), 0)
+
+    def test_two_employees_with_identical_role_get_separate_positions(self):
+        """1:1, never shared/grouped -- a Position is one seat."""
+        self._hire("E0062")
+        self._hire("E0063")
+        backfill_positions_for_current_employees()
+        post_numbers = set(Position.objects.values_list("post_number", flat=True))
+        self.assertEqual(len(post_numbers), 2)
+
+    def test_is_idempotent(self):
+        self._hire("E0064")
+        first_count = backfill_positions_for_current_employees()
+        second_count = backfill_positions_for_current_employees()
+        self.assertEqual(first_count, 1)
+        self.assertEqual(second_count, 0)  # already-linked EmployeeVersions are skipped
+        self.assertEqual(Position.objects.count(), 1)
+
+    def test_employee_with_no_current_version_is_skipped_not_errored(self):
+        """Orphan records (core_hr's own Sprint-1 data-quality case) must
+        not crash the backfill."""
+        Employee.objects.create(
+            employee_number="E0065", first_name="Orphan", last_name="Case", date_of_birth=date(1990, 1, 1),
+            work_email="orphan.case@example.com", hire_date=date(2020, 1, 1),
+        )
+        created = backfill_positions_for_current_employees()
+        self.assertEqual(created, 0)

@@ -11,6 +11,7 @@ into a 400.
 """
 from __future__ import annotations
 
+from core_hr.models import Employee
 from django.conf import settings
 from django.db import transaction
 
@@ -98,3 +99,32 @@ def revise_and_resubmit(position: Position, *, actor=None, **changed_fields) -> 
     position.current_step = 0
     position.save(update_fields=[*changed_fields.keys(), "status", "current_step"])
     return position
+
+
+def backfill_positions_for_current_employees() -> int:
+    """One-time backfill (called from migration 0002): creates exactly one
+    approved Position per currently-employed EmployeeVersion that doesn't
+    already have one -- 1:1, never grouped/shared even where department+
+    grade+title match exactly, since a Position is one seat. No
+    PositionApprovalStep rows are fabricated -- this is already-real
+    employment, not a new proposal going through review. Idempotent:
+    already-linked EmployeeVersions are skipped, safe to call more than
+    once (e.g. if the migration is re-run in a dev environment)."""
+    created = 0
+    for employee in Employee.objects.all():
+        version = employee.current_version
+        if version is None or version.position_id is not None:
+            continue
+        position = Position.objects.create(
+            post_number=_next_post_number(),
+            title=version.job_title,
+            department=version.department,
+            occupational_level=version.occupational_level,
+            job_grade=version.job_grade,
+            location=version.location,
+            status=Position.Status.APPROVED,
+        )
+        version.position = position
+        version.save(update_fields=["position"])
+        created += 1
+    return created
