@@ -30,6 +30,7 @@ import { OrgStructurePage } from './pages/OrgStructurePage'
 import { PayBandsPage } from './pages/PayBandsPage'
 import { PolicyComplianceDashboardPage } from './pages/PolicyComplianceDashboardPage'
 import { PolicyLibraryPage } from './pages/PolicyLibraryPage'
+import { PositionsPage } from './pages/PositionsPage'
 import { RecruitmentDashboardPage } from './pages/RecruitmentDashboardPage'
 import { RequisitionsPage } from './pages/RequisitionsPage'
 import { ReviewCyclesPage } from './pages/ReviewCyclesPage'
@@ -69,6 +70,7 @@ export default function App() {
               <Route path="/applicants/:id" element={<ApplicantDetailPage />} />
               <Route path="/dashboards/recruitment" element={<RecruitmentDashboardPage />} />
             </Route>
+            <Route path="/positions" element={<PositionsPage />} />
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/reviews/:id" element={<ReviewDetailPage />} />
             <Route path="/team-development" element={<TeamDevelopmentPage />} />

@@ -119,6 +119,43 @@ export const EXCEPTION_TYPE_LABELS: Record<DataQualityException['exception_type'
   orphan_record: 'Orphan record (no version history)',
 }
 
+// ---- Position / establishment control (Position-Establishment plan) ----
+
+export type PositionStatus = 'draft' | 'in_review' | 'approved' | 'rejected'
+
+export interface PositionApprovalStep {
+  id: number
+  step_index: number
+  role: string
+  actor: number | null
+  decision: 'approved' | 'rejected'
+  comment: string
+  created_at: string
+}
+
+export interface Position {
+  id: number
+  post_number: string
+  title: string
+  department: number
+  occupational_level: number
+  job_grade: number | null
+  location: number
+  status: PositionStatus
+  current_step: number
+  proposed_by: number | null
+  approval_steps: PositionApprovalStep[]
+  is_vacant: boolean
+  current_incumbent_number: string | null
+}
+
+export const POSITION_STATUS_LABELS: Record<PositionStatus, string> = {
+  draft: 'Draft',
+  in_review: 'In review',
+  approved: 'Approved',
+  rejected: 'Rejected',
+}
+
 export type RequisitionStatus = 'draft' | 'open' | 'on_hold' | 'closed' | 'filled'
 
 export interface Requisition {
@@ -130,6 +167,7 @@ export interface Requisition {
   location: number
   headcount: number
   status: RequisitionStatus
+  positions: number[]
   hiring_manager: number | null
   created_by: number | null
   opened_at: string | null

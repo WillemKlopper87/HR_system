@@ -12,6 +12,7 @@ export interface NavItem {
 const HR = ['hr_admin'] as const
 const MANAGER = ['line_manager', 'hr_admin'] as const
 const RECRUIT = ['recruiter', 'hr_admin'] as const
+const ESTABLISHMENT = ['hr_admin', 'comp_manager', 'accounting_officer', 'auditor', 'recruiter'] as const
 const COMP = ['comp_manager', 'hr_admin'] as const
 const ASSESS = ['ee_manager', 'hr_admin'] as const
 const EE = ['hr_admin', 'ee_manager', 'accounting_officer', 'auditor'] as const
@@ -23,6 +24,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: '/data-quality', label: 'Data Quality', roles: HR },
   { to: '/dashboards/headcount', label: 'Headcount', roles: [] },
   { to: '/requisitions', label: 'Requisitions', roles: RECRUIT },
+  { to: '/positions', label: 'Positions', roles: ESTABLISHMENT },
   { to: '/applicants', label: 'Applicants', roles: RECRUIT },
   { to: '/dashboards/recruitment', label: 'Recruitment', roles: RECRUIT },
   { to: '/team-development', label: 'Team Development', roles: [] },
