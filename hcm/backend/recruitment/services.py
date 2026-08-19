@@ -149,11 +149,15 @@ def _complete_hire(applicant: Applicant, *, hire_date) -> Employee:
 
 def backfill_requisition_positions() -> int:
     """One-time backfill (called from a migration): a CLOSED/FILLED
-    requisition whose resulting hire now has a backfilled Position
+    requisition whose resulting hires now have backfilled Positions
     (establishment.services.backfill_positions_for_current_employees, run
-    first) gets that Position linked. Requisitions with no resulting hire
-    predate establishment control entirely and stay unlinked. Idempotent:
-    already-linked requisitions are skipped."""
+    first) gets ALL of those positions linked -- a requisition can have
+    several distinct hires (headcount > 1), each with their own 1:1
+    backfilled Position, and all of them belong on this requisition, not
+    just the first one found. Requisitions with no resulting hire predate
+    establishment control entirely and stay unlinked. Idempotent:
+    already-linked requisitions are skipped. Returns the count of
+    requisitions backfilled (not positions linked)."""
     linked = 0
     closed_statuses = [Requisition.Status.CLOSED, Requisition.Status.FILLED]
     for requisition in Requisition.objects.filter(status__in=closed_statuses):
@@ -162,10 +166,13 @@ def backfill_requisition_positions() -> int:
         hired = requisition.applicants.filter(
             current_stage=Applicant.Stage.HIRED, resulting_employee__isnull=False
         ).select_related("resulting_employee")
-        for applicant in hired:
-            version = applicant.resulting_employee.current_version
-            if version is not None and version.position_id is not None:
-                requisition.positions.add(version.position_id)
-                linked += 1
-                break  # one linked position is enough to mark this requisition backfilled
+        position_ids = {
+            applicant.resulting_employee.current_version.position_id
+            for applicant in hired
+            if applicant.resulting_employee.current_version is not None
+            and applicant.resulting_employee.current_version.position_id is not None
+        }
+        if position_ids:
+            requisition.positions.add(*position_ids)
+            linked += 1
     return linked

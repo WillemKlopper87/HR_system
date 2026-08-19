@@ -276,6 +276,52 @@ class BackfillRequisitionPositionsTests(TestCase):
         requisition.refresh_from_db()
         self.assertEqual(list(requisition.positions.values_list("id", flat=True)), [backfilled_position_id])
 
+    def test_closed_requisition_with_multiple_hires_links_every_distinct_position(self):
+        """headcount > 1 historical requisitions can have several distinct
+        HIRED applicants -- each backfilled Position (1:1 per employee,
+        never shared) belongs on the requisition, not just the first one
+        found."""
+        requisition = Requisition.objects.create(
+            title="Legacy multi", department=self.dept, occupational_level=self.level, job_grade=self.grade,
+            location=self.location, headcount=2, status=Requisition.Status.CLOSED,
+        )
+        employee_a = Employee.objects.hire(
+            employee_number="E0071", first_name="Legacy", last_name="HireA", date_of_birth=date(1990, 1, 1),
+            work_email="legacy.hirea@example.com", hire_date=date(2023, 1, 1), department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location,
+        )
+        employee_b = Employee.objects.hire(
+            employee_number="E0072", first_name="Legacy", last_name="HireB", date_of_birth=date(1990, 1, 2),
+            work_email="legacy.hireb@example.com", hire_date=date(2023, 1, 2), department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location,
+        )
+        Applicant.objects.create(
+            requisition=requisition, first_name="Legacy", last_name="HireA", email="legacy.hirea@example.com",
+            date_of_birth=date(1990, 1, 1), current_stage=Applicant.Stage.HIRED, resulting_employee=employee_a,
+        )
+        Applicant.objects.create(
+            requisition=requisition, first_name="Legacy", last_name="HireB", email="legacy.hireb@example.com",
+            date_of_birth=date(1990, 1, 2), current_stage=Applicant.Stage.HIRED, resulting_employee=employee_b,
+        )
+        from establishment.services import backfill_positions_for_current_employees
+
+        backfill_positions_for_current_employees()
+        employee_a.refresh_from_db()
+        employee_b.refresh_from_db()
+        position_id_a = employee_a.current_version.position_id
+        position_id_b = employee_b.current_version.position_id
+        self.assertIsNotNone(position_id_a)
+        self.assertIsNotNone(position_id_b)
+        self.assertNotEqual(position_id_a, position_id_b)
+
+        linked = backfill_requisition_positions()
+
+        self.assertEqual(linked, 1)  # one requisition backfilled (not two position-links)
+        requisition.refresh_from_db()
+        self.assertEqual(
+            set(requisition.positions.values_list("id", flat=True)), {position_id_a, position_id_b}
+        )
+
     def test_open_requisition_with_no_resulting_hire_is_left_unlinked(self):
         Requisition.objects.create(
             title="Still open", department=self.dept, occupational_level=self.level, job_grade=self.grade,
