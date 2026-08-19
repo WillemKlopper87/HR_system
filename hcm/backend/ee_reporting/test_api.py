@@ -215,6 +215,57 @@ class ExportApiTests(EEReportingApiTestCase):
         self.assertEqual(response.status_code, 400)
 
 
+class ValidateApiTests(EEReportingApiTestCase):
+    """H3: the cell-by-cell validator (validation.py::validate_report_data)
+    surfaced as a read-only diagnostic action, same READ_ROLES as export."""
+
+    def setUp(self):
+        super().setUp()
+        EmployerConfig.objects.create(
+            trade_name="X", dti_registration_number="1", paye_sars_number="1", uif_reference_number="1",
+            ee_reference_number="1", ceo_name="CEO", ee_senior_manager_name="EE", business_type="state_owned_enterprise",
+        )
+        # _setup_readiness()'s bare EEQuestionnaire (no barriers) is fine for
+        # readiness tests, but this class needs a genuinely clean report —
+        # an empty barriers grid is itself a real finding (BarrierGridCompleteness
+        # in test_validation.py), so fill all 24 categories here instead.
+        from .constants import BARRIER_CATEGORIES
+
+        EEQuestionnaire.objects.create(
+            report_year=2026, barriers={key: {"barriers": False, "aa_measures": False} for key, _label in BARRIER_CATEGORIES},
+        )
+        self.report = generate_report(
+            form_type="eea2", report_year=2026, period_start=self.period_start, period_end=self.period_end
+        )
+
+    def test_hr_admin_sees_no_issues_on_a_clean_report(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get(f"/api/v1/ee-reports/{self.report.id}/validate/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["issues"], [])
+
+    def test_auditor_can_validate(self):
+        self.client.force_authenticate(user=self.auditor.user)
+        response = self.client.get(f"/api/v1/ee-reports/{self.report.id}/validate/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_line_manager_cannot_validate(self):
+        self.client.force_authenticate(user=self.line_manager.user)
+        response = self.client.get(f"/api/v1/ee-reports/{self.report.id}/validate/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_issues_surface_through_the_endpoint(self):
+        """Not just "the action exists" -- an actual defect in the frozen
+        data comes back through the real HTTP response, not just the
+        Python-level function."""
+        self.report.data["workforce_profile"]["grand_total"]["african_male"] = 999
+        self.report.save(update_fields=["data"])
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get(f"/api/v1/ee-reports/{self.report.id}/validate/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(any("grand_total][african_male] = 999" in i for i in response.data["issues"]))
+
+
 class RemunerationImportApiTests(EEReportingApiTestCase):
     def test_hr_admin_can_import_csv(self):
         emp = Employee.objects.hire(

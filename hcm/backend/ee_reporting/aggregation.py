@@ -245,10 +245,14 @@ def median_and_gap_stats(period_start, period_end) -> dict:
         }
 
     def _median(values):
+        # Remuneration is whole Rand throughout (EEA-Form-Spec-Notes.md:
+        # "no separators or decimals") -- an even-count average of two ints
+        # can land on a X.5, so round back to a whole Rand rather than
+        # leaking a float into a field the form spec requires as an integer.
         mid = len(values) // 2
         if len(values) % 2:
             return values[mid]
-        return (values[mid - 1] + values[mid]) / 2
+        return round((values[mid - 1] + values[mid]) / 2)
 
     five_pct = max(round(n * 0.05), 1) if n >= 1 else 0
     bottom_slice = totals[:five_pct]

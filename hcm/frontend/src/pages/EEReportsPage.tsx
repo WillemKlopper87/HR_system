@@ -98,6 +98,7 @@ function ReportRow({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [place, setPlace] = useState('')
+  const [validation, setValidation] = useState<'idle' | 'checking' | string[]>('idle')
 
   async function act(action: string, body?: Record<string, unknown>) {
     setError(null)
@@ -109,6 +110,16 @@ function ReportRow({
       setError(err instanceof ApiError ? err.message : 'Action failed.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function validate() {
+    setValidation('checking')
+    try {
+      const result = await api.get<{ issues: string[] }>(`/ee-reports/${report.id}/validate/`)
+      setValidation(result.issues)
+    } catch (err) {
+      setValidation([err instanceof ApiError ? err.message : 'Validation check failed.'])
     }
   }
 
@@ -130,6 +141,9 @@ function ReportRow({
           <div className="form-actions">
             <button type="button" className="btn-link" onClick={onToggleExpand}>
               {expanded ? 'Hide detail' : 'View detail'}
+            </button>
+            <button type="button" className="btn-link" disabled={validation === 'checking'} onClick={() => void validate()}>
+              {validation === 'checking' ? 'Validating…' : 'Validate'}
             </button>
             {report.status === 'draft' && hasRole('hr_admin') && (
               <button type="button" className="btn-secondary" disabled={busy} onClick={() => void act('submit_for_review')}>
@@ -157,6 +171,17 @@ function ReportRow({
             <a className="btn-link" href={exportUrl('pdf')} target="_blank" rel="noreferrer">PDF</a>
             <a className="btn-link" href={exportUrl('xml')} target="_blank" rel="noreferrer">XML</a>
           </div>
+          {Array.isArray(validation) && (
+            validation.length === 0 ? (
+              <p className="hint-text">✓ No validation issues found.</p>
+            ) : (
+              <ul className="form-error">
+                {validation.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            )
+          )}
         </td>
       </tr>
       {expanded && (

@@ -31,6 +31,7 @@ from .services import (
     sign_off,
     submit_for_review,
 )
+from .validation import validate_report_data
 
 
 def _require_hr_admin(actor, message):
@@ -214,6 +215,17 @@ class EEReportViewSet(viewsets.ModelViewSet):
         except ApprovalError as exc:
             return Response({"detail": str(exc)}, status=400)
         return Response(self.get_serializer(report).data)
+
+    @action(detail=True, methods=["get"])
+    def validate(self, request, pk=None):
+        """Cell-by-cell check of this generated snapshot against
+        EEA-Form-Spec-Notes.md's validation-engine rules — advisory, not a
+        state-machine gate (unlike validate_report_readiness, which blocks
+        generation itself): a reviewer decides what to do with what this
+        surfaces, the same way readiness issues are shown but not force-
+        fixed automatically."""
+        report = self.get_object()
+        return Response({"issues": validate_report_data(report)})
 
     @action(detail=True, methods=["get"])
     def export(self, request, pk=None):
