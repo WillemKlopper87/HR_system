@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import date
 
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
-from .models import Position
+from .models import Position, PositionApprovalStep
+from .services import ApprovalError, decide_step, propose_position, revise_and_resubmit, submit_for_approval
 
 
 def _seed_reference_data():
@@ -105,3 +106,114 @@ class PositionModelTests(TestCase):
         self.assertEqual(list(Position.objects.vacant()), [vacant])
         self.assertNotIn(occupied, Position.objects.vacant())
         self.assertNotIn(draft, Position.objects.vacant())
+
+
+class ApprovalChainTests(TestCase):
+    def setUp(self):
+        self.dept, self.level, self.grade, self.location = _seed_reference_data()
+
+    def _propose(self):
+        return propose_position(
+            title="Software Engineer", department=self.dept, occupational_level=self.level,
+            job_grade=self.grade, location=self.location,
+        )
+
+    def test_propose_creates_a_draft_with_a_post_number(self):
+        position = self._propose()
+        self.assertEqual(position.status, Position.Status.DRAFT)
+        self.assertTrue(position.post_number)
+
+    def test_post_numbers_increment_sequentially(self):
+        first = self._propose()
+        second = self._propose()
+        self.assertNotEqual(first.post_number, second.post_number)
+        first_n = int("".join(ch for ch in first.post_number if ch.isdigit()))
+        second_n = int("".join(ch for ch in second.post_number if ch.isdigit()))
+        self.assertEqual(second_n, first_n + 1)
+
+    def test_submit_moves_draft_to_in_review_at_step_zero(self):
+        position = self._propose()
+        submit_for_approval(position)
+        position.refresh_from_db()
+        self.assertEqual(position.status, Position.Status.IN_REVIEW)
+        self.assertEqual(position.current_step, 0)
+
+    def test_submit_twice_raises(self):
+        position = self._propose()
+        submit_for_approval(position)
+        with self.assertRaises(ApprovalError):
+            submit_for_approval(position)
+
+    @override_settings(POSITION_APPROVAL_CHAIN=["comp_manager", "accounting_officer"])
+    def test_full_two_step_chain_approves(self):
+        position = self._propose()
+        submit_for_approval(position)
+
+        decide_step(position, decision=PositionApprovalStep.Decision.APPROVED, comment="looks fine")
+        position.refresh_from_db()
+        self.assertEqual(position.status, Position.Status.IN_REVIEW)
+        self.assertEqual(position.current_step, 1)
+
+        decide_step(position, decision=PositionApprovalStep.Decision.APPROVED)
+        position.refresh_from_db()
+        self.assertEqual(position.status, Position.Status.APPROVED)
+
+        steps = list(position.approval_steps.order_by("step_index"))
+        self.assertEqual([s.role for s in steps], ["comp_manager", "accounting_officer"])
+        self.assertEqual([s.decision for s in steps], ["approved", "approved"])
+        self.assertEqual(steps[0].comment, "looks fine")
+
+    @override_settings(POSITION_APPROVAL_CHAIN=["accounting_officer"])
+    def test_a_different_shorter_chain_is_honoured_with_no_code_changes(self):
+        """This is the test that actually proves 'configurable' holds --
+        not just that the default 2-step shape works."""
+        position = self._propose()
+        submit_for_approval(position)
+        decide_step(position, decision=PositionApprovalStep.Decision.APPROVED)
+        position.refresh_from_db()
+        self.assertEqual(position.status, Position.Status.APPROVED)
+        self.assertEqual(position.approval_steps.count(), 1)
+        self.assertEqual(position.approval_steps.first().role, "accounting_officer")
+
+    def test_rejection_stops_the_chain_immediately(self):
+        position = self._propose()
+        submit_for_approval(position)
+        decide_step(position, decision=PositionApprovalStep.Decision.REJECTED, comment="wrong grade")
+        position.refresh_from_db()
+        self.assertEqual(position.status, Position.Status.REJECTED)
+        self.assertEqual(position.approval_steps.count(), 1)
+
+    def test_decide_step_on_a_draft_position_raises(self):
+        position = self._propose()
+        with self.assertRaises(ApprovalError):
+            decide_step(position, decision=PositionApprovalStep.Decision.APPROVED)
+
+    def test_decide_step_on_an_already_approved_position_raises(self):
+        position = self._propose()
+        submit_for_approval(position)
+        decide_step(position, decision=PositionApprovalStep.Decision.APPROVED)
+        decide_step(position, decision=PositionApprovalStep.Decision.APPROVED)
+        with self.assertRaises(ApprovalError):
+            decide_step(position, decision=PositionApprovalStep.Decision.APPROVED)
+
+    def test_revise_and_resubmit_keeps_post_number_and_prior_steps(self):
+        position = self._propose()
+        submit_for_approval(position)
+        decide_step(position, decision=PositionApprovalStep.Decision.REJECTED, comment="wrong grade")
+        original_post_number = position.post_number
+
+        junior_grade = JobGrade.objects.create(
+            name="Grade 2", code="G2", occupational_level=self.level
+        )
+        revise_and_resubmit(position, job_grade=junior_grade)
+        position.refresh_from_db()
+        self.assertEqual(position.status, Position.Status.DRAFT)
+        self.assertEqual(position.current_step, 0)
+        self.assertEqual(position.post_number, original_post_number)
+        self.assertEqual(position.job_grade, junior_grade)
+        self.assertEqual(position.approval_steps.count(), 1)  # the rejection stays on record
+
+    def test_revise_and_resubmit_from_a_non_rejected_position_raises(self):
+        position = self._propose()
+        with self.assertRaises(ApprovalError):
+            revise_and_resubmit(position, title="New title")
