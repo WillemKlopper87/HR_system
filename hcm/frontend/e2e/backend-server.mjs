@@ -34,6 +34,15 @@ const env = {
   REDIS_URL: '',
   CELERY_TASK_ALWAYS_EAGER: '1',
   PYTHONUNBUFFERED: '1',
+  // H1's per-username login throttle (default 10/min, rbac_audit/throttling.py)
+  // protects a real account from a guessing attack; it isn't meant to cap a
+  // handful of fixed demo logins used dozens of times across one full e2e
+  // run. Without this, a full `npx playwright test` run throttles the same
+  // `employee`/`manager`/`hradmin` logins mid-suite (surfaced by PC-2's
+  // review flow, which is login-heavy) with a real, correctly-working 429 --
+  // not a product bug, just not what this throttle is protecting against here.
+  THROTTLE_LOGIN_USERNAME: process.env.THROTTLE_LOGIN_USERNAME ?? '1000/min',
+  THROTTLE_LOGIN_BURST: process.env.THROTTLE_LOGIN_BURST ?? '1000/min',
 }
 
 function run(args) {

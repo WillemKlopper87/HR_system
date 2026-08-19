@@ -765,6 +765,23 @@ export type AgreementStatus =
   | 'midyear_open' | 'midyear_employee_signed' | 'midyear_signed'
   | 'final_open' | 'final_employee_signed' | 'final_signed' | 'archived'
 
+export type EvidenceKind = 'file' | 'link'
+
+export interface EvidenceItem {
+  id: number
+  element: number
+  stage: PhaseStage
+  kind: EvidenceKind
+  url: string
+  description: string
+  uploaded_by: number | null
+  uploaded_by_name: string | null
+  sha256: string
+  added_after_signoff: boolean
+  created_at: string
+  download_url: string | null
+}
+
 export interface AgreementElement {
   id: number
   agreement: number
@@ -784,6 +801,8 @@ export interface AgreementElement {
   final_employee_comment: string
   final_head_comment: string
   score: string | null
+  evidence_items: EvidenceItem[]
+  has_evidence: boolean
 }
 
 export interface PDPItem {

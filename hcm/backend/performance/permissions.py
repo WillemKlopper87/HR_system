@@ -68,6 +68,20 @@ def can_edit_agreement(agreement: PerformanceAgreement, employee) -> bool:
     return agreement.employee_id == employee.pk or is_admin(employee) or is_head_of(agreement, employee)
 
 
+def can_act_on_agreement(agreement: PerformanceAgreement, employee) -> bool:
+    """"May you act on this agreement at all" — the subject, the Head (or an
+    active delegate), hr_admin. Deliberately *not* gated on `is_editable`
+    (unlike `can_edit_agreement`): PC-2's mid-year/final stage fields and
+    evidence are writable well past contracting's own draft/returned window,
+    and it's the stage-specific rules (STAGE_ELEMENT_FIELDS, STAGE_FLOW) that
+    decide *which* action is allowed right now, not this gate."""
+    if employee is None:
+        return False
+    if has_role(employee, "auditor") and not is_admin(employee):
+        return False
+    return agreement.employee_id == employee.pk or is_admin(employee) or is_head_of(agreement, employee)
+
+
 class PerformanceAgreementPermission(permissions.IsAuthenticated):
     """Object-level gate; per-action authority (submit/return/approve/sign)
     lives in the service layer so every entry point obeys it."""
@@ -81,15 +95,7 @@ class PerformanceAgreementPermission(permissions.IsAuthenticated):
         employee = get_request_employee(request)
         if request.method in permissions.SAFE_METHODS:
             return can_view_agreement(obj, employee)
-        # "May you act on this agreement at all" — the subject, the Head (or an
-        # active delegate), hr_admin. *Which* action is allowed right now
-        # (submit vs sign vs approve) is the service layer's call, so signing an
-        # already-approved agreement isn't blocked here for not being editable.
-        if employee is None:
-            return False
-        if has_role(employee, "auditor") and not is_admin(employee):
-            return False
-        return obj.employee_id == employee.pk or is_admin(employee) or is_head_of(obj, employee)
+        return can_act_on_agreement(obj, employee)
 
 
 class IsHRAdminOrReadOnlyForPerformance(permissions.IsAuthenticated):

@@ -124,6 +124,7 @@ function PeriodCard({ period, onChanged }: { period: PerformancePeriod; onChange
               <th>Due</th>
               <th>Reminders (days before)</th>
               <th>Overdue repeat</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -136,6 +137,16 @@ function PeriodCard({ period, onChanged }: { period: PerformancePeriod; onChange
                   <ReminderOffsets phaseId={phase.id} offsets={phase.reminder_offsets_days} onChanged={onChanged} />
                 </td>
                 <td>every {phase.overdue_every_days} days</td>
+                <td>
+                  <button
+                    type="button"
+                    className="btn-link"
+                    disabled={act.busy}
+                    onClick={() => void act.run('open-phase', { stage: phase.stage })}
+                  >
+                    Open {PHASE_STAGE_LABELS[phase.stage].toLowerCase()}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -143,14 +154,6 @@ function PeriodCard({ period, onChanged }: { period: PerformancePeriod; onChange
       </div>
 
       <div className="form-actions">
-        <button
-          type="button"
-          className="btn-secondary"
-          disabled={act.busy}
-          onClick={() => void act.run('open-phase', { stage: 'contracting' })}
-        >
-          Open contracting
-        </button>
         <button
           type="button"
           className="btn-secondary"

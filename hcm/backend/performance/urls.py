@@ -4,6 +4,7 @@ from .views import FeedbackViewSet, GoalViewSet, ReviewCycleViewSet, ReviewViewS
 from .views_agreements import (
     AgreementElementViewSet,
     AgreementTemplateViewSet,
+    EvidenceItemViewSet,
     PDPItemViewSet,
     PerformanceAgreementViewSet,
     PerformancePeriodViewSet,
@@ -29,5 +30,7 @@ router.register("performance-agreements", PerformanceAgreementViewSet, basename=
 router.register("agreement-elements", AgreementElementViewSet, basename="agreement-element")
 router.register("agreement-pdp-items", PDPItemViewSet, basename="agreement-pdp-item")
 router.register("signing-delegations", SigningDelegationViewSet, basename="signing-delegation")
+# PC-2: portfolio of evidence per KPI x review stage
+router.register("agreement-evidence", EvidenceItemViewSet, basename="agreement-evidence")
 
 urlpatterns = router.urls

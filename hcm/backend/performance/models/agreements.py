@@ -15,6 +15,7 @@ the old rating from the agreement while the old pages still exist.
 """
 from __future__ import annotations
 
+import os
 from decimal import Decimal
 
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -320,6 +321,47 @@ class PDPItem(TimestampedModel):
 
     class Meta:
         ordering = ["agreement", "order", "id"]
+
+
+class EvidenceItem(TimestampedModel):
+    """Portfolio of evidence for one KPI at one review stage (PC-2).
+
+    Optional-but-visible by default (user, KPI-Contracting-Investigation.md
+    §6): a rating can be entered without evidence, but the Head's review
+    shows an explicit "no evidence attached" marker, and a template can flip
+    `evidence_required` to make the final stage genuinely require it. Never
+    hard-deleted once the stage it belongs to has been signed off — see
+    `services/agreements.py::stage_is_signed` for what "signed off" means
+    here (the Head's signature exists for that stage+revision)."""
+
+    class Kind(models.TextChoices):
+        FILE = "file", "Uploaded file"
+        LINK = "link", "Link (OneDrive / SharePoint / Teams / other)"
+
+    element = models.ForeignKey("performance.AgreementElement", on_delete=models.CASCADE, related_name="evidence_items")
+    stage = models.CharField(max_length=20, choices=PeriodPhase.Stage.choices)
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    # Files go through the policies.py authenticated-download pattern, never a
+    # raw MEDIA_URL mount. Links stay off-platform on purpose (OneDrive/Teams/
+    # SharePoint — where people already keep things); only https is accepted.
+    file = models.FileField(upload_to="performance_evidence/%Y/%m/", null=True, blank=True)
+    url = models.URLField(max_length=500, blank=True)
+    description = models.CharField(max_length=300, blank=True)
+    uploaded_by = models.ForeignKey(
+        Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name="evidence_items_uploaded"
+    )
+    sha256 = models.CharField(max_length=64, blank=True)
+    # True if the stage this evidence belongs to already had the Head's
+    # signature recorded (for this revision) at the moment it was added —
+    # still allowed (people tidy up after the fact), just flagged so an
+    # auditor can tell "part of the record at sign-off" from "added later".
+    added_after_signoff = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.description or (os.path.basename(self.file.name) if self.file else self.url)
 
 
 class SigningDelegation(TimestampedModel):

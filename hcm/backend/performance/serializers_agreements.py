@@ -15,11 +15,15 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from .evidence import UnsupportedEvidenceFileError, validate_evidence_file
+from .services import STAGE_ELEMENT_FIELDS, STAGE_FLOW, STAGE_HEAD_FIELDS
+
 from .models import (
     AgreementDocument,
     AgreementElement,
     AgreementSignature,
     AgreementTemplate,
+    EvidenceItem,
     PDPItem,
     PerformanceAgreement,
     PerformancePeriod,
@@ -85,26 +89,79 @@ class AgreementTemplateSerializer(serializers.ModelSerializer):
         return str(sum((e.default_weight for e in obj.elements.all()), Decimal("0")))
 
 
+class EvidenceItemSerializer(serializers.ModelSerializer):
+    """`kind=file` accepts a multipart upload (`file`); `kind=link` accepts an
+    https `url` -- never both, never neither. `sha256` and `added_after_signoff`
+    are computed server-side (services/agreements.py), not client input."""
+
+    uploaded_by_name = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EvidenceItem
+        fields = ["id", "element", "stage", "kind", "file", "url", "description", "uploaded_by",
+                  "uploaded_by_name", "sha256", "added_after_signoff", "created_at", "download_url"]
+        read_only_fields = ["stage", "uploaded_by", "sha256", "added_after_signoff", "created_at"]
+        extra_kwargs = {"file": {"write_only": True, "required": False}}
+
+    def get_uploaded_by_name(self, obj) -> str | None:
+        return f"{obj.uploaded_by.first_name} {obj.uploaded_by.last_name}" if obj.uploaded_by_id else None
+
+    def get_download_url(self, obj) -> str | None:
+        if obj.kind != EvidenceItem.Kind.FILE or not obj.file:
+            return None
+        return f"/api/v1/agreement-evidence/{obj.id}/download/"
+
+    def validate(self, attrs):
+        kind = attrs.get("kind", getattr(self.instance, "kind", None))
+        file = attrs.get("file", getattr(self.instance, "file", None))
+        url = attrs.get("url", getattr(self.instance, "url", ""))
+        if kind == EvidenceItem.Kind.FILE:
+            if not file:
+                raise serializers.ValidationError({"file": "A file is required for file-kind evidence."})
+            if url:
+                raise serializers.ValidationError({"url": "A file-kind evidence item doesn't take a link too."})
+            try:
+                validate_evidence_file(file)
+            except UnsupportedEvidenceFileError as exc:
+                raise serializers.ValidationError({"file": str(exc)}) from exc
+        elif kind == EvidenceItem.Kind.LINK:
+            if not url:
+                raise serializers.ValidationError({"url": "A link is required for link-kind evidence."})
+            if not url.lower().startswith("https://"):
+                raise serializers.ValidationError({"url": "Only https:// links are accepted."})
+            if file:
+                raise serializers.ValidationError({"file": "A link-kind evidence item doesn't take a file too."})
+        return attrs
+
+
 class AgreementElementSerializer(serializers.ModelSerializer):
     score = serializers.SerializerMethodField()
+    evidence_items = EvidenceItemSerializer(many=True, read_only=True)
+    has_evidence = serializers.SerializerMethodField()
 
     class Meta:
         model = AgreementElement
         fields = ["id", "agreement", "section_title", "section_order", "kpa_description", "kpi_title",
                   "metric", "weight", "level_descriptors", "order", "locked",
                   "q2_target_note", "q2_employee_comment", "q2_head_comment",
-                  "final_rating", "final_employee_comment", "final_head_comment", "score"]
+                  "final_rating", "final_employee_comment", "final_head_comment", "score",
+                  "evidence_items", "has_evidence"]
         read_only_fields = ["agreement"]
 
     def get_score(self, obj) -> str | None:
         score = obj.score
         return None if score is None else str(score)
 
+    def get_has_evidence(self, obj) -> bool:
+        # obj.evidence_items is prefetched by the viewset; avoid re-querying.
+        items = getattr(obj, "_prefetched_objects_cache", {}).get("evidence_items")
+        return bool(items) if items is not None else obj.evidence_items.exists()
+
     def validate(self, attrs):
         agreement = self.instance.agreement if self.instance else None
         if agreement is not None and not agreement.is_editable:
-            # Ratings/comments (PC-2) will have their own stage rules; contracting
-            # content is frozen the moment the agreement leaves draft/returned.
+            # Contracting content is frozen the moment the agreement leaves draft/returned.
             frozen = {"kpa_description", "kpi_title", "metric", "weight", "level_descriptors", "order"}
             if frozen & set(attrs):
                 raise serializers.ValidationError(
@@ -118,6 +175,31 @@ class AgreementElementSerializer(serializers.ModelSerializer):
         weight = attrs.get("weight")
         if weight is not None and (weight < 0 or weight > 1):
             raise serializers.ValidationError({"weight": "Weight is a fraction between 0 and 1 (e.g. 0.20 for 20%)."})
+
+        # PC-2: q2_*/final_* fields belong to a specific stage. The
+        # employee's own fields are only editable while the agreement sits
+        # exactly at that stage's *_open status; the Head's field for that
+        # stage stays open one status longer -- through *_employee_signed --
+        # so the Head can add their comment after the employee signs but
+        # before the Head signs (STAGE_HEAD_FIELDS). Outside those windows
+        # either party has already signed off on what's there (amend to
+        # change it).
+        if agreement is not None:
+            all_stage_fields = {f for fields in STAGE_ELEMENT_FIELDS.values() for f in fields}
+            touched = all_stage_fields & set(attrs)
+            if touched:
+                allowed = set()
+                for stage_name, fields in STAGE_ELEMENT_FIELDS.items():
+                    flow = STAGE_FLOW[stage_name]
+                    if agreement.status == flow["open_status"]:
+                        allowed |= fields
+                    elif agreement.status == flow["employee_signed_status"]:
+                        allowed |= STAGE_HEAD_FIELDS[stage_name]
+                disallowed = touched - allowed
+                if disallowed:
+                    raise serializers.ValidationError(
+                        f"{', '.join(sorted(disallowed))} can only be edited while that review stage is open."
+                    )
         return attrs
 
 

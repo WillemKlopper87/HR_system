@@ -38,6 +38,13 @@ test.describe('performance agreements (PC-1)', () => {
     await expect(page.locator('.detail-field', { hasText: 'Total weight' })).toContainText('100%')
     // nothing to sign yet — the Head has not approved
     await expect(page.getByRole('button', { name: 'Sign as the individual' })).toHaveCount(0)
+    // The seed already has several *other* people's agreements "Submitted to
+    // Head" under the same manager, so every /team-performance lookup below
+    // must be scoped to this employee's own row by name, never `.first()`.
+    const employeeName = (
+      await page.locator('.detail-field', { hasText: 'Employee' }).locator('dd').textContent()
+    )?.trim()
+    if (!employeeName) throw new Error('could not read the employee name off /my-performance')
 
     const weight = page.getByLabel(/^Weight for /).first()
     const original = await weight.inputValue()
@@ -60,7 +67,7 @@ test.describe('performance agreements (PC-1)', () => {
     await page.goto('/team-performance')
     await expectHeading(page, 'Team Performance')
     await settled(page)
-    const row = page.locator('table tbody tr', { hasText: 'Submitted to Head' }).first()
+    const row = page.locator('table tbody tr', { hasText: employeeName }).filter({ hasText: 'Submitted to Head' })
     await expect(row).toBeVisible()
     await row.getByRole('button', { name: 'Open' }).click()
     await settled(page)
@@ -75,7 +82,7 @@ test.describe('performance agreements (PC-1)', () => {
     await login(page, 'employee')
     await page.goto('/my-performance')
     await settled(page)
-    await expect(page.locator('.form-notice')).toContainText('Add a stretch target to the 5G KPI')
+    await expect(page.locator('.form-notice').first()).toContainText('Add a stretch target to the 5G KPI')
     await page.getByRole('button', { name: 'Submit to my Head' }).click()
     await expect(page.locator('.status-badge').first()).toContainText('Submitted')
     await logout(page)
@@ -84,13 +91,13 @@ test.describe('performance agreements (PC-1)', () => {
     await login(page, 'manager')
     await page.goto('/team-performance')
     await settled(page)
-    await page.locator('table tbody tr', { hasText: 'Submitted to Head' }).first()
+    await page.locator('table tbody tr', { hasText: employeeName }).filter({ hasText: 'Submitted to Head' })
       .getByRole('button', { name: 'Open' }).click()
     await settled(page)
     await page.getByRole('button', { name: 'Approve — ready for signature' }).click()
     await expect(page.locator('.status-badge').filter({ hasText: 'awaiting employee signature' }).first()).toBeVisible()
     await expect(page.getByRole('button', { name: /^Sign as Head$/ })).toHaveCount(0)
-    await expect(page.locator('.form-notice')).toContainText('employee signs first')
+    await expect(page.locator('.form-notice').first()).toContainText('employee signs first')
     await logout(page)
 
     // --- employee signs (password re-authentication), then the Head signs
@@ -106,7 +113,7 @@ test.describe('performance agreements (PC-1)', () => {
     await login(page, 'manager')
     await page.goto('/team-performance')
     await settled(page)
-    await page.locator('table tbody tr', { hasText: 'awaiting Head signature' }).first()
+    await page.locator('table tbody tr', { hasText: employeeName }).filter({ hasText: 'awaiting Head signature' })
       .getByRole('button', { name: 'Open' }).click()
     await settled(page)
     await page.getByLabel('Confirm your password to sign').fill('manager123')
@@ -152,5 +159,208 @@ test.describe('performance agreements (PC-1)', () => {
     await expect(page.getByRole('link', { name: 'Performance Periods' })).toHaveCount(0)
     await page.goto('/performance-periods')
     await page.waitForURL(/\/employees$/)
+  })
+})
+
+/** PC-2: mid-year (Q2) and final (Q4) reviews. Deliberately in this same
+ * file, after the PC-1 describe block above (not a separate spec file):
+ * both use the same fixed `employee`/`manager` demo login, and HR opening
+ * mid-year/final here is genuinely period-wide (PC-1's `open_phase`), so it
+ * would advance the PC-1 test's agreement too if the two files' run order
+ * ever inverted -- `workers: 1` + `fullyParallel: false` only guarantees
+ * top-to-bottom order *within* a file, not a stable order *across* files.
+ */
+test.describe('performance reviews: mid-year and final (PC-2)', () => {
+  test('a full year: contracting → mid-year → final, with evidence and a computed score', async ({ page }) => {
+    // --- get the seeded employee/head pair to AGREED as quickly as the UI allows
+    await login(page, 'employee')
+    await page.goto('/my-performance')
+    await expectHeading(page, 'My Performance')
+    await settled(page)
+    const employeeName = (
+      await page.locator('.detail-field', { hasText: 'Employee' }).locator('dd').textContent()
+    )?.trim()
+    if (!employeeName) throw new Error('could not read the employee name off /my-performance')
+    if ((await page.locator('.status-badge').first().textContent())?.includes('Draft')) {
+      await page.getByRole('button', { name: 'Submit to my Head' }).click()
+      await expect(page.locator('.status-badge').first()).toContainText('Submitted')
+    }
+    await logout(page)
+
+    await login(page, 'manager')
+    await page.goto('/team-performance')
+    await expectHeading(page, 'Team Performance')
+    await settled(page)
+    const teamRow = () =>
+      page.locator('table tbody tr', { hasText: employeeName }).filter({ hasText: 'Submitted to Head' })
+    if (await teamRow().count()) {
+      await teamRow().getByRole('button', { name: 'Open' }).click()
+      await settled(page)
+      await page.getByRole('button', { name: 'Approve — ready for signature' }).click()
+    }
+    await logout(page)
+
+    await login(page, 'employee')
+    await page.goto('/my-performance')
+    await expectHeading(page, 'My Performance')
+    await settled(page)
+    if (await page.getByRole('button', { name: 'Sign as the individual' }).count()) {
+      await page.getByLabel('Confirm your password to sign').fill('employee123')
+      await page.getByRole('button', { name: 'Sign as the individual' }).click()
+    }
+    await logout(page)
+
+    await login(page, 'manager')
+    await page.goto('/team-performance')
+    await expectHeading(page, 'Team Performance')
+    await settled(page)
+    const signRow = () =>
+      page.locator('table tbody tr', { hasText: employeeName }).filter({ hasText: 'awaiting Head signature' })
+    if (await signRow().count()) {
+      await signRow().getByRole('button', { name: 'Open' }).click()
+      await settled(page)
+      await page.getByLabel('Confirm your password to sign').fill('manager123')
+      await page.getByRole('button', { name: /^Sign as Head$/ }).click()
+      await expect(page.locator('.status-badge').filter({ hasText: 'Agreed' }).first()).toBeVisible()
+    }
+    await logout(page)
+
+    // --- HR opens the mid-year phase for the whole period
+    await login(page, 'hradmin')
+    await page.goto('/performance-periods')
+    await expectHeading(page, 'Performance Periods')
+    await settled(page)
+    await page.getByRole('button', { name: /Open mid-year review/i }).click()
+    await expect(page.getByText(/Mid-year review open/i).first()).toBeVisible()
+    await logout(page)
+
+    // --- employee: the Q2 review section appears, fill in the target note + comment
+    await login(page, 'employee')
+    await page.goto('/my-performance')
+    await expectHeading(page, 'My Performance')
+    await settled(page)
+    await expect(page.getByRole('heading', { name: 'Mid-year review (Q2)' })).toBeVisible()
+    const q2TargetNote = page.locator('textarea[aria-label="q2_target_note"]').first()
+    await q2TargetNote.fill('On track for R1.5m, ahead of the R1m target')
+    await q2TargetNote.blur()
+    const q2EmployeeComment = page.locator('textarea[aria-label="q2_employee_comment"]').first()
+    await q2EmployeeComment.fill('Pipeline is solid, two deals closing next month')
+    await q2EmployeeComment.blur()
+    await page.getByLabel('Confirm your password to sign').fill('employee123')
+    await page.getByRole('button', { name: 'Sign as the individual' }).click()
+    await expect(page.locator('.status-badge').first()).toContainText('employee signed')
+    await logout(page)
+
+    // --- Head: adds their own Q2 comment, then signs
+    await login(page, 'manager')
+    await page.goto('/team-performance')
+    await expectHeading(page, 'Team Performance')
+    await settled(page)
+    await page.locator('table tbody tr', { hasText: employeeName }).filter({ hasText: 'Mid-year' })
+      .getByRole('button', { name: 'Open' }).click()
+    await settled(page)
+    const q2HeadComment = page.locator('textarea[aria-label="q2_head_comment"]').first()
+    await q2HeadComment.fill('Agreed — good progress, keep it up')
+    await q2HeadComment.blur()
+    await page.getByLabel('Confirm your password to sign').fill('manager123')
+    await page.getByRole('button', { name: /^Sign as Head$/ }).click()
+    await expect(page.locator('.status-badge').filter({ hasText: 'Mid-year review signed' }).first()).toBeVisible()
+    await logout(page)
+
+    // --- HR opens the final phase
+    await login(page, 'hradmin')
+    await page.goto('/performance-periods')
+    await expectHeading(page, 'Performance Periods')
+    await settled(page)
+    await page.getByRole('button', { name: /Open final assessment/i }).click()
+    await expect(page.getByText(/Final assessment open/i).first()).toBeVisible()
+    await logout(page)
+
+    // --- employee: rate every KPI, attach evidence (a link and a file), then try to sign
+    await login(page, 'employee')
+    await page.goto('/my-performance')
+    await expectHeading(page, 'My Performance')
+    await settled(page)
+    await expect(page.getByRole('heading', { name: 'Final assessment (Q4)' })).toBeVisible()
+    const ratingSelects = page.locator('select[aria-label^="Rating for"]')
+    const count = await ratingSelects.count()
+    expect(count).toBeGreaterThan(0)
+    for (let i = 0; i < count; i++) {
+      await ratingSelects.nth(i).selectOption('4')
+    }
+    const commentBoxes = page.locator('textarea[aria-label="final_employee_comment"]')
+    await commentBoxes.first().fill('Consistently on target this quarter')
+    await commentBoxes.first().blur()
+
+    // attach a link to the first KPI's evidence panel
+    const firstEvidenceToggle = page.getByRole('button', { name: /No evidence attached|Evidence \(/ }).first()
+    await firstEvidenceToggle.click()
+    await page.getByPlaceholder('https://…').first().fill('https://sentech.sharepoint.com/sites/ri/Q4-evidence.xlsx')
+    await page.getByPlaceholder('Description (optional)').first().fill('Q4 revenue tracking sheet')
+    await page.getByRole('button', { name: 'Add' }).first().click()
+    await expect(page.getByRole('button', { name: /Evidence \(1\)/ }).first()).toBeVisible()
+
+    await page.getByLabel('Confirm your password to sign').fill('employee123')
+    await page.getByRole('button', { name: 'Sign as the individual' }).click()
+    await expect(page.locator('.status-badge').first()).toContainText('Final: employee signed')
+    await logout(page)
+
+    // --- Head signs off final — the score and any HR-attention flag appear
+    await login(page, 'manager')
+    await page.goto('/team-performance')
+    await expectHeading(page, 'Team Performance')
+    await settled(page)
+    await page.locator('table tbody tr', { hasText: employeeName }).filter({ hasText: 'Final: employee signed' })
+      .getByRole('button', { name: 'Open' }).click()
+    await settled(page)
+    await page.getByLabel('Confirm your password to sign').fill('manager123')
+    await page.getByRole('button', { name: /^Sign as Head$/ }).click()
+    await expect(page.locator('.status-badge').filter({ hasText: 'Final assessment signed' }).first()).toBeVisible()
+    await expect(page.locator('.detail-field', { hasText: 'Final score' })).toBeVisible()
+
+    // both the mid-year and the final signed PDFs are real, downloadable PDFs
+    const pdfLinks = page.getByRole('link', { name: /Download (midyear|final) PDF/ })
+    await expect(pdfLinks).toHaveCount(2)
+    for (let i = 0; i < 2; i++) {
+      const href = await pdfLinks.nth(i).getAttribute('href')
+      const pdf = await page.request.get(href!)
+      expect(pdf.status()).toBe(200)
+      expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-')
+    }
+  })
+
+  test('evidence uploaded via the UI is a real file, hashed and downloadable', async ({ page }) => {
+    // Independently exercise the file-upload path (the flow test above only
+    // covers the link path) against whichever agreement is already open for
+    // final review from the previous test, read fresh via the API so this
+    // test doesn't depend on run order.
+    await login(page, 'hradmin')
+    const response = await page.request.get('/api/v1/performance-agreements/?status=final_signed')
+    const agreements = (await response.json()).results as { id: number; elements: { id: number }[] }[]
+    expect(agreements.length).toBeGreaterThan(0)
+    const elementId = agreements[0].elements[0].id
+
+    const csrf = await page.request.get('/api/v1/auth/csrf/')
+    const cookies = await page.context().cookies()
+    const csrfToken = cookies.find((c) => c.name === 'csrftoken')?.value ?? ''
+    expect(csrf.ok()).toBeTruthy()
+
+    const upload = await page.request.post('/api/v1/agreement-evidence/', {
+      multipart: {
+        element: String(elementId),
+        kind: 'file',
+        description: 'Signed off attendance register',
+        file: { name: 'evidence.txt', mimeType: 'text/plain', buffer: Buffer.from('Q4 evidence content') },
+      },
+      headers: { 'X-CSRFToken': csrfToken },
+    })
+    expect(upload.status()).toBe(201)
+    const body = await upload.json()
+    expect(body.sha256).toHaveLength(64)
+    expect(body.added_after_signoff).toBe(true) // this agreement is already final_signed
+
+    const download = await page.request.get(body.download_url)
+    expect(download.status()).toBe(200)
+    expect(await download.text()).toBe('Q4 evidence content')
   })
 })

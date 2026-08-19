@@ -7,6 +7,17 @@ management command, future import) obeys the same rules:
                                     └─approve(head)─▶ approved
     approved ──sign(employee)──▶ employee_signed ──sign(head|delegate)──▶ agreed
 
+Mid-year (Q2) and final (Q4) reviews (PC-2) are the same two-signature shape,
+just without a submit/approve/return step first — the period phase opening is
+what makes the stage "open" for editing and signing:
+
+    agreed ──open(midyear)──▶ midyear_open ──sign(employee)──▶ midyear_employee_signed
+           ──sign(head|delegate)──▶ midyear_signed ──open(final)──▶ final_open ── … ──▶ final_signed
+
+`STAGE_FLOW` below is the one table every stage's submit/sign logic reads from,
+so contracting/mid-year/final can never quietly drift out of sync with each
+other.
+
 Hard rules (user-confirmed, KPI-Contracting-Investigation.md §2a):
 * weights must sum to exactly 1.00 before submission, every element needs all
   five level descriptors;
@@ -40,16 +51,88 @@ from ..models import (
     AgreementElement,
     AgreementSignature,
     AgreementTemplate,
+    EvidenceItem,
     PDPItem,
     PerformanceAgreement,
     PerformancePeriod,
     PeriodPhase,
+    Review,
     SigningDelegation,
 )
+from ..models.agreements import RATING_MAX, RATING_MIN
 from ..pdf import render_agreement_pdf
 
 WEIGHT_TOLERANCE = Decimal("0.0005")
 REQUIRED_LEVELS = {"1", "2", "3", "4", "5"}
+
+# One row per stage: which status means "open for signing", what each role's
+# signature moves it to, and the message an early employee-side attempt gets.
+# sign_agreement() and the can-sign view both read this — the single source
+# of truth for "who may sign what, in what order" across all three stages.
+STAGE_FLOW = {
+    PeriodPhase.Stage.CONTRACTING: {
+        "open_status": PerformanceAgreement.Status.APPROVED,
+        "employee_signed_status": PerformanceAgreement.Status.EMPLOYEE_SIGNED,
+        "head_signed_status": PerformanceAgreement.Status.AGREED,
+        "employee_error": "The agreement must be reviewed and approved by your Head before you sign.",
+    },
+    PeriodPhase.Stage.MIDYEAR: {
+        "open_status": PerformanceAgreement.Status.MIDYEAR_OPEN,
+        "employee_signed_status": PerformanceAgreement.Status.MIDYEAR_EMPLOYEE_SIGNED,
+        "head_signed_status": PerformanceAgreement.Status.MIDYEAR_SIGNED,
+        "employee_error": "The mid-year review isn't open yet — it opens once HR starts the Q2 phase.",
+    },
+    PeriodPhase.Stage.FINAL: {
+        "open_status": PerformanceAgreement.Status.FINAL_OPEN,
+        "employee_signed_status": PerformanceAgreement.Status.FINAL_EMPLOYEE_SIGNED,
+        "head_signed_status": PerformanceAgreement.Status.FINAL_SIGNED,
+        "employee_error": "The final assessment isn't open yet — it opens once HR starts the Q4 phase.",
+    },
+}
+
+# Which AgreementElement fields belong to which stage, and therefore when they
+# may be edited: only while the agreement sits exactly at that stage's
+# open_status (mirrors "contracting content freezes once out of draft" —
+# see AgreementElementSerializer.validate()).
+STAGE_ELEMENT_FIELDS = {
+    PeriodPhase.Stage.MIDYEAR: {"q2_target_note", "q2_employee_comment", "q2_head_comment"},
+    PeriodPhase.Stage.FINAL: {"final_rating", "final_employee_comment", "final_head_comment"},
+}
+
+# The Head's own field for each stage stays open one status later than the
+# rest -- through *_employee_signed -- so the Head can add their comment
+# after the employee has signed but before the Head signs themself, mirroring
+# how contracting lets the Head act (approve/return) on what the employee
+# already submitted. AgreementElementSerializer.validate() is the real gate.
+STAGE_HEAD_FIELDS = {
+    PeriodPhase.Stage.MIDYEAR: {"q2_head_comment"},
+    PeriodPhase.Stage.FINAL: {"final_head_comment"},
+}
+
+
+_STAGE_COMPLETE_STATUSES = {
+    PerformanceAgreement.Status.AGREED,
+    PerformanceAgreement.Status.MIDYEAR_SIGNED,
+    PerformanceAgreement.Status.FINAL_SIGNED,
+    PerformanceAgreement.Status.ARCHIVED,
+}
+
+
+def active_stage_for(agreement: PerformanceAgreement) -> str | None:
+    """Same three-way split as `current_stage` (the display property), except
+    the moment a stage is *fully* signed off (AGREED / MIDYEAR_SIGNED /
+    FINAL_SIGNED / ARCHIVED) this returns None instead of naming the stage
+    that just finished: there is nothing left to sign until the next phase
+    opens, and reusing the just-completed stage's name is what caused a
+    signing attempt in that gap to read as a duplicate of the stage that
+    already closed rather than "nothing is open right now". Every other
+    status (including SUBMITTED/RETURNED/APPROVED, which aren't literally
+    an *_open status but are still meaningfully "in the contracting stage")
+    keeps `current_stage`'s answer, so sign_agreement's per-stage error
+    messages stay exactly as specific as before this existed."""
+    if agreement.status in _STAGE_COMPLETE_STATUSES:
+        return None
+    return agreement.current_stage
 
 
 class AgreementWorkflowError(ValueError):
@@ -326,6 +409,100 @@ def _snapshot_document(agreement: PerformanceAgreement, stage: str) -> Agreement
 
 
 @transaction.atomic
+def stage_is_signed(agreement: PerformanceAgreement, stage: str, *, revision: int | None = None) -> bool:
+    """True once the Head's signature exists for that stage+revision — the
+    point past which evidence for that stage may no longer be deleted and new
+    evidence is flagged `added_after_signoff`."""
+    revision = agreement.revision if revision is None else revision
+    return AgreementSignature.objects.filter(
+        agreement=agreement, stage=stage, revision=revision, role=AgreementSignature.Role.HEAD
+    ).exists()
+
+
+def validate_final_ratings_complete(agreement: PerformanceAgreement) -> None:
+    """Every KPI needs a rating before the final stage can be signed off --
+    the same completeness principle as contracting's weight/descriptor check
+    (validate_agreement_ready_to_submit). Without this an unrated KPI would
+    silently score as 0 in the weighted sum instead of blocking sign-off."""
+    unrated = [e.kpi_title for e in agreement.elements.all() if e.final_rating is None]
+    if unrated:
+        raise AgreementWorkflowError(
+            "Every KPI needs a rating before you can sign off: " + ", ".join(unrated)
+        )
+
+
+def validate_evidence_for_final(agreement: PerformanceAgreement) -> None:
+    """Gate the FINAL stage's employee signature on evidence, but only when
+    the template opted into that (`evidence_required`) — by default evidence
+    is optional-but-visible, never a hard gate (user, investigation §6)."""
+    if not agreement.template.evidence_required:
+        return
+    missing = [
+        e.kpi_title
+        for e in agreement.elements.all()
+        if e.final_rating is not None and not e.evidence_items.exists()
+    ]
+    if missing:
+        raise AgreementWorkflowError(
+            "This template requires evidence before signing off: " + ", ".join(missing)
+        )
+
+
+def _finalize_scoring(agreement: PerformanceAgreement) -> None:
+    """Σ(weight × rating) over every rated element, frozen onto the agreement
+    at the moment the Head signs the final stage. Also decides `hr_attention`:
+    the user's rule is "3 = doing your job" — below that on the overall score
+    *or* on any individual KPI is worth HR's attention (KPI-Contracting-
+    Investigation.md §6 flagged this as "to be confirmed"; both are checked
+    until told otherwise, and the reason says which)."""
+    threshold = agreement.period.attention_threshold
+    elements = list(agreement.elements.all())
+    total = sum((e.score for e in elements if e.score is not None), Decimal("0"))
+    agreement.final_score = total.quantize(Decimal("0.01"))
+
+    reasons = []
+    if agreement.final_score < threshold:
+        reasons.append(f"overall score {agreement.final_score} is below {threshold}")
+    low_kpis = [e.kpi_title for e in elements if e.final_rating is not None and Decimal(e.final_rating) < threshold]
+    if low_kpis:
+        reasons.append(f"KPI rating below {threshold}: {', '.join(low_kpis)}")
+    agreement.hr_attention = bool(reasons)
+    agreement.hr_attention_reason = "; ".join(reasons)[:300]
+
+
+def sync_legacy_review(agreement: PerformanceAgreement) -> Review | None:
+    """Mirrors the final score onto the Sprint 6-7 `Review` row so the pages
+    built on it keep showing something real while they're still around (they
+    retire in PC-3). No-op if this period was never linked to a legacy cycle
+    — new periods don't need one. `Review` has one self_rating and one
+    manager_rating; the agreement has a single, jointly-agreed final_rating
+    per KPI, so both sides of the legacy record get the same rounded overall
+    score rather than inventing a second number that was never actually
+    collected."""
+    period = agreement.period
+    if period.legacy_cycle_id is None or agreement.final_score is None:
+        return None
+    review, _ = Review.objects.get_or_create(
+        review_cycle_id=period.legacy_cycle_id, employee=agreement.employee, defaults={"manager": agreement.head}
+    )
+    rating = int(min(RATING_MAX, max(RATING_MIN, round(agreement.final_score))))
+    review.manager = agreement.head
+    review.self_rating = rating
+    review.manager_rating = rating
+    employee_sig = agreement.signatures.filter(
+        stage=PeriodPhase.Stage.FINAL, role=AgreementSignature.Role.EMPLOYEE, revision=agreement.revision
+    ).first()
+    head_sig = agreement.signatures.filter(
+        stage=PeriodPhase.Stage.FINAL, role=AgreementSignature.Role.HEAD, revision=agreement.revision
+    ).first()
+    if employee_sig:
+        review.self_submitted_at = employee_sig.signed_at
+    if head_sig:
+        review.manager_submitted_at = head_sig.signed_at
+    review.save()
+    return review
+
+
 def sign_agreement(
     agreement: PerformanceAgreement,
     *,
@@ -335,14 +512,14 @@ def sign_agreement(
     ip_address: str | None = None,
     user_agent: str = "",
 ) -> AgreementSignature:
-    """Record one signature. Order is enforced: employee first, then Head."""
-    stage = agreement.current_stage
-    if stage != PeriodPhase.Stage.CONTRACTING:
-        raise AgreementWorkflowError("Only contracting-stage signing is implemented (mid-year/final land in PC-2).")
-
-    # Authority first ("are you allowed to sign in this role at all"), then
-    # duplication ("you already did"), then order ("not yet") — so the message
-    # the caller gets is the most specific true one.
+    """Record one signature. Order is enforced: employee first, then Head —
+    for whichever stage (contracting/mid-year/final) the agreement is
+    currently at; see STAGE_FLOW for the per-stage status table."""
+    # Authority first ("are you allowed to sign in this role at all") —
+    # stage-independent, so this must run before stage resolution: someone
+    # who was never allowed to sign gets that specific 400, never a generic
+    # "nothing open" 409 that would (a) leak stage-timing details to them and
+    # (b) contradict what an authorised signer sees for the same agreement.
     if role == AgreementSignature.Role.EMPLOYEE:
         if actor.pk != agreement.employee_id:
             raise AgreementWorkflowError("Only the employee can sign as the employee.")
@@ -352,17 +529,28 @@ def sign_agreement(
     else:
         raise AgreementWorkflowError(f"Unknown signature role: {role}")
 
+    # Then: is there even a stage open to act on right now, then duplication
+    # ("you already did"), then order ("not yet") — so the message the
+    # caller gets is the most specific true one.
+    stage = active_stage_for(agreement)
+    if stage is None:
+        raise AgreementWorkflowError(
+            "There is nothing open to sign on this agreement right now.", conflict=True
+        )
+    flow = STAGE_FLOW[stage]
+
     if AgreementSignature.objects.filter(
         agreement=agreement, stage=stage, revision=agreement.revision, role=role
     ).exists():
         raise AgreementWorkflowError("That signature has already been recorded.", conflict=True)
 
     if role == AgreementSignature.Role.EMPLOYEE:
-        if agreement.status != PerformanceAgreement.Status.APPROVED:
-            raise AgreementWorkflowError(
-                "The agreement must be reviewed and approved by your Head before you sign.", conflict=True
-            )
-    elif agreement.status != PerformanceAgreement.Status.EMPLOYEE_SIGNED:
+        if agreement.status != flow["open_status"]:
+            raise AgreementWorkflowError(flow["employee_error"], conflict=True)
+        if stage == PeriodPhase.Stage.FINAL:
+            validate_final_ratings_complete(agreement)
+            validate_evidence_for_final(agreement)
+    elif agreement.status != flow["employee_signed_status"]:
         raise AgreementWorkflowError(
             "The employee signs first — you can sign once their signature is recorded.", conflict=True
         )
@@ -379,19 +567,26 @@ def sign_agreement(
         ip_address=ip_address, user_agent=(user_agent or "")[:300],
     )
 
+    update_fields = ["status"]
     if role == AgreementSignature.Role.EMPLOYEE:
-        agreement.status = PerformanceAgreement.Status.EMPLOYEE_SIGNED
-        agreement.save(update_fields=["status"])
+        agreement.status = flow["employee_signed_status"]
     else:
-        agreement.status = PerformanceAgreement.Status.AGREED
-        agreement.agreed_at = timezone.now()
-        agreement.save(update_fields=["status", "agreed_at"])
+        agreement.status = flow["head_signed_status"]
+        if stage == PeriodPhase.Stage.CONTRACTING:
+            agreement.agreed_at = timezone.now()
+            update_fields.append("agreed_at")
+        elif stage == PeriodPhase.Stage.FINAL:
+            _finalize_scoring(agreement)
+            update_fields += ["final_score", "hr_attention", "hr_attention_reason"]
+    agreement.save(update_fields=update_fields)
+    if role == AgreementSignature.Role.HEAD and stage == PeriodPhase.Stage.FINAL:
+        sync_legacy_review(agreement)
 
     log_access(
         actor=actor, action=AuditLogEntry.Action.UPDATE, entity_type="performance.AgreementSignature",
         entity_id=signature.pk, field_tier=FieldTier.SENSITIVE, ip_address=ip_address,
         fields_touched=(
-            f"{role} signature on agreement {agreement.pk} rev{agreement.revision} "
+            f"{role} signature on agreement {agreement.pk} rev{agreement.revision} [{stage}] "
             f"({method}, sha256={document.sha256[:12]}…"
             + (f", acting for {acting_for.employee_number}" if acting_for else "")
             + ")"
@@ -405,7 +600,10 @@ def sign_agreement(
 
 def open_phase(period: PerformancePeriod, stage: str, *, actor=None) -> PerformancePeriod:
     """Move the period into a stage. Contracting also generates the agreements
-    so there is something for the reminders to point at."""
+    so there is something for the reminders to point at; mid-year/final also
+    carry every eligible agreement forward into that stage's *_open status —
+    otherwise "the phase is open" would be a period-level fact with no effect
+    on any individual scorecard."""
     phase = period.phase(stage)
     if phase is None:
         raise AgreementWorkflowError(f"This period has no {stage} phase configured.")
@@ -415,8 +613,19 @@ def open_phase(period: PerformancePeriod, stage: str, *, actor=None) -> Performa
         period.status = PerformancePeriod.Status.CONTRACTING
     elif stage == PeriodPhase.Stage.MIDYEAR:
         period.status = PerformancePeriod.Status.MIDYEAR
+        PerformanceAgreement.objects.filter(
+            period=period, status=PerformanceAgreement.Status.AGREED
+        ).update(status=PerformanceAgreement.Status.MIDYEAR_OPEN)
     else:
         period.status = PerformancePeriod.Status.FINAL
+        # Whichever of the two contracted "ready" states an agreement is in —
+        # mid-year genuinely happened (MIDYEAR_SIGNED) or it didn't
+        # (still AGREED, e.g. this org skipped Q2 this year) — both are
+        # legitimate starting points for the final assessment.
+        PerformanceAgreement.objects.filter(
+            period=period,
+            status__in=[PerformanceAgreement.Status.AGREED, PerformanceAgreement.Status.MIDYEAR_SIGNED],
+        ).update(status=PerformanceAgreement.Status.FINAL_OPEN)
     period.save(update_fields=["status"])
     return period
 
@@ -437,8 +646,12 @@ def add_days(day: date, n: int) -> date:
 
 
 __all__ = [
+    "STAGE_ELEMENT_FIELDS",
+    "STAGE_FLOW",
+    "STAGE_HEAD_FIELDS",
     "AgreementWorkflowError",
     "active_delegation",
+    "active_stage_for",
     "add_days",
     "amend_agreement",
     "approve_agreement",
@@ -453,6 +666,10 @@ __all__ = [
     "publish_template",
     "return_agreement",
     "sign_agreement",
+    "stage_is_signed",
     "submit_agreement",
+    "sync_legacy_review",
     "validate_agreement_ready_to_submit",
+    "validate_evidence_for_final",
+    "validate_final_ratings_complete",
 ]

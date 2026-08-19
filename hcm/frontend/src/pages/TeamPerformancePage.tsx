@@ -37,6 +37,7 @@ export function TeamPerformancePage() {
         signs first, then you.
       </p>
       {error && <p className="form-error">{error}</p>}
+      {data === null && <p className="empty-state">Loading…</p>}
 
       <section className="detail-card">
         <div className="page-header">

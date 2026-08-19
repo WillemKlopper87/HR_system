@@ -31,7 +31,18 @@ hcm/
                 agreements/signatures/delegation/ReminderLog), pdf.py (the signed
                 scorecard grid — its bytes are what a signature's sha256 commits to),
                 reminders.py + tasks.py + `manage.py run_performance_reminders`
-                (daily offsets -> collab to-dos/digests/announcements, idempotent)
+                (daily offsets -> collab to-dos/digests/announcements, idempotent);
+                + PC-2 mid-year (Q2) + final (Q4) reviews on the same agreement/
+                STAGE_FLOW state machine: q2_*/final_* AgreementElement fields
+                (editable window per field — the employee's own only while that
+                stage's *_open status holds, the Head's own comment stays open
+                one status longer, through *_employee_signed, so the Head can
+                react to what the employee just signed before signing themself),
+                `EvidenceItem` (file, sniffed+hashed+authenticated download, or
+                https link; "added after sign-off" stamped, never hard-deleted
+                once its stage is signed), final score = Σ(weight × rating) +
+                `hr_attention` computed in `_finalize_scoring`, legacy `Review`
+                derived via `sync_legacy_review` when `period.legacy_cycle` is set
     learning/  skills, certifications, training records, WSP/ATR export (Sprint 8);
                 + Sprint 15 ESS (TrainingRecord.Status.REQUESTED — self-submitted
                 enrollment requests, forced status/field restrictions)
