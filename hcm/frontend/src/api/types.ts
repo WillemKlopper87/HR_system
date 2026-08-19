@@ -147,6 +147,11 @@ export interface Position {
   approval_steps: PositionApprovalStep[]
   is_vacant: boolean
   current_incumbent_number: string | null
+  /** The role that must act next (server-computed from the live, deployment-
+   * configurable settings.POSITION_APPROVAL_CHAIN) -- null unless status is
+   * 'in_review'. Read this instead of re-deriving it from a hardcoded chain
+   * on the frontend, since the chain's roles/length can vary by deployment. */
+  next_approver_role: string | null
 }
 
 export const POSITION_STATUS_LABELS: Record<PositionStatus, string> = {

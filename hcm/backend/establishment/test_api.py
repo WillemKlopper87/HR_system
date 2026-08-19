@@ -166,6 +166,56 @@ class PositionCreateAndChainApiTests(EstablishmentApiTestCase):
         self.assertEqual(position.job_grade_id, new_grade.id)
         self.assertEqual(position.status, Position.Status.DRAFT)
 
+    def test_next_approver_role_at_each_step_of_default_chain(self):
+        """next_approver_role is the API's source of truth for who can act
+        next -- the frontend must read it instead of re-deriving it from a
+        hardcoded chain, since POSITION_APPROVAL_CHAIN is deployment-
+        configurable (see the other override-settings test below)."""
+        position_id = self._propose()
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get(f"/api/v1/positions/{position_id}/")
+        self.assertIsNone(response.data["next_approver_role"])  # draft: no one can decide yet
+
+        response = self.client.post(f"/api/v1/positions/{position_id}/submit/")
+        self.assertEqual(response.data["status"], "in_review")
+        self.assertEqual(response.data["next_approver_role"], "comp_manager")
+
+        self.client.force_authenticate(user=self.comp_manager.user)
+        response = self.client.post(f"/api/v1/positions/{position_id}/decide/", {"decision": "approved"}, format="json")
+        self.assertEqual(response.data["status"], "in_review")
+        self.assertEqual(response.data["next_approver_role"], "accounting_officer")
+
+        self.client.force_authenticate(user=self.accounting_officer.user)
+        response = self.client.post(f"/api/v1/positions/{position_id}/decide/", {"decision": "approved"}, format="json")
+        self.assertEqual(response.data["status"], "approved")
+        self.assertIsNone(response.data["next_approver_role"])
+
+    @override_settings(POSITION_APPROVAL_CHAIN=["accounting_officer"])
+    def test_next_approver_role_with_a_different_single_role_chain(self):
+        """Proves next_approver_role tracks the configured chain, not a
+        hardcoded assumption of ['comp_manager', 'accounting_officer']."""
+        position_id = self._propose()
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(f"/api/v1/positions/{position_id}/submit/")
+        self.assertEqual(response.data["next_approver_role"], "accounting_officer")
+
+        self.client.force_authenticate(user=self.accounting_officer.user)
+        response = self.client.post(f"/api/v1/positions/{position_id}/decide/", {"decision": "approved"}, format="json")
+        self.assertEqual(response.data["status"], "approved")
+        self.assertIsNone(response.data["next_approver_role"])
+
+    def test_next_approver_role_is_none_for_a_rejected_position(self):
+        position_id = self._propose()
+        self.client.force_authenticate(user=self.hr_admin.user)
+        self.client.post(f"/api/v1/positions/{position_id}/submit/")
+
+        self.client.force_authenticate(user=self.comp_manager.user)
+        response = self.client.post(
+            f"/api/v1/positions/{position_id}/decide/", {"decision": "rejected", "comment": "no"}, format="json"
+        )
+        self.assertEqual(response.data["status"], "rejected")
+        self.assertIsNone(response.data["next_approver_role"])
+
 
 class PositionReadAccessApiTests(EstablishmentApiTestCase):
     def setUp(self):

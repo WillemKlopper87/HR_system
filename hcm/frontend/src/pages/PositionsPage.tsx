@@ -5,8 +5,6 @@ import { useReferenceData } from '../api/ReferenceDataContext'
 import { POSITION_STATUS_LABELS, type Position } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 
-const APPROVAL_CHAIN_ROLES = ['comp_manager', 'accounting_officer'] as const
-
 export function PositionsPage() {
   const { hasRole } = useAuth()
   const { data: positions, error: loadError, reload: load } = useAllPages<Position>('/positions/', [], 'Failed to load positions.')
@@ -85,7 +83,7 @@ function PositionRow({ position, onChanged }: { position: Position; onChanged: (
     }
   }
 
-  const requiredRole = position.status === 'in_review' ? APPROVAL_CHAIN_ROLES[position.current_step] : null
+  const requiredRole = position.next_approver_role
 
   return (
     <tr>

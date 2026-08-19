@@ -70,7 +70,9 @@ export default function App() {
               <Route path="/applicants/:id" element={<ApplicantDetailPage />} />
               <Route path="/dashboards/recruitment" element={<RecruitmentDashboardPage />} />
             </Route>
-            <Route path="/positions" element={<PositionsPage />} />
+            <Route element={<RequireRole roles={['hr_admin', 'comp_manager', 'accounting_officer', 'auditor', 'recruiter']} />}>
+              <Route path="/positions" element={<PositionsPage />} />
+            </Route>
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/reviews/:id" element={<ReviewDetailPage />} />
             <Route path="/team-development" element={<TeamDevelopmentPage />} />
