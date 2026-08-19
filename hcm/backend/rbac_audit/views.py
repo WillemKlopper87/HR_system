@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import csv
+
 from django.contrib.auth import authenticate, login, logout
+from django.http import HttpResponse
 from django.middleware.csrf import get_token
+from django.utils.dateparse import parse_date
+from rest_framework import mixins, permissions, serializers, viewsets
+from rest_framework.pagination import CursorPagination
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .audit import log_access
-from .drf import get_request_employee
+from .drf import get_request_employee, int_query_param
 from .models import AuditLogEntry, StepUpGrant, TOTPDevice
 from .throttling import LOGIN_THROTTLES, TOTP_THROTTLES
-from .permissions import active_roles_for
+from .permissions import active_roles_for, has_role
 from .stepup import (
     StepUpError,
     confirm_totp_device,
@@ -154,3 +160,118 @@ def step_up_status_view(request):
     employee = get_request_employee(request)
     scope = request.query_params.get("scope", StepUpGrant.Scope.PAYROLL_DATA)
     return Response({"active": has_active_step_up_grant(employee, scope=scope)})
+
+
+# --- Audit-log viewer (H3) ---------------------------------------------------
+# The auditor role's own seed description: "Read-only everywhere, including
+# the audit log itself — every auditor read is itself audited." So every
+# list/export call here writes its own AuditLogEntry, same as any other
+# sensitive read in the app.
+
+
+class AuditLogEntrySerializer(serializers.ModelSerializer):
+    actor_name = serializers.SerializerMethodField()
+    actor_employee_number = serializers.SerializerMethodField()
+    action_display = serializers.CharField(source="get_action_display", read_only=True)
+    field_tier_display = serializers.CharField(source="get_field_tier_display", read_only=True)
+
+    class Meta:
+        model = AuditLogEntry
+        fields = [
+            "id", "timestamp", "actor", "actor_name", "actor_employee_number", "action", "action_display",
+            "entity_type", "entity_id", "field_tier", "field_tier_display", "fields_touched",
+            "request_id", "ip_address",
+        ]
+        read_only_fields = fields
+
+    def get_actor_name(self, obj) -> str:
+        return f"{obj.actor.first_name} {obj.actor.last_name}" if obj.actor_id else "system"
+
+    def get_actor_employee_number(self, obj) -> str | None:
+        return obj.actor.employee_number if obj.actor_id else None
+
+
+class IsHRAdminOrAuditor(permissions.IsAuthenticated):
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
+        employee = get_request_employee(request)
+        return employee is not None and (has_role(employee, "hr_admin") or has_role(employee, "auditor"))
+
+
+def _filtered_audit_log(request):
+    qs = AuditLogEntry.objects.select_related("actor").all()
+    actor_id = int_query_param(request, "actor")
+    if actor_id is not None:
+        qs = qs.filter(actor_id=actor_id)
+    entity_type = request.query_params.get("entity_type")
+    if entity_type:
+        qs = qs.filter(entity_type__icontains=entity_type)
+    action = request.query_params.get("action")
+    if action:
+        qs = qs.filter(action=action)
+    field_tier = request.query_params.get("field_tier")
+    if field_tier:
+        qs = qs.filter(field_tier=field_tier)
+    date_from = parse_date(request.query_params.get("date_from") or "")
+    if date_from:
+        qs = qs.filter(timestamp__date__gte=date_from)
+    date_to = parse_date(request.query_params.get("date_to") or "")
+    if date_to:
+        qs = qs.filter(timestamp__date__lte=date_to)
+    return qs
+
+
+class _AuditLogCursorPagination(CursorPagination):
+    """`AuditLogEntry.timestamp` predates the TimestampedModel convention
+    (`created_at`) the project-wide default pagination ordering assumes."""
+
+    ordering = "-timestamp"
+
+
+class AuditLogEntryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """Read-only, filterable, hr_admin/auditor only. No detail route — a
+    single entry in isolation is meaningless without the same filters that
+    found it, and there is nothing to act on (append-only, see the model)."""
+
+    serializer_class = AuditLogEntrySerializer
+    permission_classes = [IsHRAdminOrAuditor]
+    pagination_class = _AuditLogCursorPagination
+
+    def get_queryset(self):
+        return _filtered_audit_log(self.request)
+
+    def list(self, request, *args, **kwargs):
+        log_access(
+            actor=get_request_employee(request), action=AuditLogEntry.Action.READ_SENSITIVE,
+            entity_type="rbac_audit.AuditLogEntry", entity_id="list", field_tier=FieldTier.RESTRICTED,
+            fields_touched=f"filters={dict(request.query_params)}",
+        )
+        return super().list(request, *args, **kwargs)
+
+
+@api_view(["GET"])
+@permission_classes([IsHRAdminOrAuditor])
+def audit_log_export(request):
+    entries = _filtered_audit_log(request).order_by("-timestamp")
+    log_access(
+        actor=get_request_employee(request), action=AuditLogEntry.Action.EXPORT,
+        entity_type="rbac_audit.AuditLogEntry", entity_id="export", field_tier=FieldTier.RESTRICTED,
+        fields_touched=f"csv export, filters={dict(request.query_params)}",
+    )
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="audit-log.csv"'
+    writer = csv.writer(response)
+    writer.writerow([
+        "timestamp", "actor_employee_number", "actor_name", "action", "entity_type", "entity_id",
+        "field_tier", "fields_touched", "request_id", "ip_address",
+    ])
+    for entry in entries:
+        writer.writerow([
+            entry.timestamp.isoformat(),
+            entry.actor.employee_number if entry.actor_id else "",
+            f"{entry.actor.first_name} {entry.actor.last_name}" if entry.actor_id else "system",
+            entry.action, entry.entity_type, entry.entity_id, entry.field_tier,
+            entry.fields_touched, entry.request_id, entry.ip_address or "",
+        ])
+    return response

@@ -22,6 +22,7 @@ import { MyLearningPage } from './pages/MyLearningPage'
 import { MyProfilePage } from './pages/MyProfilePage'
 import { MyPerformancePage } from './pages/MyPerformancePage'
 import { PerformancePeriodsPage } from './pages/PerformancePeriodsPage'
+import { AuditLogPage } from './pages/AuditLogPage'
 import { PerformanceRecordsPage } from './pages/PerformanceRecordsPage'
 import { TeamPerformancePage } from './pages/TeamPerformancePage'
 import { MyPoliciesPage } from './pages/MyPoliciesPage'
@@ -114,6 +115,7 @@ export default function App() {
             </Route>
             <Route element={<RequireRole roles={['hr_admin', 'auditor']} />}>
               <Route path="/performance-records" element={<PerformanceRecordsPage />} />
+              <Route path="/audit-log" element={<AuditLogPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/employees" replace />} />
           </Route>

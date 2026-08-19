@@ -977,3 +977,26 @@ export interface Notification {
   read_at: string | null
   created_at: string
 }
+
+export type AuditAction =
+  | 'read_sensitive' | 'access_denied' | 'create' | 'update' | 'delete' | 'export' | 'login'
+  | 'permission_change' | 'step_up_granted'
+
+export type FieldTierCode = 'P' | 'I' | 'S' | 'R'
+
+export interface AuditLogEntry {
+  id: number
+  timestamp: string
+  actor: number | null
+  actor_name: string
+  actor_employee_number: string | null
+  action: AuditAction
+  action_display: string
+  entity_type: string
+  entity_id: string
+  field_tier: FieldTierCode
+  field_tier_display: string
+  fields_touched: string
+  request_id: string
+  ip_address: string | null
+}

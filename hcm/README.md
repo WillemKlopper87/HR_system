@@ -21,7 +21,12 @@ hcm/
                 Data-Dictionary.md tiers "R"); + H1: retention.py (handler
                 registry + executor for RetentionRule, tasks.py Celery task,
                 `manage.py run_retention`), throttling.py (login per-IP +
-                per-username, TOTP per-user rate limits)
+                per-username, TOTP per-user rate limits); + H3 audit-log viewer
+                (views.py: AuditLogEntryViewSet/audit_log_export, filterable by
+                actor/action/tier/entity_type/date + CSV — AuditLogEntry itself
+                is Sprint 2, was write-only/admin-only until now; its own
+                `-timestamp` ordering needed a dedicated cursor pagination
+                class, since the project-wide default assumes `created_at`)
     recruitment/ requisitions, applicant pipeline, offers, hire automation (Sprint 4);
                 + H1 retention.py (rejected-applicant anonymise/delete handler,
                 registered from apps.py)
