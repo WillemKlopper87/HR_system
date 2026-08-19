@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "generate:api-types": "node scripts/generate-api-types.mjs"
   },
   "dependencies": {
     "@vladmandic/face-api": "^1.7.15",

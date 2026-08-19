@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from core_hr.models import Employee
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rbac_audit.consent import record_consent
 from rbac_audit.drf import get_request_employee, int_query_param
 from rbac_audit.models import ConsentRecord
@@ -145,6 +147,7 @@ class LivenessCheckViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(check).data)
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def attendance_summary(request):

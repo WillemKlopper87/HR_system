@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from core_hr.models import Employee
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
@@ -9,6 +11,7 @@ from .models import Policy, PolicyAcknowledgment
 from .permissions import IsHRAdmin
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([IsHRAdmin])
 def acknowledgment_dashboard(request):

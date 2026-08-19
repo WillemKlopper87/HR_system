@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from django.db.models import Count
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rbac_audit.consent import record_consent
 from rbac_audit.drf import get_request_employee
 from rbac_audit.models import ConsentRecord
@@ -155,6 +157,7 @@ class OfferViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(offer).data)
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated, IsRecruiterOrHRAdmin])
 def recruitment_dashboard(request):

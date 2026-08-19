@@ -110,5 +110,5 @@ class DataQualityExceptionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["employee", "exception_type", "detail", "detected_at"]
 
-    def get_employee_name(self, obj):
+    def get_employee_name(self, obj) -> str:
         return f"{obj.employee.first_name} {obj.employee.last_name}"

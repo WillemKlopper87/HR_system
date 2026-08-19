@@ -6,6 +6,8 @@ from core_hr.models import Employee
 from core_hr.permissions import IsHRAdmin, IsHRAdminOrReadOnly
 from django.db.models import Q
 from django.http import HttpResponse
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rbac_audit.drf import RowScopePermission, get_request_employee, int_query_param, row_scoped_queryset
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import api_view, permission_classes
@@ -64,6 +66,7 @@ class TrainingRecordViewSet(_RowScopedLearningViewSet):
     permission_classes = [permissions.IsAuthenticated, RowScopePermission]
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([IsHRAdmin])
 def skills_inventory(request):
@@ -95,6 +98,7 @@ def skills_inventory(request):
     return Response({"skills": skills})
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def team_development(request):
@@ -124,6 +128,7 @@ def team_development(request):
     return Response({"employees": rows})
 
 
+@extend_schema(responses={200: OpenApiTypes.BINARY})
 @api_view(["GET"])
 @permission_classes([IsHRAdmin])
 def wsp_atr_export(request):

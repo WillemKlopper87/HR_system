@@ -125,9 +125,18 @@ hcm/
     components/ small pieces shared across pages (e.g. the dashboard Breakdown chart)
     api/       fetch client (CSRF-aware, global session-expiry handling) + shared
                reference-data context; hooks.ts — useApiQuery/useAllPages/useMutation
-               (H2: the one place loading/error/stale-response state lives)
+               (H2: the one place loading/error/stale-response state lives);
+               + H3: generated-types.ts (OpenAPI-generated, not yet consumed by any
+               page — see `npm run generate:api-types` below; types.ts is still the
+               real source of truth for now)
     layout/    AppShell + navConfig.ts (nav as data with role gates)
     lib/       small pure helpers (formatZAR)
+  frontend/tools/api-codegen/  isolated devDependency scope (H3), pinned to
+               TypeScript 5 — openapi-typescript 7.x calls the TS compiler API
+               directly and breaks under this project's TypeScript 7; see the
+               comment in scripts/generate-api-types.mjs for the full story.
+               `npm run generate:api-types` (from hcm/frontend) regenerates
+               src/api/generated-types.ts from the live Django schema.
   frontend/e2e/ Playwright suite (H2): 23 real-browser tests over a throwaway seeded
                Django (e2e/backend-server.mjs) + Vite dev server — `npm test`
   docker-compose.yml  db + redis + backend + celery worker + beat + frontend (nginx SPA +
@@ -143,7 +152,8 @@ Sentry (`sentry-sdk`) is opt-in via `SENTRY_DSN` — unset by default everywhere
 imported only inside that guard so nothing needs it installed to boot; `send_default_pii=False`
 always (POPIA). Backup/restore procedures (concrete `pg_dump`/`pg_restore`/media-volume
 commands, a restore-rehearsal checklist) live in `docs/RUNBOOK.md`, not just referenced
-as policy in ADR-005.
+as policy in ADR-005. `/api/schema/` (raw OpenAPI JSON) and `/api/docs/` (Swagger UI) are
+hr_admin-only (`IsHRAdminSchema`) — developer/ops tooling, not an employee-facing surface.
 
 ## Local development
 

@@ -5,6 +5,8 @@ from types import SimpleNamespace
 from django.db.models import Count, Q
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rbac_audit.audit import log_access
 from rbac_audit.consent import has_active_consent, record_consent
 from rbac_audit.drf import RowScopePermission, get_request_employee, int_query_param, row_scoped_queryset
@@ -291,6 +293,7 @@ class DataQualityExceptionViewSet(viewsets.ReadOnlyModelViewSet):
 SMALL_CELL_THRESHOLD = 5
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def headcount_dashboard(request):

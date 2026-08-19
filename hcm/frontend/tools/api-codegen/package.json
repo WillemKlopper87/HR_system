@@ -1,0 +1,10 @@
+{
+  "name": "api-codegen",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Isolated devDependency scope for openapi-typescript (H3) -- pinned to TypeScript 5.x deliberately. openapi-typescript 7.x calls the `typescript` compiler API (ts.factory) directly, and as of this writing it breaks under TS 7 (the main frontend's version, ~7.0.2): `Cannot read properties of undefined (reading 'createKeywordTypeNode')`. Node module resolution would otherwise pick up the nearest `typescript` package, so this tool needs its own node_modules with an older, working TS to shadow the parent's. Regenerate types with `npm run generate:api-types` from hcm/frontend, not by running anything in here directly.",
+  "devDependencies": {
+    "openapi-typescript": "^7.13",
+    "typescript": "^5.7"
+  }
+}

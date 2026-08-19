@@ -6,6 +6,8 @@ venv/
 db.sqlite3
 staticfiles/
 .env
+backend/schema.json
+backend/schema.yaml
 
 # Node
 node_modules/

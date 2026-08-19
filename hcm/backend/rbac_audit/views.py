@@ -6,6 +6,8 @@ from django.contrib.auth import authenticate, login, logout
 from django.http import HttpResponse
 from django.middleware.csrf import get_token
 from django.utils.dateparse import parse_date
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, permissions, serializers, viewsets
 from rest_framework.pagination import CursorPagination
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -47,6 +49,7 @@ def _me_payload(request):
     }
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def csrf(request):
@@ -57,6 +60,7 @@ def csrf(request):
     return Response({"detail": "CSRF cookie set"})
 
 
+@extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes(LOGIN_THROTTLES)
@@ -83,6 +87,7 @@ def login_view(request):
     return Response(payload)
 
 
+@extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
@@ -90,6 +95,7 @@ def logout_view(request):
     return Response({"detail": "Logged out"})
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me_view(request):
@@ -99,6 +105,7 @@ def me_view(request):
     return Response(payload)
 
 
+@extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def totp_enroll(request):
@@ -111,6 +118,7 @@ def totp_enroll(request):
     return Response({"secret": device.secret, "provisioning_uri": totp_provisioning_uri(device)})
 
 
+@extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @throttle_classes(TOTP_THROTTLES)
@@ -123,6 +131,7 @@ def totp_confirm(request):
     return Response({"detail": "Authenticator device confirmed."})
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def totp_status(request):
@@ -134,6 +143,7 @@ def totp_status(request):
     })
 
 
+@extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @throttle_classes(TOTP_THROTTLES)
@@ -154,6 +164,7 @@ def step_up_request_view(request):
     return Response({"scope": grant.scope, "expires_at": grant.expires_at})
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def step_up_status_view(request):
@@ -250,6 +261,7 @@ class AuditLogEntryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         return super().list(request, *args, **kwargs)
 
 
+@extend_schema(responses={200: OpenApiTypes.BINARY})
 @api_view(["GET"])
 @permission_classes([IsHRAdminOrAuditor])
 def audit_log_export(request):

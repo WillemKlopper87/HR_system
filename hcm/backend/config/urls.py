@@ -5,10 +5,35 @@ from django.core.cache import cache
 from django.db import connections
 from django.http import JsonResponse
 from django.urls import include, path
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from rbac_audit.drf import get_request_employee
+from rbac_audit.permissions import has_role
+from rest_framework.permissions import IsAuthenticated
 
 from assessments.views import assessment_webhook
 
 logger = logging.getLogger(__name__)
+
+
+class IsHRAdminSchema(IsAuthenticated):
+    """The schema/docs UI exposes every field name and endpoint shape in
+    one place — operational/developer tooling, not an employee-facing
+    feature, so it gets hr_admin's access bar rather than being open to
+    any authenticated session."""
+
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
+        employee = get_request_employee(request)
+        return employee is not None and has_role(employee, "hr_admin")
+
+
+class HRAdminSchemaView(SpectacularAPIView):
+    permission_classes = [IsHRAdminSchema]
+
+
+class HRAdminSwaggerView(SpectacularSwaggerView):
+    permission_classes = [IsHRAdminSchema]
 
 
 def healthz(_request):
@@ -61,6 +86,9 @@ urlpatterns = [
     path("api/v1/", include("ee_reporting.urls")),
     path("api/v1/", include("policies.urls")),
     path("api/v1/", include("notifications.urls")),
+    # OpenAPI schema + Swagger UI (H3) — hr_admin only, see IsHRAdminSchema.
+    path("api/schema/", HRAdminSchemaView.as_view(), name="schema"),
+    path("api/docs/", HRAdminSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     # Inbound provider webhooks are versioned separately from the session-
     # authenticated /api/v1/ surface (Architecture-Design.md §6) — HMAC
     # signature verification is the auth here, not a Django session.

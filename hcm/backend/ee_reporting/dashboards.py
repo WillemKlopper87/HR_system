@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rbac_audit.drf import get_request_employee
 from rbac_audit.permissions import can_see_unsuppressed_aggregates
 from rbac_audit.tiers import FieldTier
@@ -53,6 +55,7 @@ def _target_gap(actual: dict, targets: dict) -> dict:
     return gap
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def equity_dashboard(request):

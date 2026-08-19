@@ -58,6 +58,8 @@ INSTALLED_APPS = [
     "policies",
     "integrations",
     "notifications",
+    # third-party (OpenAPI schema generation, H3)
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
@@ -151,6 +153,22 @@ REST_FRAMEWORK = {
     },
     "DEFAULT_PAGINATION_CLASS": "config.pagination.DefaultCursorPagination",
     "PAGE_SIZE": 50,
+    # OpenAPI schema generation (H3) — drf-spectacular introspects every
+    # viewset/serializer for the schema at /api/schema/; the ~7 endpoints
+    # that return a computed dict instead of a serialized model (dashboard
+    # views) are annotated individually with @extend_schema where they live.
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# hr_admin only — this is operational/developer tooling (the schema exposes
+# every field name and endpoint shape in one place), not an employee-facing
+# feature, so it gets the same access bar as the rest of the app's internal
+# surfaces rather than being open to any authenticated user.
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Sentech HCM API",
+    "DESCRIPTION": "Django + DRF backend for the Sentech HCM system. See hcm/README.md for module docs.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 LANGUAGE_CODE = "en-za"
