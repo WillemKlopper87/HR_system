@@ -3,6 +3,42 @@ import { expectHeading, login, settled } from './helpers'
 
 test.describe('recruitment (Sprint 4-5)', () => {
   test('recruiter: requisitions list, create one, applicants and dashboard', async ({ page }) => {
+    // Requisition.positions must match headcount 1:1 (C1 establishment
+    // control) -- propose and fully approve a position first so the
+    // requisition form's picker has an approved, vacant candidate to
+    // select (same department/occupational level the form picks below).
+    const positionTitle = `E2E Talent Post ${Date.now().toString().slice(-5)}`
+    await login(page, 'hradmin')
+    await page.goto('/positions')
+    await settled(page)
+    await page.getByRole('button', { name: '+ Propose position' }).click()
+    await page.getByLabel('Title').fill(positionTitle)
+    await page.getByLabel('Department').selectOption({ index: 1 })
+    await page.getByLabel('Occupational level').selectOption({ index: 1 })
+    await page.getByLabel('Location').selectOption({ index: 1 })
+    await page.getByRole('button', { name: 'Propose position' }).click()
+    await settled(page)
+    await page.locator('tr', { hasText: positionTitle }).getByRole('button', { name: 'Submit' }).click()
+    await settled(page)
+    await page.getByRole('button', { name: 'Sign out' }).click()
+    await page.waitForURL(/\/login$/)
+
+    await login(page, 'compmanager')
+    await page.goto('/positions')
+    await settled(page)
+    await page.locator('tr', { hasText: positionTitle }).getByRole('button', { name: 'Approve' }).click()
+    await settled(page)
+    await page.getByRole('button', { name: 'Sign out' }).click()
+    await page.waitForURL(/\/login$/)
+
+    await login(page, 'accountingofficer')
+    await page.goto('/positions')
+    await settled(page)
+    await page.locator('tr', { hasText: positionTitle }).getByRole('button', { name: 'Approve' }).click()
+    await settled(page)
+    await page.getByRole('button', { name: 'Sign out' }).click()
+    await page.waitForURL(/\/login$/)
+
     await login(page, 'recruiter')
     await page.goto('/requisitions')
     await expectHeading(page, 'Requisitions')
@@ -15,6 +51,7 @@ test.describe('recruitment (Sprint 4-5)', () => {
     await page.getByLabel('Department').selectOption({ index: 1 })
     await page.getByLabel('Occupational level').selectOption({ index: 1 })
     await page.getByLabel('Location').selectOption({ index: 1 })
+    await page.getByLabel(positionTitle, { exact: false }).check()
     await page.getByRole('button', { name: 'Create requisition' }).click()
     await expect(page.locator('table tbody tr', { hasText: title })).toHaveCount(1)
     expect(await page.locator('table tbody tr').count()).toBe(before + 1)
