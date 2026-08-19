@@ -270,3 +270,50 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
+
+# --- Logging + error tracking (H3 ops/observability) -------------------------
+# Plain stdlib logging to stderr — every gunicorn/Celery deployment already
+# captures that, so this needs no new infrastructure. Level is env-tunable
+# so debugging one noisy module doesn't require a code change.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "default"},
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO"),
+    },
+    "loggers": {
+        # Explicit so raising the root level to quiet a noisy module can
+        # never accidentally silence Django's own 5xx tracebacks.
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+    },
+}
+
+# Sentry is entirely optional and inert unless SENTRY_DSN is set — most
+# deployments (dev, CI, a pilot with no Sentry project yet) never touch
+# this block. sentry-sdk is imported inside the guard, not at module top
+# level, so a venv that hasn't installed it (nothing else here requires
+# it) still boots cleanly with SENTRY_DSN unset.
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.celery import CeleryIntegration
+        from sentry_sdk.integrations.django import DjangoIntegration
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration(), CeleryIntegration()],
+            environment=os.environ.get("SENTRY_ENVIRONMENT", "development"),
+            traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.0")),
+            # POPIA: never forward employee PII to a third-party service by default.
+            send_default_pii=False,
+        )
+    except ImportError:
+        pass

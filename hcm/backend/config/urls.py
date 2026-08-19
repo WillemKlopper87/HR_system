@@ -1,17 +1,54 @@
+import logging
+
 from django.contrib import admin
+from django.core.cache import cache
+from django.db import connections
 from django.http import JsonResponse
 from django.urls import include, path
 
 from assessments.views import assessment_webhook
 
+logger = logging.getLogger(__name__)
+
 
 def healthz(_request):
+    """Process-up only — deliberately checks nothing else. A load balancer
+    polling this every few seconds should never fail because Postgres had
+    one slow query; that is exactly what /readyz is for."""
     return JsonResponse({"status": "ok"})
+
+
+def readyz(_request):
+    """Can this instance actually serve traffic: DB and cache both
+    reachable. Every check runs even if an earlier one fails, so a caller
+    sees the full picture in one request instead of fixing issues one at
+    a time (H3 ops/observability)."""
+    checks = {}
+
+    try:
+        with connections["default"].cursor() as cursor:
+            cursor.execute("SELECT 1")
+        checks["database"] = "ok"
+    except Exception as exc:  # noqa: BLE001 — report any DB failure, not just specific ones
+        checks["database"] = "unreachable"
+        logger.warning("readyz: database check failed: %s", exc)
+
+    try:
+        marker = "readyz-probe"
+        cache.set(marker, "1", timeout=5)
+        checks["cache"] = "ok" if cache.get(marker) == "1" else "unreachable"
+    except Exception as exc:  # noqa: BLE001
+        checks["cache"] = "unreachable"
+        logger.warning("readyz: cache check failed: %s", exc)
+
+    ready = all(v == "ok" for v in checks.values())
+    return JsonResponse({"status": "ready" if ready else "not_ready", "checks": checks}, status=200 if ready else 503)
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("healthz", healthz),
+    path("readyz", readyz),
     # Module APIs mount under /api/v1/ as sprints deliver them.
     path("api/v1/auth/", include("rbac_audit.urls")),
     path("api/v1/", include("core_hr.urls")),

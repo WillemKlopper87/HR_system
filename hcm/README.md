@@ -131,8 +131,19 @@ hcm/
   frontend/e2e/ Playwright suite (H2): 23 real-browser tests over a throwaway seeded
                Django (e2e/backend-server.mjs) + Vite dev server — `npm test`
   docker-compose.yml  db + redis + backend + celery worker + beat + frontend (nginx SPA +
-                reverse proxy, port 8080) (ADR-005); frontend/Dockerfile + nginx.conf
+                reverse proxy, port 8080) (ADR-005); frontend/Dockerfile + nginx.conf;
+                + H3: backend's Dockerfile HEALTHCHECK polls /readyz (stdlib urllib, no
+                curl in python:3.13-slim), frontend now waits on backend: service_healthy
 ```
+
+**Ops (H3):** `/healthz` is process-up only (load-balancer liveness); `/readyz` checks
+DB + cache and is what Docker's `HEALTHCHECK` / an orchestrator's readiness probe should
+point at instead. `LOGGING` is plain stdlib-to-stderr (`DJANGO_LOG_LEVEL` to tune).
+Sentry (`sentry-sdk`) is opt-in via `SENTRY_DSN` — unset by default everywhere, `sentry_sdk`
+imported only inside that guard so nothing needs it installed to boot; `send_default_pii=False`
+always (POPIA). Backup/restore procedures (concrete `pg_dump`/`pg_restore`/media-volume
+commands, a restore-rehearsal checklist) live in `docs/RUNBOOK.md`, not just referenced
+as policy in ADR-005.
 
 ## Local development
 

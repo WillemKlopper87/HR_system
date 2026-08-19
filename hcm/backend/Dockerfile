@@ -25,4 +25,9 @@ RUN useradd --create-home --shell /bin/false appuser \
 USER appuser
 
 EXPOSE 8000
+# python:3.13-slim has no curl; urllib is stdlib, no extra package needed.
+# /readyz (H3), not /healthz — a container Docker calls "healthy" should
+# mean "can actually serve traffic", not just "process started".
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=3 \
+  CMD python -c "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/readyz').status == 200 else 1)"
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
