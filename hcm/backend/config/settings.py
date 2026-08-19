@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "policies",
     "integrations",
     "notifications",
+    "establishment",
     # third-party (OpenAPI schema generation, H3)
     "drf_spectacular",
 ]
@@ -335,3 +336,13 @@ if SENTRY_DSN:
         )
     except ImportError:
         pass
+
+# Position/establishment approval chain (C1) -- ordered list of role names
+# an in-review Position must clear, one at a time, after hr_admin proposes
+# and submits it. Deployment-time config, not runtime-editable: different
+# environments/orgs can use a different chain length or different roles
+# without touching establishment/services.py's state machine. See
+# docs/superpowers/specs/2026-08-19-position-establishment-design.md §2.3.
+POSITION_APPROVAL_CHAIN = os.environ.get(
+    "POSITION_APPROVAL_CHAIN", "comp_manager,accounting_officer"
+).split(",")

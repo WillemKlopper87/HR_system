@@ -20,7 +20,7 @@ BACKEND = Path(settings.BASE_DIR)
 DOMAIN_APPS = [
     "core_hr", "rbac_audit", "recruitment", "performance", "learning", "compensation",
     "assessments", "identity_verification", "ee_reporting", "policies", "integrations",
-    "notifications",
+    "notifications", "establishment",
 ]
 # Shared infrastructure every module may import. `integrations` joined in PC-0:
 # it is an outbound *adapter* layer (ADR-011), deliberately domain-agnostic —
@@ -30,9 +30,13 @@ DOMAIN_APPS = [
 # reasoning: every domain app calls `notifications.services.notify()` the
 # way it would call `integrations.collab`, and notifications itself knows
 # nothing about agreements/proposals/policies as domains, only recipients
-# and message text. The kernel test below is what keeps that true:
-# infrastructure may not import a domain app back.
-SHARED_KERNEL = {"core_hr", "rbac_audit", "integrations", "notifications"}
+# and message text. establishment joined in C1 on the same reasoning again:
+# core_hr and recruitment both need a direct relationship into it
+# (EmployeeVersion.position, Requisition.positions), and establishment itself
+# knows nothing about agreements/proposals/applicants as domains, only posts
+# and who's allowed to approve them. The kernel test below is what keeps
+# that true: infrastructure may not import a domain app back.
+SHARED_KERNEL = {"core_hr", "rbac_audit", "integrations", "notifications", "establishment"}
 EXEMPT_FILES = {BACKEND / "core_hr" / "management" / "commands" / "seed_demo_data.py"}
 
 
