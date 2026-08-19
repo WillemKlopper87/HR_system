@@ -39,6 +39,7 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
     "core_hr.EmployeeVersion": {
         "department": FieldTier.PUBLIC,
         "job_title": FieldTier.PUBLIC,
+        "position": FieldTier.PUBLIC,
         "occupational_level": FieldTier.INTERNAL,
         "job_grade": FieldTier.INTERNAL,
         "manager": FieldTier.INTERNAL,

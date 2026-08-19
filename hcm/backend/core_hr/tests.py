@@ -4,6 +4,7 @@ from datetime import date
 import openpyxl
 from django.db.utils import IntegrityError
 from django.test import TestCase
+from establishment.models import Position
 
 from .data_quality import run_data_quality_checks
 from .imports import import_employees_csv, import_employees_xlsx
@@ -331,3 +332,44 @@ class EmployeeVersionConstraintTests(TestCase):
                 employment_status=EmployeeVersion.EmploymentStatus.PERMANENT,
                 citizenship_status=EmployeeVersion.CitizenshipStatus.SA_CITIZEN_BIRTH_DESCENT,
             )
+
+
+class EmployeeVersionPositionTests(TestCase):
+    def setUp(self):
+        self.dept_a, _, self.level_top, self.grade, self.location = _seed_reference_data()
+        self.position = Position.objects.create(
+            post_number="P-00001", title="Engineer", department=self.dept_a, occupational_level=self.level_top,
+            job_grade=self.grade, location=self.location, status=Position.Status.APPROVED,
+        )
+
+    def test_hire_can_link_a_position(self):
+        employee = Employee.objects.hire(
+            employee_number="E0050", first_name="Pos", last_name="Itioned", date_of_birth=date(1990, 1, 1),
+            work_email="pos.itioned@example.com", hire_date=date(2024, 1, 1), department=self.dept_a,
+            occupational_level=self.level_top, job_grade=self.grade, location=self.location, position=self.position,
+        )
+        self.assertEqual(employee.current_version.position_id, self.position.id)
+
+    def test_hire_without_a_position_still_works(self):
+        """Backward compatibility: every existing caller (bulk import, seed
+        data, other tests) omits position entirely."""
+        employee = Employee.objects.hire(
+            employee_number="E0051", first_name="No", last_name="Position", date_of_birth=date(1990, 1, 1),
+            work_email="no.position@example.com", hire_date=date(2024, 1, 1), department=self.dept_a,
+            occupational_level=self.level_top, job_grade=self.grade, location=self.location,
+        )
+        self.assertIsNone(employee.current_version.position_id)
+
+    def test_position_carries_forward_across_a_promotion(self):
+        """Regression guard: VERSION_CARRY_FIELDS must include 'position',
+        or a promotion/transfer/grade-change silently vacates the post even
+        though the employee never actually left it."""
+        employee = Employee.objects.hire(
+            employee_number="E0052", first_name="Carried", last_name="Forward", date_of_birth=date(1990, 1, 1),
+            work_email="carried.forward@example.com", hire_date=date(2024, 1, 1), department=self.dept_a,
+            occupational_level=self.level_top, job_grade=self.grade, location=self.location, position=self.position,
+        )
+        employee.apply_lifecycle_event(
+            event_type=EmploymentEvent.EventType.GRADE_CHANGE, effective_date=date(2025, 1, 1),
+        )
+        self.assertEqual(employee.current_version.position_id, self.position.id)

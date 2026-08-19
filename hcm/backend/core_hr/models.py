@@ -114,6 +114,7 @@ class EmployeeManager(models.Manager):
         citizenship_status=None,
         job_grade=None,
         manager=None,
+        position=None,
         race=None,
         gender=None,
         disability_status=None,
@@ -157,6 +158,7 @@ class EmployeeManager(models.Manager):
             citizenship_status=citizenship_status
             or EmployeeVersion.CitizenshipStatus.SA_CITIZEN_BIRTH_DESCENT,
             location=location,
+            position=position,
             race=race or EmployeeVersion.Race.NOT_DISCLOSED,
             gender=gender or EmployeeVersion.Gender.NOT_DISCLOSED,
             disability_status=disability_status or EmployeeVersion.DisabilityStatus.NOT_DISCLOSED,
@@ -176,7 +178,7 @@ class EmployeeManager(models.Manager):
 
 VERSION_CARRY_FIELDS = (
     "department", "job_title", "occupational_level", "job_grade", "manager",
-    "employment_status", "citizenship_status", "location",
+    "employment_status", "citizenship_status", "location", "position",
     "race", "gender", "disability_status", "disability_detail",
     "race_source", "disability_source",
 )
@@ -328,6 +330,14 @@ class EmployeeVersion(TimestampedModel):
     citizenship_status = models.CharField(max_length=30, choices=CitizenshipStatus.choices)
     location = models.ForeignKey(
         Location, on_delete=models.PROTECT, related_name="employee_versions"
+    )
+    # String reference, not a direct import: establishment/models.py imports
+    # core_hr for its own FKs, so a direct import here would be circular.
+    # Django resolves string FKs lazily via the app registry -- core_hr
+    # needs no production import of establishment at all for this to work.
+    position = models.ForeignKey(
+        "establishment.Position", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="employee_versions",
     )
 
     race = models.CharField(max_length=20, choices=Race.choices, default=Race.NOT_DISCLOSED)
