@@ -145,3 +145,27 @@ def _complete_hire(applicant: Applicant, *, hire_date) -> Employee:
         requisition.save(update_fields=["status", "closed_at"])
 
     return employee
+
+
+def backfill_requisition_positions() -> int:
+    """One-time backfill (called from a migration): a CLOSED/FILLED
+    requisition whose resulting hire now has a backfilled Position
+    (establishment.services.backfill_positions_for_current_employees, run
+    first) gets that Position linked. Requisitions with no resulting hire
+    predate establishment control entirely and stay unlinked. Idempotent:
+    already-linked requisitions are skipped."""
+    linked = 0
+    closed_statuses = [Requisition.Status.CLOSED, Requisition.Status.FILLED]
+    for requisition in Requisition.objects.filter(status__in=closed_statuses):
+        if requisition.positions.exists():
+            continue
+        hired = requisition.applicants.filter(
+            current_stage=Applicant.Stage.HIRED, resulting_employee__isnull=False
+        ).select_related("resulting_employee")
+        for applicant in hired:
+            version = applicant.resulting_employee.current_version
+            if version is not None and version.position_id is not None:
+                requisition.positions.add(version.position_id)
+                linked += 1
+                break  # one linked position is enough to mark this requisition backfilled
+    return linked

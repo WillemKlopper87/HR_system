@@ -7,7 +7,12 @@ from django.test import TestCase
 from establishment.models import Position
 
 from .models import Applicant, ApplicantStageEvent, Requisition
-from .services import StageTransitionError, transition_applicant, validate_requisition_positions
+from .services import (
+    StageTransitionError,
+    backfill_requisition_positions,
+    transition_applicant,
+    validate_requisition_positions,
+)
 
 
 def _seed_reference_data():
@@ -236,3 +241,45 @@ class HireAssignsPositionTests(TestCase):
 
         self.requisition.refresh_from_db()
         self.assertEqual(self.requisition.status, Requisition.Status.FILLED)
+
+
+class BackfillRequisitionPositionsTests(TestCase):
+    def setUp(self):
+        self.dept, self.level, self.grade, self.location = _seed_reference_data()
+
+    def test_closed_requisition_with_a_resulting_hire_gets_linked(self):
+        requisition = Requisition.objects.create(
+            title="Legacy", department=self.dept, occupational_level=self.level, job_grade=self.grade,
+            location=self.location, headcount=1, status=Requisition.Status.FILLED,
+        )
+        employee = Employee.objects.hire(
+            employee_number="E0070", first_name="Legacy", last_name="Hire", date_of_birth=date(1990, 1, 1),
+            work_email="legacy.hire@example.com", hire_date=date(2023, 1, 1), department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location,
+        )
+        applicant = Applicant.objects.create(
+            requisition=requisition, first_name="Legacy", last_name="Hire", email="legacy.hire@example.com",
+            date_of_birth=date(1990, 1, 1), current_stage=Applicant.Stage.HIRED, resulting_employee=employee,
+        )
+        # this employee predates C1 -- backfill their position first, same
+        # as establishment.services.backfill_positions_for_current_employees
+        from establishment.services import backfill_positions_for_current_employees
+
+        backfill_positions_for_current_employees()
+        employee.refresh_from_db()
+        backfilled_position_id = employee.current_version.position_id
+        self.assertIsNotNone(backfilled_position_id)
+
+        linked = backfill_requisition_positions()
+
+        self.assertEqual(linked, 1)
+        requisition.refresh_from_db()
+        self.assertEqual(list(requisition.positions.values_list("id", flat=True)), [backfilled_position_id])
+
+    def test_open_requisition_with_no_resulting_hire_is_left_unlinked(self):
+        Requisition.objects.create(
+            title="Still open", department=self.dept, occupational_level=self.level, job_grade=self.grade,
+            location=self.location, headcount=1, status=Requisition.Status.OPEN,
+        )
+        linked = backfill_requisition_positions()
+        self.assertEqual(linked, 0)
