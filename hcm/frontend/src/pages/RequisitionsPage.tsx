@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api/client'
 import { useAllPages } from '../api/hooks'
 import { useReferenceData } from '../api/ReferenceDataContext'
-import { REQUISITION_STATUS_LABELS, type Requisition, type RequisitionStatus } from '../api/types'
+import { REQUISITION_STATUS_LABELS, type Position, type Requisition, type RequisitionStatus } from '../api/types'
 
 const STATUS_OPTIONS = Object.entries(REQUISITION_STATUS_LABELS) as [RequisitionStatus, string][]
 
@@ -101,8 +101,19 @@ function NewRequisitionForm({ onCreated }: { onCreated: () => void }) {
   const [location, setLocation] = useState<number | ''>('')
   const [headcount, setHeadcount] = useState(1)
   const [status, setStatus] = useState<RequisitionStatus>('open')
+  const [selectedPositions, setSelectedPositions] = useState<number[]>([])
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const { data: vacantPositions } = useAllPages<Position>('/positions/?vacant=true', [], 'Failed to load positions.')
+  const candidatePositions = (vacantPositions ?? []).filter(
+    (p) => p.department === department && p.occupational_level === occupationalLevel
+      && (jobGrade === '' || p.job_grade === jobGrade),
+  )
+
+  function togglePosition(id: number) {
+    setSelectedPositions((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]))
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -111,16 +122,15 @@ function NewRequisitionForm({ onCreated }: { onCreated: () => void }) {
       setError('Department, occupational level, and location are required.')
       return
     }
+    if (selectedPositions.length !== headcount) {
+      setError(`Select exactly ${headcount} approved, vacant position(s) to match headcount.`)
+      return
+    }
     setSubmitting(true)
     try {
       await api.post('/requisitions/', {
-        title,
-        department,
-        occupational_level: occupationalLevel,
-        job_grade: jobGrade || null,
-        location,
-        headcount,
-        status,
+        title, department, occupational_level: occupationalLevel, job_grade: jobGrade || null, location,
+        headcount, status, positions: selectedPositions,
       })
       onCreated()
     } catch (err) {
@@ -190,6 +200,23 @@ function NewRequisitionForm({ onCreated }: { onCreated: () => void }) {
         Headcount
         <input type="number" min={1} value={headcount} onChange={(e) => setHeadcount(Number(e.target.value))} />
       </label>
+      <fieldset>
+        <legend>Positions ({selectedPositions.length} of {headcount} selected)</legend>
+        {candidatePositions.length === 0 ? (
+          <p className="hint-text">No approved, vacant positions match this department/level/grade yet.</p>
+        ) : (
+          candidatePositions.map((p) => (
+            <label key={p.id} style={{ display: 'block' }}>
+              <input
+                type="checkbox"
+                checked={selectedPositions.includes(p.id)}
+                onChange={() => togglePosition(p.id)}
+              />
+              {p.post_number} — {p.title}
+            </label>
+          ))
+        )}
+      </fieldset>
       <label>
         Status
         <select value={status} onChange={(e) => setStatus(e.target.value as RequisitionStatus)}>
