@@ -52,9 +52,14 @@ class PositionViewSet(viewsets.ModelViewSet):
         _require_hr_admin(actor, "Only hr_admin can propose a position.")
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        position = propose_position(actor=actor, **{
-            k: v for k, v in serializer.validated_data.items()
-        })
+        # job_grade is optional (Position.job_grade is null=True/blank=True,
+        # so the serializer's is_valid() doesn't require it) but
+        # propose_position()'s job_grade parameter has no default -- omitting
+        # it from request.data would otherwise omit the key entirely from
+        # this spread and crash propose_position() with a TypeError.
+        validated = dict(serializer.validated_data)
+        validated.setdefault("job_grade", None)
+        position = propose_position(actor=actor, **validated)
         return Response(self.get_serializer(position).data, status=201)
 
     @action(detail=True, methods=["post"])
@@ -90,7 +95,17 @@ class PositionViewSet(viewsets.ModelViewSet):
         _require_hr_admin(actor, "Only hr_admin can revise a rejected position.")
         position = self.get_object()
         allowed_fields = {"title", "department", "occupational_level", "job_grade", "location"}
-        changed = {k: v for k, v in request.data.items() if k in allowed_fields}
+        # Route through the serializer (partial=True: only fields present in
+        # request.data are validated/returned) rather than passing
+        # request.data straight through -- FK fields arrive as raw ids over
+        # JSON, and revise_and_resubmit's setattr(position, field, value)
+        # requires a resolved model instance; PrimaryKeyRelatedField.
+        # to_internal_value() does that resolution (and raises a clean 400
+        # via is_valid(raise_exception=True) for an unknown id) instead of
+        # setattr crashing with an unhandled ValueError.
+        serializer = self.get_serializer(instance=position, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        changed = {k: v for k, v in serializer.validated_data.items() if k in allowed_fields}
         try:
             revise_and_resubmit(position, actor=actor, **changed)
         except ApprovalError as exc:
