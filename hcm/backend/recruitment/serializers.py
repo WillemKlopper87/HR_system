@@ -9,6 +9,7 @@ from rbac_audit.tiers import FieldTier, highest_tier, tier_of
 from rest_framework import serializers
 
 from .models import Applicant, ApplicantStageEvent, Offer, Requisition
+from .services import validate_requisition_positions
 
 DEMOGRAPHIC_FIELDS = {"race", "gender", "disability_status"}
 
@@ -18,7 +19,7 @@ class RequisitionSerializer(serializers.ModelSerializer):
         model = Requisition
         fields = [
             "id", "title", "department", "occupational_level", "job_grade", "location",
-            "headcount", "status", "hiring_manager", "created_by",
+            "headcount", "status", "hiring_manager", "created_by", "positions",
             "opened_at", "target_fill_date", "closed_at",
         ]
         # status is directly writable (draft/open/on_hold/closed) — the
@@ -26,6 +27,21 @@ class RequisitionSerializer(serializers.ModelSerializer):
         # than Applicant's dedicated transition action since Requisition
         # status has no equivalent ALLOWED_TRANSITIONS validation to enforce.
         read_only_fields = ["created_by", "closed_at"]
+
+    def validate(self, attrs):
+        positions = attrs.get("positions")
+        if positions is None:
+            positions = list(self.instance.positions.all()) if self.instance else []
+        headcount = attrs.get("headcount", self.instance.headcount if self.instance else 1)
+        if not positions:
+            raise serializers.ValidationError(
+                {"positions": "At least one approved, vacant position is required."}
+            )
+        try:
+            validate_requisition_positions(list(positions), headcount=headcount, requisition=self.instance)
+        except ValueError as exc:
+            raise serializers.ValidationError({"positions": str(exc)})
+        return attrs
 
 
 class ApplicantSerializer(serializers.ModelSerializer):

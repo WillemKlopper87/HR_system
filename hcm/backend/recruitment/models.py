@@ -5,6 +5,7 @@ from simple_history.models import HistoricalRecords
 
 from core_hr.base import TimestampedModel
 from core_hr.models import Department, Employee, EmployeeVersion, JobGrade, Location, OccupationalLevel
+from establishment.models import Position  # direct import: no cycle, establishment never imports recruitment back
 
 
 class Requisition(TimestampedModel):
@@ -26,6 +27,11 @@ class Requisition(TimestampedModel):
     location = models.ForeignKey(Location, on_delete=models.PROTECT, related_name="requisitions")
     headcount = models.PositiveSmallIntegerField(default=1)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    # Which specific approved, vacant posts this requisition targets (C1) --
+    # M2M, not a single FK: headcount can already be >1 (several identical
+    # hires), so one requisition may claim several identical vacant posts
+    # at once. See docs/superpowers/specs/2026-08-19-position-establishment-design.md §4.2.
+    positions = models.ManyToManyField(Position, related_name="requisitions", blank=True)
     hiring_manager = models.ForeignKey(
         Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name="requisitions_managed"
     )

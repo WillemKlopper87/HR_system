@@ -4,9 +4,10 @@ from datetime import date
 
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
 from django.test import TestCase
+from establishment.models import Position
 
 from .models import Applicant, ApplicantStageEvent, Requisition
-from .services import StageTransitionError, transition_applicant
+from .services import StageTransitionError, transition_applicant, validate_requisition_positions
 
 
 def _seed_reference_data():
@@ -115,3 +116,81 @@ class HireAutomationTests(TestCase):
         transition_applicant(self.applicant, to_stage=Applicant.Stage.HIRED)
         self.requisition.refresh_from_db()
         self.assertNotEqual(self.requisition.status, Requisition.Status.FILLED)
+
+
+def _approved_position(post_number, dept, level, grade, location):
+    return Position.objects.create(
+        post_number=post_number, title="Call Centre Agent", department=dept, occupational_level=level,
+        job_grade=grade, location=location, status=Position.Status.APPROVED,
+    )
+
+
+class ValidateRequisitionPositionsTests(TestCase):
+    def setUp(self):
+        self.dept, self.level, self.grade, self.location = _seed_reference_data()
+
+    def test_matching_count_of_approved_vacant_positions_is_valid(self):
+        positions = [
+            _approved_position(f"P-{i:05d}", self.dept, self.level, self.grade, self.location) for i in range(3)
+        ]
+        validate_requisition_positions(positions, headcount=3)  # must not raise
+
+    def test_count_mismatch_raises(self):
+        positions = [_approved_position("P-00001", self.dept, self.level, self.grade, self.location)]
+        with self.assertRaises(ValueError):
+            validate_requisition_positions(positions, headcount=2)
+
+    def test_unapproved_position_raises(self):
+        position = Position.objects.create(
+            post_number="P-00001", title="X", department=self.dept, occupational_level=self.level,
+            job_grade=self.grade, location=self.location, status=Position.Status.DRAFT,
+        )
+        with self.assertRaises(ValueError):
+            validate_requisition_positions([position], headcount=1)
+
+    def test_already_occupied_position_raises(self):
+        position = _approved_position("P-00001", self.dept, self.level, self.grade, self.location)
+        Employee.objects.hire(
+            employee_number="E001", first_name="A", last_name="B", date_of_birth=date(1990, 1, 1),
+            work_email="a.b@example.com", hire_date=date(2024, 1, 1), department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location, position=position,
+        )
+        with self.assertRaises(ValueError):
+            validate_requisition_positions([position], headcount=1)
+
+    def test_position_already_claimed_by_another_open_requisition_raises(self):
+        position = _approved_position("P-00001", self.dept, self.level, self.grade, self.location)
+        other = Requisition.objects.create(
+            title="Other req", department=self.dept, occupational_level=self.level, job_grade=self.grade,
+            location=self.location, headcount=1, status=Requisition.Status.OPEN,
+        )
+        other.positions.add(position)
+        with self.assertRaises(ValueError):
+            validate_requisition_positions([position], headcount=1)
+
+    def test_position_claimed_by_a_closed_requisition_is_available_again(self):
+        position = _approved_position("P-00001", self.dept, self.level, self.grade, self.location)
+        other = Requisition.objects.create(
+            title="Other req", department=self.dept, occupational_level=self.level, job_grade=self.grade,
+            location=self.location, headcount=1, status=Requisition.Status.CLOSED,
+        )
+        other.positions.add(position)
+        validate_requisition_positions([position], headcount=1)  # must not raise
+
+    def test_already_linked_position_is_allowed_even_once_filled(self):
+        """A position this SAME requisition already claimed stays valid
+        even after it's since been filled by one of the requisition's own
+        hires -- an unrelated later PATCH must not be rejected just
+        because is_vacant flipped to False for an already-committed post."""
+        position = _approved_position("P-00001", self.dept, self.level, self.grade, self.location)
+        requisition = Requisition.objects.create(
+            title="Req", department=self.dept, occupational_level=self.level, job_grade=self.grade,
+            location=self.location, headcount=1, status=Requisition.Status.OPEN,
+        )
+        requisition.positions.add(position)
+        Employee.objects.hire(
+            employee_number="E001", first_name="A", last_name="B", date_of_birth=date(1990, 1, 1),
+            work_email="a.b@example.com", hire_date=date(2024, 1, 1), department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location, position=position,
+        )
+        validate_requisition_positions([position], headcount=1, requisition=requisition)  # must not raise

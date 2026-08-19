@@ -5,6 +5,7 @@ from datetime import date
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from establishment.models import Position
 from rbac_audit.models import ConsentRecord, Role, RoleAssignment
 from rest_framework.test import APIClient
 
@@ -70,12 +71,19 @@ class RequisitionPermissionTests(RecruitmentApiTestCase):
         response = self.client.get("/api/v1/requisitions/")
         self.assertEqual(response.status_code, 200)
 
+        # Predates Task 6's establishment-control validation (Sprint 4-5,
+        # commit 787fcd3) -- a position is now required to link on create.
+        position = Position.objects.create(
+            post_number="P-00002", title="Frontend Engineer", department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location,
+            status=Position.Status.APPROVED,
+        )
         response = self.client.post(
             "/api/v1/requisitions/",
             {
                 "title": "Frontend Engineer", "department": self.dept.id, "occupational_level": self.level.id,
                 "job_grade": self.grade.id, "location": self.location.id, "headcount": 1,
-                "status": Requisition.Status.OPEN,
+                "status": Requisition.Status.OPEN, "positions": [position.id],
             },
             format="json",
         )
@@ -191,3 +199,30 @@ class RecruitmentDashboardTests(RecruitmentApiTestCase):
         self.assertEqual(response.data["open_requisitions"], 1)
         # recruiter holds an ALL-scope role with S-tier read -> unsuppressed
         self.assertFalse(response.data["small_cell_suppression_applied"])
+
+
+class RequisitionPositionValidationApiTests(RecruitmentApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.position = Position.objects.create(
+            post_number="P-00001", title="Agent", department=self.dept, occupational_level=self.level,
+            job_grade=self.grade, location=self.location, status=Position.Status.APPROVED,
+        )
+
+    def test_create_without_positions_is_rejected(self):
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.post("/api/v1/requisitions/", {
+            "title": "X", "department": self.dept.id, "occupational_level": self.level.id,
+            "job_grade": self.grade.id, "location": self.location.id, "headcount": 1, "status": "open",
+        }, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("positions", response.data)
+
+    def test_create_with_matching_approved_vacant_position_succeeds(self):
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.post("/api/v1/requisitions/", {
+            "title": "X", "department": self.dept.id, "occupational_level": self.level.id,
+            "job_grade": self.grade.id, "location": self.location.id, "headcount": 1, "status": "open",
+            "positions": [self.position.id],
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)

@@ -4,12 +4,44 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from core_hr.models import Employee, EmployeeVersion
+from establishment.models import Position
 
 from .models import Applicant, ApplicantStageEvent, Requisition
 
 
 class StageTransitionError(ValueError):
     pass
+
+
+def validate_requisition_positions(positions, *, headcount: int, requisition=None) -> None:
+    """Raises ValueError (caught by the serializer, surfaced as a 400) if
+    the linked positions don't satisfy C1's establishment-control rules.
+    Already-linked positions (requisition.positions before this call) are
+    exempt from the approved/vacant/unclaimed checks -- a position this
+    SAME requisition already committed to stays valid even once one of its
+    own hires has since filled it; only newly-added positions are held to
+    the strict bar."""
+    if len(positions) != headcount:
+        raise ValueError(
+            f"{len(positions)} position(s) linked but headcount is {headcount} -- they must match."
+        )
+
+    already_linked_ids = set(requisition.positions.values_list("id", flat=True)) if requisition else set()
+
+    for position in positions:
+        if position.id in already_linked_ids:
+            continue
+        if position.status != Position.Status.APPROVED:
+            raise ValueError(f"Position {position.post_number} is not approved yet.")
+        if not position.is_vacant:
+            raise ValueError(f"Position {position.post_number} is not vacant.")
+        claimed_by = position.requisitions.exclude(
+            status__in=[Requisition.Status.CLOSED, Requisition.Status.FILLED]
+        )
+        if requisition is not None:
+            claimed_by = claimed_by.exclude(pk=requisition.pk)
+        if claimed_by.exists():
+            raise ValueError(f"Position {position.post_number} is already linked to another open requisition.")
 
 
 def _next_employee_number() -> str:
