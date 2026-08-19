@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.db import transaction
 from django.utils import timezone
+from notifications.services import notify
 
 from .models import CompProposal, PayBand
 
@@ -61,6 +62,13 @@ def approve_proposal(proposal: CompProposal, *, approver, override_reason: str =
         proposal.override_reason = override_reason
         update_fields.append("override_reason")
     proposal.save(update_fields=update_fields)
+    if proposal.proposed_by_id:
+        notify(
+            recipient=proposal.proposed_by, kind="comp_approval",
+            title=f"Compensation proposal approved for {proposal.employee.employee_number}",
+            body=f"Proposed annual salary {proposal.proposed_annual_salary} was approved.",
+            link="/comp-proposals",
+        )
     return proposal
 
 
@@ -71,4 +79,11 @@ def reject_proposal(proposal: CompProposal, *, approver) -> CompProposal:
     proposal.approved_by = approver
     proposal.approved_at = timezone.now()
     proposal.save(update_fields=["status", "approved_by", "approved_at"])
+    if proposal.proposed_by_id:
+        notify(
+            recipient=proposal.proposed_by, kind="comp_approval",
+            title=f"Compensation proposal rejected for {proposal.employee.employee_number}",
+            body=f"Proposed annual salary {proposal.proposed_annual_salary} was rejected.",
+            link="/comp-proposals",
+        )
     return proposal

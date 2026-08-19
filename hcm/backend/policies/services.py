@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from core_hr.models import Employee, EmployeeVersion
 from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
+from notifications.services import notify_many
 
 from .chunking import chunk_text
 from .extraction import UnsupportedDocumentError, extract_text
@@ -125,6 +127,15 @@ def publish_policy(policy: Policy, *, actor=None) -> Policy:
     policy.published_by = actor
     policy.published_at = timezone.now()
     policy.save(update_fields=["status", "published_by", "published_at"])
+    # A policy has no audience-targeting fields (unlike AgreementTemplate) --
+    # it applies org-wide, so every currently-employed person is notified,
+    # not a subset. Best-effort email per notify_many; never blocks publish.
+    recipients = Employee.objects.filter(pk__in=EmployeeVersion.objects.current().values_list("employee_id", flat=True))
+    notify_many(
+        recipients, kind="policy_publish", title=f"New policy published: {policy.title}",
+        body=f"{policy.get_category_display()} — please review and acknowledge.",
+        link="/my-policies",
+    )
     return policy
 
 

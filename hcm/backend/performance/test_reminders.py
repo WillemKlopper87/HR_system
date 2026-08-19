@@ -160,6 +160,11 @@ class ReminderRunTests(TestCase):
         self.assertEqual(run.items_sent, 2)  # Cara has no collab account
         self.assertEqual(run.skipped_no_collab_account, ["E3"])
         self.assertEqual(run.digests_sent, 1)
+        # in-app is a second, independent channel (H3) -- it fires for all 3
+        # outstanding employees, including Cara who has no collab account.
+        from notifications.models import Notification
+
+        self.assertEqual(Notification.objects.filter(kind="pc_reminder").count(), 4)  # 3 employees + 1 head digest
         refs = sorted(self.items_refs(fake))
         self.assertEqual(len(refs), 3)  # 2 employee items + 1 head digest
         item = fake.items[[r for r in refs if r.startswith("hcm:agreement")][0]]
@@ -178,7 +183,15 @@ class ReminderRunTests(TestCase):
         self.assertEqual(second.items_sent, 0)
         self.assertEqual(second.digests_sent, 0)
         self.assertEqual(len(fake.items), calls_after_first)
-        self.assertEqual(ReminderLog.objects.filter(kind="employee_item").count(), 3)  # incl. the "no account" note
+        # 3 collab-channel rows (incl. the "no account" note) + 3 in-app
+        # rows (H3's independent second channel, unaffected by no-collab-
+        # account) -- both idempotent across the two runs, so still 3 each.
+        self.assertEqual(
+            ReminderLog.objects.filter(kind="employee_item").exclude(channel="in_app").count(), 3
+        )
+        self.assertEqual(
+            ReminderLog.objects.filter(kind="employee_item", channel="in_app").count(), 3
+        )
         self.assertGreater(first.items_sent, 0)
 
     def test_a_signed_agreement_drops_out_of_the_next_batch(self):

@@ -34,6 +34,7 @@ from django.utils import timezone
 
 from integrations import collab
 from integrations.collab import CollabError
+from notifications.services import notify
 
 from .models import PerformanceAgreement, PerformancePeriod, PeriodPhase, ReminderLog
 
@@ -196,6 +197,23 @@ def run_reminders(*, period: PerformancePeriod | None = None, today: date | None
         for agreement in agreements:
             employee = agreement.employee
             key = f"{period.name}:{phase.stage}:employee_item:{employee.employee_number}:{label}"
+
+            # In-app is a second, independent channel from the collab push
+            # below -- it needs no collab_user_id/department mapping, so it
+            # fires for every outstanding employee, not just the ones collab
+            # can reach. Own idempotency key (same `key`, different channel)
+            # so a rerun never double-notifies either channel.
+            in_app_key = f"{key}:in_app"
+            if not dry_run and not _already_sent(in_app_key):
+                notify(
+                    recipient=employee, kind="pc_reminder",
+                    title=title_template.format(period=period.name),
+                    body=f"Due {phase.due_on:%d %b %Y}.",
+                    link="/my-performance",
+                )
+                _record(period, phase.stage, ReminderLog.Kind.EMPLOYEE_ITEM, in_app_key, employee=employee,
+                        agreement=agreement, offset_days=offset, channel="in_app")
+
             if _already_sent(key):
                 continue
             if not employee.collab_user_id:
@@ -255,6 +273,18 @@ def run_reminders(*, period: PerformancePeriod | None = None, today: date | None
         for head_id, items in by_head.items():
             head = items[0].head
             key = f"{period.name}:{phase.stage}:head_digest:{head.employee_number}:{label}"
+
+            in_app_key = f"{key}:in_app"
+            if not dry_run and not _already_sent(in_app_key):
+                notify(
+                    recipient=head, kind="pc_reminder",
+                    title=f"{len(items)} of your team still to complete {period.name} {phase.get_stage_display()}",
+                    body=", ".join(f"{a.employee.first_name} {a.employee.last_name}" for a in items[:20]),
+                    link="/team-performance",
+                )
+                _record(period, phase.stage, ReminderLog.Kind.HEAD_DIGEST, in_app_key, employee=head,
+                        offset_days=offset, channel="in_app")
+
             if _already_sent(key):
                 continue
             if not head.collab_user_id:

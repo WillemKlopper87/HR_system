@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { ReferenceDataProvider } from '../api/ReferenceDataContext'
 import { useAuth } from '../auth/AuthContext'
 import { NAV_ITEMS } from './navConfig'
+import { NotificationBell } from './NotificationBell'
 
 export function AppShell() {
   const { user, logout, hasRole } = useAuth()
@@ -20,6 +21,7 @@ export function AppShell() {
             ))}
           </nav>
           <div className="app-user">
+            <NotificationBell />
             <span>
               {user?.first_name} {user?.last_name}
             </span>

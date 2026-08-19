@@ -963,3 +963,17 @@ export interface ArchiveResult {
   archived: number
   outstanding: number
 }
+
+export type NotificationKind =
+  | 'pc_reminder' | 'comp_approval' | 'review_launch' | 'policy_publish' | 'liveness_flag' | 'ee_signoff'
+
+export interface Notification {
+  id: number
+  kind: NotificationKind
+  kind_display: string
+  title: string
+  body: string
+  link: string
+  read_at: string | null
+  created_at: string
+}

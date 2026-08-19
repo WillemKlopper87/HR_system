@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "ee_reporting",
     "policies",
     "integrations",
+    "notifications",
 ]
 
 MIDDLEWARE = [
@@ -199,6 +200,24 @@ COLLAB_TIMEOUT_SECONDS = float(os.environ.get("COLLAB_TIMEOUT_SECONDS", "10"))
 # Absolute base URL of *this* SPA, used for deep links inside pushed items
 # (e.g. https://hcm.sentech.local/my-performance).
 HCM_PUBLIC_URL = os.environ.get("HCM_PUBLIC_URL", "http://localhost:5173").rstrip("/")
+
+# --- Email adapter (H3, notifications/services.py) ---------------------------
+# SMTP, not Graph -- sufficient for the demo's own domain and every consumer
+# H3 wires (comp approvals, review launch, policy publish, liveness flag,
+# EE sign-off); a Graph-specific backend is a drop-in EMAIL_BACKEND swap
+# later, not a redesign, since callers only ever see notifications.notify().
+# No SMTP_HOST set (local dev/tests/CI) => console backend, so nothing ever
+# blocks on a real mail server and every send is visible in the log instead.
+if os.environ.get("SMTP_HOST"):
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = os.environ["SMTP_HOST"]
+    EMAIL_PORT = int(os.environ.get("SMTP_PORT", "587"))
+    EMAIL_HOST_USER = os.environ.get("SMTP_USER", "")
+    EMAIL_HOST_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+    EMAIL_USE_TLS = os.environ.get("SMTP_USE_TLS", "1") == "1"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "hcm-noreply@sentech.example.com")
 
 # --- Celery (ADR-005: web + worker + beat + Redis) ---------------------------
 # Broker/result backend come from REDIS_URL (docker-compose sets it). With no

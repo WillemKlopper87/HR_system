@@ -82,6 +82,14 @@ hcm/
                 a future RAG/chatbot phase would embed and retrieve over; no
                 embeddings, vector search, or LLM integration exist yet (deliberately
                 deferred — see ADR-008)
+    notifications/ in-app + email notifications (H3): models.py::Notification,
+                services.py::notify/notify_many/employees_with_role — the one write
+                path every consumer uses (PC reminders, comp approvals, review
+                launch, policy publish, liveness flag, EE sign-off); email is
+                best-effort on top of an always-created in-app row (SMTP via
+                EMAIL_* settings, console backend when SMTP_HOST is unset).
+                Shared kernel (like integrations): imports core_hr only, knows
+                recipients and message text, nothing about any domain
   frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards; RequirePayrollStepUp.tsx —
                TOTP enrollment + step-up challenge UI, a children-wrapper (not a

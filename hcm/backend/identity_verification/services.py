@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
+from notifications.services import employees_with_role, notify_many
 from rbac_audit.models import ConsentRecord
 
 from .geo import OFFICE_GEOFENCE_RADIUS_M, REQUIRED_OFFICE_DAYS_PER_WEEK, haversine_distance_m
@@ -86,11 +87,19 @@ def run_liveness_check(
         else LivenessCheck.ReviewStatus.PENDING
     )
 
-    return LivenessCheck.objects.create(
+    check = LivenessCheck.objects.create(
         employee=employee, trigger=trigger, requested_by=requested_by, match_distance=distance, outcome=outcome,
         latitude=latitude, longitude=longitude, distance_from_office_m=distance_from_office, at_office=at_office,
         review_status=review_status,
     )
+    if review_status == LivenessCheck.ReviewStatus.PENDING:
+        notify_many(
+            employees_with_role("hr_admin"), kind="liveness_flag",
+            title=f"Liveness check flagged for review: {employee.employee_number}",
+            body=f"Outcome: {check.get_outcome_display()}.",
+            link="/workforce-integrity",
+        )
+    return check
 
 
 def resolve_review(check: LivenessCheck, *, reviewer, decision: str, notes: str = "") -> LivenessCheck:

@@ -41,6 +41,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core_hr.models import Employee
+from notifications.services import notify, notify_many
 from rbac_audit.audit import log_access
 from rbac_audit.models import AuditLogEntry
 from rbac_audit.stepup import has_active_step_up_grant
@@ -592,7 +593,29 @@ def sign_agreement(
             + ")"
         ),
     )
+    _notify_signature(agreement, role=role, stage=stage)
     return signature
+
+
+def _notify_signature(agreement: PerformanceAgreement, *, role: str, stage: str) -> None:
+    """EE sign-off (H3): the other signatory is told it's their turn once
+    the employee signs; the employee is told once the Head completes it."""
+    if role == AgreementSignature.Role.EMPLOYEE:
+        if agreement.head_id:
+            employee = agreement.employee
+            notify(
+                recipient=agreement.head, kind="ee_signoff",
+                title=f"{employee.first_name} {employee.last_name} signed — your turn",
+                body=f"{stage} stage awaiting your signature on {agreement.period.name}.",
+                link="/team-performance",
+            )
+    else:
+        notify(
+            recipient=agreement.employee, kind="ee_signoff",
+            title=f"Your {agreement.period.name} {stage} stage is now fully signed",
+            body="Both signatures are recorded.",
+            link="/my-performance",
+        )
 
 
 # --- phases -----------------------------------------------------------------
@@ -613,21 +636,37 @@ def open_phase(period: PerformancePeriod, stage: str, *, actor=None) -> Performa
         period.status = PerformancePeriod.Status.CONTRACTING
     elif stage == PeriodPhase.Stage.MIDYEAR:
         period.status = PerformancePeriod.Status.MIDYEAR
-        PerformanceAgreement.objects.filter(
-            period=period, status=PerformanceAgreement.Status.AGREED
-        ).update(status=PerformanceAgreement.Status.MIDYEAR_OPEN)
+        opened = PerformanceAgreement.objects.filter(period=period, status=PerformanceAgreement.Status.AGREED)
+        _notify_stage_opened(opened, period=period, stage_label="mid-year (Q2) review")
+        opened.update(status=PerformanceAgreement.Status.MIDYEAR_OPEN)
     else:
         period.status = PerformancePeriod.Status.FINAL
         # Whichever of the two contracted "ready" states an agreement is in —
         # mid-year genuinely happened (MIDYEAR_SIGNED) or it didn't
         # (still AGREED, e.g. this org skipped Q2 this year) — both are
         # legitimate starting points for the final assessment.
-        PerformanceAgreement.objects.filter(
+        opened = PerformanceAgreement.objects.filter(
             period=period,
             status__in=[PerformanceAgreement.Status.AGREED, PerformanceAgreement.Status.MIDYEAR_SIGNED],
-        ).update(status=PerformanceAgreement.Status.FINAL_OPEN)
+        )
+        _notify_stage_opened(opened, period=period, stage_label="final (Q4) assessment")
+        opened.update(status=PerformanceAgreement.Status.FINAL_OPEN)
     period.save(update_fields=["status"])
     return period
+
+
+def _notify_stage_opened(opened_queryset, *, period: PerformancePeriod, stage_label: str) -> None:
+    """Review launch (H3): every employee whose agreement just moved to an
+    *_open status is told directly, in-app -- `reminders.py`'s daily job
+    already re-nags outstanding people later, this is the one-time "it just
+    opened" notice. Evaluated before the caller's `.update()` runs the
+    status transition."""
+    employees = Employee.objects.filter(pk__in=list(opened_queryset.values_list("employee_id", flat=True)))
+    if employees:
+        notify_many(
+            employees, kind="review_launch", title=f"{period.name} {stage_label} is now open",
+            body="Complete and sign it before the deadline.", link="/my-performance",
+        )
 
 
 def archive_period(period: PerformancePeriod, *, actor=None) -> dict:
