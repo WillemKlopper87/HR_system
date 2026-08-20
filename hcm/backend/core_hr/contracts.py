@@ -65,32 +65,50 @@ def _validate_renewal_end_date(employee_version, end_date, *, required_message):
     defers a past-end-date check. A fat-fingered 2017-12-31 would be a
     permanent, silent black hole.
 
-    When the version has no `contract_end_date` at all, the comparison
-    falls back to today. Spec §7 leaves the pre-existing fixed-term
-    population un-backfilled (NULL, flagged by MISSING_CONTRACT_END_DATE),
-    so these functions are genuinely reachable with nothing to order
-    against -- and skipping the check there would leave the exact same
-    black hole open through the exact same code path. Today is the weakest
-    bound that still closes it, and it is the honest one: the resulting
-    version is created with today's effective date either way (see
-    `effective_date` below), so an end date on or before today describes a
-    contract that is over before it starts. Genuine historical corrections
-    go through Django admin (spec §7), not through this workflow.
+    The binding floor is therefore the *later* of the stored date and
+    today, which closes three cases with one comparison:
+
+    * **No stored date.** Spec §7 leaves the pre-existing fixed-term
+      population un-backfilled (NULL, flagged by
+      MISSING_CONTRACT_END_DATE), so these functions are genuinely
+      reachable with nothing to order against. Skipping the check there
+      would leave the identical black hole open through the identical code
+      path, so today is the bound.
+    * **Stored date in the future** -- the ordinary case. The new date must
+      extend past the one it replaces.
+    * **Stored date already in the past** -- a contract that lapsed with
+      nobody deciding, a state spec §11 explicitly acknowledges is live.
+      Ordering against the stored date alone would accept a renewal that is
+      after the old expiry but still before today, minting precisely the
+      already-expired version this function exists to prevent. Today binds
+      instead.
+
+    Today is the honest bound in every case: the resulting version is
+    created with today's effective date (see `effective_date` below), so an
+    end date on or before today describes a contract that is over before it
+    starts. Genuine historical corrections go through Django admin
+    (spec §7), not through this workflow.
     """
     if end_date is None:
         raise ContractDecisionError(required_message)
-    floor = employee_version.contract_end_date
-    if floor is None:
-        if end_date <= timezone.localdate():
-            raise ContractDecisionError(
-                "The new contract end date must be in the future "
-                "(this version has no current contract end date to extend)."
-            )
+    today = timezone.localdate()
+    stored = employee_version.contract_end_date
+    floor = stored if stored is not None and stored > today else today
+    if end_date > floor:
         return
-    if end_date <= floor:
+    if stored is None:
         raise ContractDecisionError(
-            f"The new contract end date must be after the current one ({floor:%Y-%m-%d})."
+            "The new contract end date must be in the future "
+            "(this version has no current contract end date to extend)."
         )
+    if stored <= today:
+        raise ContractDecisionError(
+            f"The current contract end date ({stored:%Y-%m-%d}) has already passed; "
+            "the new one must be in the future."
+        )
+    raise ContractDecisionError(
+        f"The new contract end date must be after the current one ({stored:%Y-%m-%d})."
+    )
 
 
 def recommend_contract_action(employee_version, *, actor, action, comment="", end_date=None):

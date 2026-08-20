@@ -836,6 +836,30 @@ class ContractActionApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 400, response.data)
 
+    def test_past_end_date_rejected_when_the_current_contract_already_lapsed(self):
+        # The gap ordering-against-the-stored-date-alone leaves open: for a
+        # contract that already lapsed with nobody deciding (spec §11
+        # acknowledges this state is live), any date merely *after* the old
+        # expiry passes -- including one still in the past, which mints the
+        # exact already-expired version this rule exists to prevent. The
+        # floor is the later of the stored date and today, so today binds
+        # here. Dates are relative so this can't rot into a pass as the
+        # calendar moves.
+        version = self.employee.current_version
+        version.contract_end_date = timezone.localdate() - timedelta(days=365)
+        version.save(update_fields=["contract_end_date"])
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{version.id}/decide_contract/",
+            # Comfortably after the lapsed date, still comfortably in the past.
+            {"action": "renew", "end_date": (timezone.localdate() - timedelta(days=30)).isoformat()},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("already passed", str(response.data))
+        version.refresh_from_db()
+        self.assertIsNone(version.valid_to)  # no lifecycle event fired
+
     def test_past_end_date_rejected_when_version_has_no_current_end_date(self):
         # Spec §7 leaves pre-existing fixed-term employees un-backfilled
         # (contract_end_date IS NULL, flagged by MISSING_CONTRACT_END_DATE),
