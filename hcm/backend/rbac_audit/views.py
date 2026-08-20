@@ -235,9 +235,14 @@ def _filtered_audit_log(request):
 
 class _AuditLogCursorPagination(CursorPagination):
     """`AuditLogEntry.timestamp` predates the TimestampedModel convention
-    (`created_at`) the project-wide default pagination ordering assumes."""
+    (`created_at`) the project-wide default pagination ordering assumes.
 
-    ordering = "-timestamp"
+    `-id` is a tiebreaker: `timestamp` alone isn't unique enough (entries
+    created in quick succession can share a value), and DRF's cursor
+    pagination needs a fully deterministic ordering to avoid skipping or
+    duplicating rows across pages when ties occur at a page boundary."""
+
+    ordering = ("-timestamp", "-id")
 
 
 class AuditLogEntryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -265,7 +270,7 @@ class AuditLogEntryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 @api_view(["GET"])
 @permission_classes([IsHRAdminOrAuditor])
 def audit_log_export(request):
-    entries = _filtered_audit_log(request).order_by("-timestamp")
+    entries = _filtered_audit_log(request).order_by("-timestamp", "-id")
     log_access(
         actor=get_request_employee(request), action=AuditLogEntry.Action.EXPORT,
         entity_type="rbac_audit.AuditLogEntry", entity_id="export", field_tier=FieldTier.RESTRICTED,

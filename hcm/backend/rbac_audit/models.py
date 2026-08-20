@@ -111,7 +111,12 @@ class AuditLogEntry(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-timestamp"]
+        # `-id` is a tiebreaker: `timestamp` (auto_now_add) doesn't have
+        # enough resolution to guarantee uniqueness between entries created
+        # in quick succession (e.g. in tests, or two log_access() calls in
+        # the same request) — without it, "-timestamp" alone lets rows that
+        # share a timestamp come back in either order non-deterministically.
+        ordering = ["-timestamp", "-id"]
         indexes = [
             models.Index(fields=["actor", "timestamp"]),
             models.Index(fields=["entity_type", "entity_id"]),

@@ -73,7 +73,7 @@ class AuditLogApiTests(TestCase):
         client = self._login(self.auditor)
         client.get("/api/v1/auth/audit-log/")
         self.assertEqual(AuditLogEntry.objects.count(), before + 1)
-        newest = AuditLogEntry.objects.order_by("-timestamp").first()
+        newest = AuditLogEntry.objects.order_by("-timestamp", "-id").first()
         self.assertEqual(newest.actor, self.auditor)
         self.assertEqual(newest.entity_type, "rbac_audit.AuditLogEntry")
 
