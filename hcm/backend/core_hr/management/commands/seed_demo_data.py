@@ -4,6 +4,7 @@ import random
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -26,6 +27,13 @@ from ee_reporting.constants import BARRIER_CATEGORIES
 from ee_reporting.constants import OCCUPATIONAL_LEVEL_CODES as EE_LEVEL_CODES
 from ee_reporting.models import EEPlan, EEQuestionnaire, EmployerConfig, RemunerationRecord
 from ee_reporting.services import ee_manager_approve, generate_report, sign_off, submit_for_review
+from establishment.models import PositionApprovalStep
+from establishment.services import (
+    backfill_positions_for_current_employees,
+    decide_step,
+    propose_position,
+    submit_for_approval,
+)
 from performance.models import (
     AgreementTemplate,
     PerformanceAgreement,
@@ -263,7 +271,7 @@ class Command(BaseCommand):
             auditor_employee.user = User.objects.create_user(username="auditor", password="auditor123")
             auditor_employee.save(update_fields=["user"])
 
-            self._seed_recruitment_demo_data(
+            demo_requisitions = self._seed_recruitment_demo_data(
                 departments=departments, levels=levels, grades_by_level=grades_by_level,
                 locations=locations, recruiter=slm_head, rng=rng,
             )
@@ -284,6 +292,12 @@ class Command(BaseCommand):
             self._seed_ess_demo_data(direct_report=staff)
             self._seed_policies_demo_data(hr_admin=hr_head, direct_report=staff, rng=rng)
             self._seed_performance_agreements_demo_data(hr_admin=hr_head, head=eng_head, staff=staff, rng=rng)
+            # LAST, once every employee exists: establishment.migrations.
+            # 0002 ran its backfill against an empty database (correctly
+            # creating nothing), so without this every fresh demo/e2e
+            # environment has zero Positions and both seeded requisitions
+            # sit unlinked -- the exact pre-C1 state this feature replaces.
+            self._seed_establishment_demo_data(requisitions=demo_requisitions, hr_admin=hr_head)
 
         run_data_quality_checks()
 
@@ -299,7 +313,10 @@ class Command(BaseCommand):
         """A handful of requisitions/applicants spanning the pipeline —
         including one carried all the way through transition_applicant to
         HIRED, so the demo shows the Sprint 4 acceptance criterion (hire
-        creates an employees row) with real seeded data, not just tests."""
+        creates an employees row) with real seeded data, not just tests.
+
+        Returns the two requisitions so _seed_establishment_demo_data can
+        link real approved posts to them once every employee exists (C1)."""
         eng_dept = next(d for d in departments if d.code == "ENG")
         fin_dept = next(d for d in departments if d.code == "FIN")
         junior_level = levels[-1]
@@ -361,6 +378,88 @@ class Command(BaseCommand):
         transition_applicant(
             rejected, to_stage=Applicant.Stage.REJECTED, actor=recruiter, rejected_reason="Not enough relevant experience"
         )
+
+        return [eng_req, fin_req]
+
+    # --- Position / establishment control (C1) ------------------------------
+
+    def _seed_establishment_demo_data(self, *, requisitions, hr_admin):
+        """One approved Position per currently-employed person — the same
+        idempotent backfill establishment/migrations/0002 wraps, run here
+        because that migration executed against an empty database — and
+        then real approved posts behind the seeded requisitions, so the
+        Positions page, the vacancy-rate stats, and the recruiter's
+        position picker all have live data in a fresh environment."""
+        backfilled = backfill_positions_for_current_employees()
+
+        linked = 0
+        for requisition in requisitions:
+            positions = self._positions_for_requisition(requisition, hr_admin=hr_admin)
+            requisition.positions.set(positions)
+            linked += len(positions)
+
+        self.stdout.write(
+            f"Seeded establishment control: {backfilled} positions backfilled from current employees, "
+            f"{linked} linked across {len(requisitions)} demo requisitions."
+        )
+
+    def _positions_for_requisition(self, requisition, *, hr_admin):
+        """Exactly `headcount` posts: the ones this requisition's completed
+        hires already occupy, topped up with freshly approved vacant ones.
+
+        Linking a hire's own backfilled post (the same rule
+        recruitment.services.backfill_requisition_positions applies to
+        historical closed requisitions) is what keeps the design spec's
+        §4.3 invariant true in the demo data: "all linked positions
+        occupied" stays the same fact as "hired_count >= headcount". Every
+        backfilled position is occupied by definition — it was backfilled
+        FROM its occupant — so the still-open seats need brand-new posts,
+        which also gives the recruiter's picker something genuinely vacant
+        to offer."""
+        positions = []
+        hired = requisition.applicants.filter(
+            current_stage=Applicant.Stage.HIRED, resulting_employee__isnull=False
+        ).select_related("resulting_employee")
+        for applicant in hired:
+            version = applicant.resulting_employee.current_version
+            if version is not None and version.position is not None:
+                positions.append(version.position)
+
+        while len(positions) < requisition.headcount:
+            positions.append(self._approve_new_position(requisition=requisition, hr_admin=hr_admin))
+        return positions[: requisition.headcount]
+
+    def _approve_new_position(self, *, requisition, hr_admin):
+        """Walked through the real configured approval chain rather than
+        created pre-approved, so the demo's Positions page shows a genuine
+        PositionApprovalStep audit trail instead of posts that appeared
+        from nowhere."""
+        position = propose_position(
+            title=requisition.title, department=requisition.department,
+            occupational_level=requisition.occupational_level, job_grade=requisition.job_grade,
+            location=requisition.location, actor=hr_admin,
+        )
+        submit_for_approval(position, actor=hr_admin)
+        for role_name in settings.POSITION_APPROVAL_CHAIN:
+            decide_step(
+                position, actor=self._employee_with_role(role_name),
+                decision=PositionApprovalStep.Decision.APPROVED,
+                comment=f"Approved on the establishment for '{requisition.title}'.",
+            )
+        return position
+
+    @staticmethod
+    def _employee_with_role(role_name):
+        """Whoever actually holds the role in this seeded org — looked up,
+        not hardcoded, so a deployment running a different
+        POSITION_APPROVAL_CHAIN still records a real actor. None if nobody
+        holds it; establishment/services.py doesn't require an actor."""
+        assignment = (
+            RoleAssignment.objects.filter(role__name=role_name, revoked_at__isnull=True)
+            .select_related("employee")
+            .first()
+        )
+        return assignment.employee if assignment else None
 
     def _seed_performance_demo_data(self, *, manager, direct_report):
         """Launches one review cycle against the full seeded workforce (so
