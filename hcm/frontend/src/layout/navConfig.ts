@@ -33,6 +33,13 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       { to: '/employees', label: 'Employees', roles: [] },
       { to: '/org-structure', label: 'Org Structure', roles: [] },
       { to: '/data-quality', label: 'Data Quality', roles: HR },
+      // Folded in here rather than getting its own top-level category
+      // containing a single identically-named item: every other category
+      // groups 3–6 related items, which is the whole premise of the
+      // sidebar grouping. Workforce fits its hr_admin/line_manager
+      // audience (alongside Employees / Data Quality) better than
+      // Recruitment does.
+      { to: '/contract-renewals', label: 'Contract Renewals', roles: CONTRACTS },
       { to: '/dashboards/headcount', label: 'Headcount', roles: [] },
     ],
   },
@@ -79,12 +86,6 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       { to: '/dashboards/equity', label: 'Equity Dashboard', roles: EE },
       { to: '/ee-configuration', label: 'EE Configuration', roles: EE },
       { to: '/ee-reports', label: 'EE Reports', roles: EE },
-    ],
-  },
-  {
-    label: 'Contract Renewals',
-    items: [
-      { to: '/contract-renewals', label: 'Contract Renewals', roles: CONTRACTS },
     ],
   },
   {
