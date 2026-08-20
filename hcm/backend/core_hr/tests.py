@@ -6,6 +6,7 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 from establishment.models import Position
 
+from .contracts import ContractDecisionError, decide_contract_action, recommend_contract_action
 from .data_quality import run_data_quality_checks
 from .imports import import_employees_csv, import_employees_xlsx
 from .models import (
@@ -478,3 +479,94 @@ class ContractRenewalDecisionModelTests(TestCase):
 
     def test_no_row_created_by_default(self):
         self.assertFalse(ContractRenewalDecision.objects.filter(employee_version=self.employee.current_version).exists())
+
+
+class ContractDecisionServiceTests(TestCase):
+    def setUp(self):
+        self.dept = Department.objects.create(code="ENG", name="Engineering")
+        self.level = OccupationalLevel.objects.create(code="P", name="Professional", order=97)
+        self.location = Location.objects.create(code="JHB", name="Johannesburg", province="Gauteng")
+        self.manager = Employee.objects.hire(
+            employee_number="E800", first_name="Line", last_name="Manager",
+            date_of_birth=date(1980, 1, 1), work_email="linemanager3@sentech.example.com",
+            hire_date=date(2020, 1, 1), department=self.dept, occupational_level=self.level,
+            location=self.location, employment_status=EmployeeVersion.EmploymentStatus.PERMANENT,
+        )
+        self.hr_admin = Employee.objects.hire(
+            employee_number="E801", first_name="HR", last_name="Admin",
+            date_of_birth=date(1980, 1, 1), work_email="hradmin3@sentech.example.com",
+            hire_date=date(2020, 1, 1), department=self.dept, occupational_level=self.level,
+            location=self.location, employment_status=EmployeeVersion.EmploymentStatus.PERMANENT,
+        )
+        self.employee = Employee.objects.hire(
+            employee_number="E900", first_name="Test", last_name="Contractor",
+            date_of_birth=date(1990, 1, 1), work_email="contractor3@sentech.example.com",
+            hire_date=date(2026, 1, 1), department=self.dept, occupational_level=self.level,
+            location=self.location, employment_status=EmployeeVersion.EmploymentStatus.FIXED_TERM,
+            contract_end_date=date(2026, 12, 31), manager=self.manager,
+        )
+        self.version = self.employee.current_version
+
+    def test_recommend_creates_a_recommended_row(self):
+        decision = recommend_contract_action(
+            self.version, actor=self.manager, action=ContractRenewalDecision.Action.RENEW,
+            comment="Team still needs them.", end_date=date(2027, 12, 31),
+        )
+        self.assertEqual(decision.status, ContractRenewalDecision.Status.RECOMMENDED)
+        self.assertEqual(decision.recommended_by, self.manager)
+        self.assertEqual(decision.recommended_end_date, date(2027, 12, 31))
+
+    def test_recommend_twice_raises(self):
+        recommend_contract_action(self.version, actor=self.manager, action=ContractRenewalDecision.Action.RENEW, end_date=date(2027, 12, 31))
+        with self.assertRaises(ContractDecisionError):
+            recommend_contract_action(self.version, actor=self.manager, action=ContractRenewalDecision.Action.LET_LAPSE)
+
+    def test_decide_without_a_prior_recommendation_is_allowed(self):
+        decision = decide_contract_action(
+            self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.CONVERT_PERMANENT,
+        )
+        self.assertEqual(decision.status, ContractRenewalDecision.Status.DECIDED)
+        self.assertIsNone(decision.recommended_action)
+
+    def test_decide_renew_creates_a_new_version_and_closes_the_old_one(self):
+        decide_contract_action(
+            self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.RENEW,
+            end_date=date(2027, 12, 31),
+        )
+        self.version.refresh_from_db()
+        self.assertIsNotNone(self.version.valid_to)
+        new_version = self.employee.current_version
+        self.assertEqual(new_version.contract_end_date, date(2027, 12, 31))
+        self.assertEqual(new_version.employment_status, EmployeeVersion.EmploymentStatus.FIXED_TERM)
+        decision = ContractRenewalDecision.objects.get(employee_version=self.version)
+        self.assertEqual(decision.resulting_employee_version, new_version)
+        event = EmploymentEvent.objects.get(from_version=self.version)
+        self.assertEqual(event.event_type, EmploymentEvent.EventType.CONTRACT_RENEWAL)
+
+    def test_decide_convert_permanent_clears_the_end_date(self):
+        decide_contract_action(self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.CONVERT_PERMANENT)
+        new_version = self.employee.current_version
+        self.assertEqual(new_version.employment_status, EmployeeVersion.EmploymentStatus.PERMANENT)
+        self.assertIsNone(new_version.contract_end_date)
+        event = EmploymentEvent.objects.get(from_version=self.version)
+        self.assertEqual(event.event_type, EmploymentEvent.EventType.CONTRACT_CONVERSION)
+
+    def test_decide_let_lapse_terminates_with_no_new_version(self):
+        decide_contract_action(self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.LET_LAPSE)
+        self.assertIsNone(self.employee.current_version)
+        event = EmploymentEvent.objects.get(from_version=self.version)
+        self.assertEqual(event.event_type, EmploymentEvent.EventType.TERMINATION)
+        self.assertEqual(event.termination_reason, EmploymentEvent.TerminationReason.CONTRACT_END)
+        decision = ContractRenewalDecision.objects.get(employee_version=self.version)
+        self.assertIsNone(decision.resulting_employee_version)
+
+    def test_decide_twice_raises(self):
+        decide_contract_action(self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.CONVERT_PERMANENT)
+        with self.assertRaises(ContractDecisionError):
+            decide_contract_action(self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.LET_LAPSE)
+
+    def test_decide_accepts_and_can_override_a_recommendation(self):
+        recommend_contract_action(self.version, actor=self.manager, action=ContractRenewalDecision.Action.RENEW, end_date=date(2027, 6, 30))
+        decide_contract_action(self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.RENEW, end_date=date(2027, 12, 31))
+        new_version = self.employee.current_version
+        self.assertEqual(new_version.contract_end_date, date(2027, 12, 31))
