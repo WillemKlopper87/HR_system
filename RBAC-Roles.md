@@ -43,6 +43,29 @@ actually perform it — wrong role at a step is a 403, wrong *state* is a 400. C
 changes the decide row with no code change and no edit here; the frontend reads the required role off the API
 (`next_approver_role`) rather than re-deriving it, so a different chain shape needs no UI change either.
 
+## Module access: contract renewals (roadmap C1 part 2)
+
+Two POST actions on `EmployeeVersionViewSet` (`core_hr/views.py`) plus the read surface of the
+`contract_renewal_decision` they produce. Spec:
+`docs/superpowers/specs/2026-08-20-contract-end-date-tracking-design.md`.
+
+| Action | Roles allowed |
+|---|---|
+| Recommend — `POST /api/v1/employee-versions/{id}/recommend_contract/` | **line_manager, and only for an employee in their own reporting chain.** The check is `has_role(actor, "line_manager") **and** is_in_reporting_chain(actor, subject)` — deliberately both. `has_role` is scope-blind and `RowScopePermission` grants object access if *any* active role covers the target, so `has_role` alone would let anyone holding line_manager **plus** any `row_scope=all` role recommend for the whole organisation. That combination is normal in production: line_manager is derived from having direct reports (see the group-mapping table below), so an hr_head or ee_manager with reports holds both. `is_in_reporting_chain` is transitive, so a skip-level manager may also recommend; the UI offers the button to the direct manager only |
+| Decide — `POST /api/v1/employee-versions/{id}/decide_contract/` | **hr_admin only** (all-scope by design — deciding is an HR act, not a team-scoped one). Any other role gets 403, *including* the recommending manager and an auditor with full row access |
+| Read — the nested `contract_renewal_decision` on `GET /api/v1/employee-versions/…` | Any role whose row scope reaches the record **and** which holds `I:read` — that is **hr_admin · auditor · ee_manager · recruiter · comp_manager** (all `row_scope=all`), plus the subject's own line_manager (`own_team`). `sysadmin` and `accounting_officer` are excluded because both hold `I:read=False`. **On top of that**, the record's own subject is hidden from their decision unless they separately hold one of hr_admin/auditor/manager-of-themselves — a row-relational gate in `core_hr/serializers.py`, not a tier one, since the base `employee` role's self scope grants `I:read` on their own row |
+
+The read surface is genuinely wider than the C1 part 2 spec's §6 table first claimed, and that is **documented
+rather than "fixed"**. Field tiers gate by *data sensitivity*, not identity — that invariant is what makes
+`FIELD_TIERS` readable at a glance — so adding a per-role allowlist there to exclude ee_manager/recruiter/
+comp_manager would break it for every other consumer. A dedicated endpoint instead would mean duplicating the
+row-scope + field-tier + subject-gate stack the sprint plan's hard rule exists to prevent. Internal was still the
+right tier: it admits every intended consumer and excludes `sysadmin`, which was the actual over-exposure.
+
+Wrong role is a 403 from the view; wrong *state* (already recommended, already decided, not fixed-term, not the
+current version, a renewal end date that isn't after the current one) is a 400 from
+`core_hr/contracts.py` — the same split `establishment` uses.
+
 ## Entra ID group mapping (draft — confirm names with IT, ADR-004)
 
 | Entra group | Role |

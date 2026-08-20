@@ -41,6 +41,7 @@
 | citizenship_status | enum | ✔ | S | sa_citizen_birth_descent / sa_naturalised_pre_1994 / sa_naturalised_post_1994 / foreign_national. **EEA matrices race only citizens; Foreign Nationals are separate M/F columns** (see `EEA-Form-Spec-Notes.md`) |
 | location | FK location | ✔ | I | Province needed for EEA2 |
 | position | FK position, null | | P | *(roadmap C1)* The specific approved post this version occupies (`establishment.position`, §3); `SET_NULL`. **This column is what makes occupancy derivable** — a post is filled iff a current version points at it. Carried forward across promotions/transfers (`VERSION_CARRY_FIELDS`) so a version change never silently vacates the post; a partial unique index (`one_current_occupant_per_position`, on `valid_to IS NULL`) enforces at most one current occupant per post. Null = predates establishment control, or holds no numbered post |
+| contract_end_date | date, null | | P | *(roadmap C1 part 2)* The date this version's fixed-term contract expires. **Meaningful only when `employment_status = fixed_term`; ignored otherwise.** Nullable by design — existing fixed-term employees got no backfill migration; they are surfaced by the `missing_contract_end_date` data-quality check instead (§7 of the C1 part 2 spec), and cleared one-off through Django admin. Carried forward across promotions/transfers (`VERSION_CARRY_FIELDS`), for the same reason `position` is: an unrelated version change must not silently wipe a still-running contract and stop its reminders. Drives the daily expiry-reminder sweep (`core_hr/contract_reminders.py`) and the renew/convert/lapse decision workflow below. Set explicitly (overriding carry-forward) by `decide_contract_action`: the new date on a renewal, `NULL` on a conversion to permanent |
 | race | enum | ✔* | S | **EEA categories: African / Coloured / Indian / White** (+ foreign national flags per EEA2). *Required for EE reporting (legal obligation); "not disclosed" allowed pending self-ID |
 | gender | enum | ✔* | S | Male / Female per current EEA2 spec (verify against A3; store separately from self-described gender identity if captured) |
 | disability_status | enum + detail | | S | Self-ID only; consent-gated |
@@ -51,11 +52,51 @@
 | Field | Type | Req | Tier | Notes |
 |---|---|---|---|---|
 | employee | FK | ✔ | I | |
-| event_type | enum | ✔ | I | hire / promotion / transfer / grade_change / termination / contract_conversion |
+| event_type | enum | ✔ | I | hire / promotion / transfer / grade_change / termination / contract_conversion / contract_renewal |
 | effective_date | date | ✔ | I | |
 | termination_reason | enum, null | ✔ if termination | I | **EEA2 movement categories:** resignation / dismissal_misconduct / dismissal_incapacity / operational_requirements / retirement / death / contract_end / other |
 | from_version / to_version | FK employee_version | | — | Links the version rows the event closed/opened |
 | notes | text | | I | |
+
+### contract_renewal_decision (roadmap C1 part 2 — fixed-term renew / convert / lapse)
+
+The recommend → decide workflow for a fixed-term contract approaching its `employee_version.contract_end_date`.
+Spec: `docs/superpowers/specs/2026-08-20-contract-end-date-tracking-design.md`.
+
+**One row per expiry, and the row only exists once someone has acted** — there is no synthetic "pending, nothing
+happened yet" row, so the reminder sweep's "who hasn't acted" query runs off `employee_version.contract_end_date`
+directly, never off this table. hr_admin may decide without a prior recommendation (the escalation path), in which
+case the row is created straight at `status=decided` with every `recommended_*` column null.
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| employee_version | O2O employee_version | ✔ | I | `CASCADE`; `related_name="contract_renewal_decision"`. One-to-one, which is what makes "already actioned" a database fact rather than a query |
+| status | enum | ✔ | I | recommended / decided. `decided` is terminal — there is no undo and no revise (contrast `position_approval_step`, §3, which has a rejection path back to draft; here hr_admin's decision is final and executes immediately) |
+| recommended_action | enum, null | | I | renew / convert_permanent / let_lapse. Null on the hr_admin-decides-directly path |
+| recommended_by | FK employee, null | | I | `PROTECT`; the line manager who recommended |
+| recommended_at | datetime, null | | I | |
+| recommended_comment | text | | I | The manager's motivation |
+| recommended_end_date | date, null | | I | Meaningful only when `recommended_action = renew` |
+| decided_action | enum, null | | I | Same three choices; hr_admin may accept the recommendation as-is or override it |
+| decided_by | FK employee, null | | I | `PROTECT`; the deciding hr_admin |
+| decided_at | datetime, null | | I | Also the `effective_date` of the resulting lifecycle event |
+| decided_comment | text | | I | |
+| decided_end_date | date, null | | I | Meaningful only when `decided_action = renew`; becomes the new version's `contract_end_date` |
+| resulting_employee_version | FK employee_version, null | | I | `SET_NULL`. The version the decision opened. Null for `let_lapse` — a termination closes the current version without opening a successor |
+
+Deciding **records and executes in one transaction**, the same way `position.decide_step` both records and advances
+state: each action calls `Employee.apply_lifecycle_event()`, so the resulting `employment_event` row is ordinary
+EEA2 workforce-movement data with no special-casing — `contract_renewal` for a renewal, `contract_conversion` for a
+conversion to permanent, `termination` + `termination_reason=contract_end` for a lapse. Both service functions are
+guarded to the employee's **current, fixed-term** version: they are the only API-reachable callers of
+`apply_lifecycle_event` in the backend, so nothing else prevents a lapse against a permanent employee (corrupt
+statutory data) or a decision recorded against a historical version while the event closes the current one.
+
+`simple_history` is enabled (`HistoricalRecords`), so amendments to a row are themselves an audit trail; the
+`recommended_by`/`decided_by` columns carry the actor without a separate `log_access` write, the same precedent
+`establishment` sets. Access is gated by field tier on the **nested** `contract_renewal_decision` field of
+`EmployeeVersionSerializer` (registered Internal in `rbac_audit/tiers.py`) plus a row-relational check that hides
+it from the subject of the decision — see `RBAC-Roles.md` for who can actually read and write it.
 
 ### department / job_grade / location
 

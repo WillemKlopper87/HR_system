@@ -1,6 +1,9 @@
 # Contract End-Date Tracking & Renewal Decisions — Design Spec
 
-**Status:** Approved by user, ready for implementation planning.
+**Status:** Approved by user; **built and shipped 2026-08-20** (`921f2a4` + final-review fixes).
+**Amendments:** §6 and §9 were corrected during the final whole-branch review to describe what was actually built
+rather than what the spec first assumed — the amended passages are marked *(amended 2026-08-20, final review)*.
+This spec is a living document: it stays the description of the shipped system, not a frozen proposal.
 **Part of:** C1 (Position/establishment control), part 2 of 3. Part 1 (Position/establishment) shipped 2026-08-20 (`b34bfb7`). Part 3 (onboarding/offboarding checklists + termination cascades) is separate future work.
 
 ## 1. Purpose
@@ -69,7 +72,7 @@ class ContractRenewalDecision(TimestampedModel):
 
 ## 4. Decision Flow & State Machine
 
-- **Manager recommends** (`recommend_contract_action(employee_version, *, actor, action, comment="", end_date=None)`): creates the row (if none exists) at `status=RECOMMENDED`. Raises if a row already exists for this version (no re-recommending — matches this codebase's existing "no double-submit" pattern from Position's `submit_for_approval`). `end_date` required when `action=RENEW`, must be after the version's current `contract_end_date`; ignored otherwise.
+- **Manager recommends** (`recommend_contract_action(employee_version, *, actor, action, comment="", end_date=None)`): creates the row (if none exists) at `status=RECOMMENDED`. Raises if a row already exists for this version (no re-recommending — matches this codebase's existing "no double-submit" pattern from Position's `submit_for_approval`). `end_date` required when `action=RENEW`, must be after the version's current `contract_end_date`; ignored otherwise. *(amended 2026-08-20, final review: this ordering rule was dropped by the plan and is now enforced in `contracts.py` for **both** functions. Where the version has no `contract_end_date` at all — §7's un-backfilled population — the bound falls back to today rather than being skipped: with no prior end to extend past, the hazard is identical, and the resulting version is created with today's effective date either way, so an end date on or before today describes a contract that is over before it starts. Genuine historical corrections go through Django admin, per §7, not through this workflow.)*
 - **hr_admin decides** (`decide_contract_action(employee_version, *, actor, action, comment="", end_date=None)`): creates the row if none exists, or updates an existing `RECOMMENDED` row. Raises if the row is already `DECIDED` (no re-deciding, same idempotency guard as Position's `decide_step`). Sets `status=DECIDED`, then **executes immediately, in the same transaction** — deciding and executing are one action, not two, matching how Position's `decide_step` both records and advances state in one call:
 All three call `Employee.apply_lifecycle_event()` (`core_hr/models.py:231`) directly — the existing close-current/open-next mechanism every version change already goes through, which also carries `VERSION_CARRY_FIELDS` forward and records the linking `EmploymentEvent` automatically. No new version-management logic; this spec only supplies the `event_type` and `field_updates` for each action:
   - `RENEW`: `apply_lifecycle_event(event_type=CONTRACT_RENEWAL, effective_date=<today>, contract_end_date=decided_end_date)`. **`CONTRACT_RENEWAL` is a new `EmploymentEvent.EventType` choice this spec adds** — `employment_status` carries forward unchanged (still `FIXED_TERM`), only `contract_end_date` is overridden. Sets `resulting_employee_version` to the new version (`to_version` on the created `EmploymentEvent`).
@@ -97,16 +100,41 @@ Daily Celery task (`core_hr/tasks.py`, added to `CELERY_BEAT_SCHEDULE` alongside
 
 ## 6. Access Control
 
-New `ContractPermission` (shaped like `EstablishmentPermission`):
+*(amended 2026-08-20, final review — the write rules stand as designed; the read row now describes the real
+surface, which is wider than this table originally claimed.)*
 
 | Action | Roles |
 |---|---|
 | Read (own reports) | line manager |
-| Read (all) | hr_admin, auditor |
-| Recommend | line manager, own direct reports only |
+| Read (all) | hr_admin, auditor — **and, in fact, `ee_manager`, `recruiter` and `comp_manager` too** (see below) |
+| Recommend | line manager, **own reporting chain** (transitive/skip-level, not direct reports only — see below) |
 | Decide | hr_admin only |
 
-No `comp_manager`/`accounting_officer` involvement — this is a manager+HR administrative decision, not a budget/establishment-control one (contrast Position/establishment's 3-role chain).
+**Recommend is scoped to the reporting chain, not "direct reports only."** The check as built is
+`has_role(actor, "line_manager") and is_in_reporting_chain(actor, subject)` — both halves are needed, because
+`has_role` is scope-blind and `RowScopePermission` grants object access if *any* active role covers the target, so
+`has_role` alone let anyone holding line_manager **plus** any `row_scope=all` role recommend for the whole
+organisation. `is_in_reporting_chain` is the codebase-wide "own team" primitive (it is what backs
+`row_scope=own_team` itself) and is transitive, so a skip-level manager may recommend as well; the spec is amended
+to the codebase convention rather than the backend being bent to the spec's stricter original wording. The
+frontend still offers the Recommend button to the **direct** manager only — a deliberate asymmetry (the UI shows
+the affordance to the person who actually holds the contract conversation; a skip-level manager acting is an
+exception, not the default path).
+
+**The read surface is genuinely broader than "hr_admin, auditor", and that is documented rather than "fixed."**
+`contract_renewal_decision` is gated as an Internal-tier field on `EmployeeVersionSerializer`, so *any* role with
+`row_scope=all` and `I:read=True` can read it: that is `ee_manager`, `recruiter` **and** `comp_manager`, on top of
+the two intended ones. `accounting_officer` and `sysadmin` are correctly excluded — both hold `I:read=False`.
+This is a structural property of the field-tier system: tiers gate by **data sensitivity, not identity**. The
+final review considered and explicitly rejected both alternatives — adding per-role allowlists to `FIELD_TIERS`
+would break the invariant that makes that table readable at a glance for every other consumer, and a dedicated
+endpoint would mean duplicating the row-scope/tier/subject-gate stack that the sprint plan's hard rule forbids.
+Internal remains the right tier: it admits every intended consumer and excludes `sysadmin`, which was the actual
+over-exposure this feature closed. On top of the tier, a row-relational check in `core_hr/serializers.py` hides a
+decision from its own subject unless they separately hold hr_admin, auditor, or manager-over-themselves.
+
+No `accounting_officer` involvement in the *workflow* — this is a manager+HR administrative decision, not a
+budget/establishment-control one (contrast Position/establishment's 3-role chain).
 
 ## 7. Existing Data & the Data-Quality Registry
 
@@ -126,6 +154,18 @@ New page, `/contract-renewals`, following `PositionsPage.tsx`'s established thre
 - hr_admin's view: a "Decide" action on any row not yet `DECIDED`, pre-filled with the manager's recommendation if one exists, editable before submitting.
 - Summary stats mirroring `PositionsPage.tsx`'s vacancy-stats block: count expiring within `CONTRACT_REMINDER_OFFSETS_DAYS[0]` days, count awaiting a manager recommendation past the escalation threshold, count decided this month.
 
+*(amended 2026-08-20, final review — what was actually built, and why.)* "Count decided this month" was replaced
+during implementation with **"awaiting HR decision"**, on the reasoning that a decided version can never appear in
+the list: `decide_contract_action` always closes the just-decided version via `apply_lifecycle_event`, so it drops
+out immediately. That reasoning was right about the *plan*, not about *this spec* — the unreachability came from
+the plan's choice to fetch the list as `?current=true`; §9 above never said "current". `GET
+/employee-versions/?fixed_term=true` on its own returns the closed versions with their nested decision, so the
+decided stat was reachable all along without any new endpoint. The final review restored it: the page now issues a
+second, non-current fetch and shows **both** stats — "awaiting HR decision" (a genuinely useful addition, since a
+recommendation persists on a still-current version) **and** "decided this month", plus a compact list of those
+decisions. That list is the only read surface a decided outcome has anywhere in the app; without it, submitting a
+decision made it vanish from the user's view. A full decision-history view remains out of scope.
+
 ## 10. Testing
 
 Standard TDD for this project:
@@ -138,4 +178,4 @@ Standard TDD for this project:
 ## 11. Known Boundaries
 
 - A contract can only be renewed, converted, or let lapse once per expiry — there's no "undo" or "revise a decided outcome" action (contrast Position's `revise_and_resubmit`, which exists because a *rejected* Position needs a path back to draft; there's no equivalent rejection state here, since hr_admin's decision is final and immediately executed). If a decision turns out to be wrong, fixing it means directly correcting the resulting `EmployeeVersion` through existing means, same as correcting any other historical HR record today.
-- No SLA/overdue alerting beyond the reminder offsets and escalation threshold — if hr_admin also lets an escalated contract run past its end date with no decision, nothing currently auto-terminates or auto-flags it as breached. Worth a future data-quality check (fixed-term, past end date, no `DECIDED` `ContractRenewalDecision`) if this proves to be a real gap in practice — not built speculatively now.
+- No SLA/overdue alerting beyond the reminder offsets and escalation threshold — if hr_admin also lets an escalated contract run past its end date with no decision, nothing currently auto-terminates or auto-flags it as breached. Worth a future data-quality check (fixed-term, past end date, no `DECIDED` `ContractRenewalDecision`) if this proves to be a real gap in practice — not built speculatively now. *(amended 2026-08-20, final review: still deferred, and now on a firmer footing — §4's ordering rule closes the main way to **create** an already-expired fixed-term version in the first place, so the remaining exposure is a contract that quietly runs past its date with nobody deciding, not one minted expired by a typo.)*
