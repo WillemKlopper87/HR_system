@@ -1,7 +1,7 @@
 from rbac_audit.consent import has_active_consent
 from rbac_audit.drf import TieredModelSerializer, get_request_employee
 from rbac_audit.models import ConsentRecord
-from rbac_audit.permissions import has_role
+from rbac_audit.permissions import has_role, is_in_reporting_chain
 from rest_framework import serializers
 
 from .models import (
@@ -48,9 +48,34 @@ class EmployeeVersionSerializer(TieredModelSerializer):
 
     def get_contract_renewal_decision(self, obj):
         try:
-            return ContractRenewalDecisionSerializer(obj.contract_renewal_decision).data
+            decision = obj.contract_renewal_decision
         except ContractRenewalDecision.DoesNotExist:
             return None
+        # Design spec Sec2, explicitly out of scope: "the employee does not
+        # see or participate in this workflow -- only the outcome (their
+        # employment record changing) is visible to them" (contract_end_date
+        # stays visible -- that IS the outcome; PUBLIC-tier, untouched by
+        # this check). This is a row-relational gate, not a field-tier one:
+        # the base "employee" role's self row-scope grants I:read on the
+        # subject's own row same as everyone else's, so tiering alone (see
+        # rbac_audit/tiers.py's INTERNAL registration above) can't exclude
+        # just the subject -- checked here instead. Someone who is ALSO the
+        # subject's line manager, hr_admin, or auditor (design spec Sec6's
+        # three intended-consumer roles) still sees it via that separate
+        # entitlement, the same way they would for anyone else's record --
+        # only a bare subject-with-no-other-entitlement is hidden from it.
+        request = self.context.get("request")
+        requester = get_request_employee(request) if request is not None else None
+        subject = obj.employee
+        if requester is not None and requester.id == subject.id:
+            has_separate_entitlement = (
+                has_role(requester, "hr_admin")
+                or has_role(requester, "auditor")
+                or (has_role(requester, "line_manager") and is_in_reporting_chain(requester, subject))
+            )
+            if not has_separate_entitlement:
+                return None
+        return ContractRenewalDecisionSerializer(decision).data
 
 
 class EmployeeSerializer(TieredModelSerializer):

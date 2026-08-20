@@ -657,3 +657,74 @@ class ContractActionApiTests(TestCase):
         sysadmin_view = self.client.get(f"/api/v1/employee-versions/{version_id}/")
         self.assertEqual(sysadmin_view.status_code, 200, sysadmin_view.data)
         self.assertNotIn("contract_renewal_decision", sysadmin_view.data)
+
+    def test_employee_cannot_see_own_decision_but_can_see_own_contract_end_date(self):
+        # Design spec Sec2, explicitly out of scope: "the employee does not
+        # see or participate in this workflow -- only the outcome (their
+        # employment record changing) is visible to them." contract_end_date
+        # IS that outcome and must stay visible; the decision object
+        # (including its free-text manager/HR comments) must not, even
+        # though tier-wise the base "employee" role holds I:read=True on
+        # its own row -- this is a row-relational gate (is the requester
+        # the record's own subject with no separate entitlement over it),
+        # not a tier one, per the second review round on this task.
+        self.client.force_authenticate(user=self.hr_admin.user)
+        version_id = self.employee.current_version.id
+        decide_response = self.client.post(
+            f"/api/v1/employee-versions/{version_id}/decide_contract/",
+            {"action": "convert_permanent", "comment": "Approved after performance review."}, format="json",
+        )
+        self.assertEqual(decide_response.status_code, 200, decide_response.data)
+
+        self.client.force_authenticate(user=self.employee.user)
+        self_view = self.client.get(f"/api/v1/employee-versions/{version_id}/")
+        self.assertEqual(self_view.status_code, 200, self_view.data)
+        self.assertIsNone(self_view.data["contract_renewal_decision"])
+        self.assertEqual(self_view.data["contract_end_date"], "2026-12-31")
+
+    def test_line_manager_and_hr_admin_still_see_decision_for_that_same_employee(self):
+        # Pins the other direction of the fix above: hiding the decision
+        # from the SUBJECT must not collapse into hiding it from everyone
+        # -- the report's own line_manager and hr_admin (the design spec's
+        # actual intended consumers) still see it exactly as before.
+        self.client.force_authenticate(user=self.hr_admin.user)
+        version_id = self.employee.current_version.id
+        decide_response = self.client.post(
+            f"/api/v1/employee-versions/{version_id}/decide_contract/",
+            {"action": "convert_permanent", "comment": "Approved after performance review."}, format="json",
+        )
+        self.assertEqual(decide_response.status_code, 200, decide_response.data)
+
+        self.client.force_authenticate(user=self.manager.user)
+        manager_view = self.client.get(f"/api/v1/employee-versions/{version_id}/")
+        self.assertEqual(manager_view.status_code, 200, manager_view.data)
+        self.assertIsNotNone(manager_view.data["contract_renewal_decision"])
+
+        self.client.force_authenticate(user=self.hr_admin.user)
+        hr_admin_view = self.client.get(f"/api/v1/employee-versions/{version_id}/")
+        self.assertEqual(hr_admin_view.status_code, 200, hr_admin_view.data)
+        self.assertIsNotNone(hr_admin_view.data["contract_renewal_decision"])
+
+    def test_hr_admin_viewing_own_record_still_sees_decision_via_hr_admin_entitlement(self):
+        # "Someone who happens to be both" (coordinator's framing): an
+        # hr_admin who is also the subject of a decision must still see it,
+        # via their hr_admin entitlement -- the subject-is-requester check
+        # must key on "holds a separate entitlement", not "is this my own
+        # row", or this case would wrongly hide it too.
+        self.client.force_authenticate(user=self.hr_admin.user)
+        own_version = self.hr_admin.current_version
+        own_version.employment_status = EmployeeVersion.EmploymentStatus.FIXED_TERM
+        own_version.contract_end_date = date(2026, 6, 30)
+        own_version.save()
+        version_id = own_version.id
+
+        decide_response = self.client.post(
+            f"/api/v1/employee-versions/{version_id}/decide_contract/",
+            {"action": "convert_permanent", "comment": "Self-approved, no conflict of interest here."},
+            format="json",
+        )
+        self.assertEqual(decide_response.status_code, 200, decide_response.data)
+
+        self_view = self.client.get(f"/api/v1/employee-versions/{version_id}/")
+        self.assertEqual(self_view.status_code, 200, self_view.data)
+        self.assertIsNotNone(self_view.data["contract_renewal_decision"])
