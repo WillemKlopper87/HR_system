@@ -15,13 +15,58 @@ class ContractDecisionError(ValueError):
     """Raised for state-machine violations (re-recommending, re-deciding)."""
 
 
+def _validate_renewal_end_date(employee_version, end_date, *, required_message):
+    """Spec §4: a renewal's new `end_date` "must be after the version's
+    current `contract_end_date`". A renewal *extends* a contract; it must
+    never mint one that already expired.
+
+    Why this is a hard 400 rather than a soft warning: nothing downstream
+    ever surfaces an already-expired fixed-term version again.
+    contract_reminders.py matches `contract_end_date - today` against
+    CONTRACT_REMINDER_OFFSETS_DAYS, so a negative days_remaining can never
+    hit an offset; the MISSING_CONTRACT_END_DATE data-quality check only
+    fires on NULL, not on "set, but in the past"; and spec §11 deliberately
+    defers a past-end-date check. A fat-fingered 2017-12-31 would be a
+    permanent, silent black hole.
+
+    When the version has no `contract_end_date` at all, the comparison
+    falls back to today. Spec §7 leaves the pre-existing fixed-term
+    population un-backfilled (NULL, flagged by MISSING_CONTRACT_END_DATE),
+    so these functions are genuinely reachable with nothing to order
+    against -- and skipping the check there would leave the exact same
+    black hole open through the exact same code path. Today is the weakest
+    bound that still closes it, and it is the honest one: the resulting
+    version is created with today's effective date either way (see
+    `effective_date` below), so an end date on or before today describes a
+    contract that is over before it starts. Genuine historical corrections
+    go through Django admin (spec §7), not through this workflow.
+    """
+    if end_date is None:
+        raise ContractDecisionError(required_message)
+    floor = employee_version.contract_end_date
+    if floor is None:
+        if end_date <= timezone.localdate():
+            raise ContractDecisionError(
+                "The new contract end date must be in the future "
+                "(this version has no current contract end date to extend)."
+            )
+        return
+    if end_date <= floor:
+        raise ContractDecisionError(
+            f"The new contract end date must be after the current one ({floor:%Y-%m-%d})."
+        )
+
+
 def recommend_contract_action(employee_version, *, actor, action, comment="", end_date=None):
     if action not in ContractRenewalDecision.Action.values:
         raise ContractDecisionError(f"'{action}' is not a valid recommendation action.")
     if hasattr(employee_version, "contract_renewal_decision"):
         raise ContractDecisionError("A decision already exists for this contract.")
-    if action == ContractRenewalDecision.Action.RENEW and end_date is None:
-        raise ContractDecisionError("end_date is required when recommending a renewal.")
+    if action == ContractRenewalDecision.Action.RENEW:
+        _validate_renewal_end_date(
+            employee_version, end_date,
+            required_message="end_date is required when recommending a renewal.",
+        )
     return ContractRenewalDecision.objects.create(
         employee_version=employee_version,
         status=ContractRenewalDecision.Status.RECOMMENDED,
@@ -35,8 +80,11 @@ def recommend_contract_action(employee_version, *, actor, action, comment="", en
 
 @transaction.atomic
 def decide_contract_action(employee_version, *, actor, action, comment="", end_date=None):
-    if action == ContractRenewalDecision.Action.RENEW and end_date is None:
-        raise ContractDecisionError("end_date is required when deciding to renew.")
+    if action == ContractRenewalDecision.Action.RENEW:
+        _validate_renewal_end_date(
+            employee_version, end_date,
+            required_message="end_date is required when deciding to renew.",
+        )
 
     decision, _ = ContractRenewalDecision.objects.get_or_create(
         employee_version=employee_version,

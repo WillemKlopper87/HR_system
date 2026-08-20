@@ -9,6 +9,7 @@ from rest_framework.test import APIClient
 
 from .data_quality import run_data_quality_checks
 from .models import (
+    ContractRenewalDecision,
     DataQualityException,
     Department,
     Employee,
@@ -765,3 +766,99 @@ class ContractActionApiTests(TestCase):
         first_decision = EmployeeVersion.objects.get(id=first_version_id).contract_renewal_decision
         self.assertEqual(first_decision.status, "decided")
         self.assertEqual(first_decision.decided_end_date, date(2027, 6, 30))
+
+    def test_unparseable_end_date_is_400_not_500_on_recommend(self):
+        # Final-review finding 1: request.data["end_date"] used to reach
+        # ContractRenewalDecision.objects.create() unvalidated, where
+        # DateField.get_prep_value() raises django.core.exceptions
+        # .ValidationError -- an Exception, NOT a ValueError, so
+        # contracts.py's `except ValueError` never caught it and DRF's
+        # default handler (no EXCEPTION_HANDLER override in settings.py)
+        # never translated it: an unhandled 500. Same defect class
+        # rbac_audit.drf.int_query_param's docstring hardened the read
+        # layer against.
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.employee.current_version.id}/recommend_contract/",
+            {"action": "renew", "end_date": "tomorrow"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("end_date", response.data)
+
+    def test_unparseable_end_date_is_400_not_500_on_decide(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.employee.current_version.id}/decide_contract/",
+            {"action": "renew", "end_date": "tomorrow"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("end_date", response.data)
+
+    def test_unknown_action_is_400_with_field_errors(self):
+        # The hand-rolled `action not in Action.values` check is gone --
+        # the input serializer's ChoiceField reports it instead, keeping
+        # one validation path rather than two.
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.employee.current_version.id}/decide_contract/",
+            {"action": "explode"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("action", response.data)
+
+    def test_past_end_date_is_rejected_on_recommend(self):
+        # Spec §4: the new end_date "must be after the version's current
+        # contract_end_date". Without this a fat-fingered past date
+        # creates a FIXED_TERM version whose contract already expired and
+        # which nothing ever surfaces again (contract_reminders.py can
+        # never match a negative days_remaining; the data-quality check
+        # only fires on NULL).
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.employee.current_version.id}/recommend_contract/",
+            {"action": "renew", "end_date": "2017-12-31"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(
+            ContractRenewalDecision.objects.filter(
+                employee_version=self.employee.current_version
+            ).exists()
+        )
+
+    def test_end_date_equal_to_current_end_date_is_rejected_on_decide(self):
+        # "after", not "on or after" -- re-stamping the same date is not a
+        # renewal, it just burns the one decision this contract gets.
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.employee.current_version.id}/decide_contract/",
+            {"action": "renew", "end_date": "2026-12-31"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+
+    def test_past_end_date_rejected_when_version_has_no_current_end_date(self):
+        # Spec §7 leaves pre-existing fixed-term employees un-backfilled
+        # (contract_end_date IS NULL, flagged by MISSING_CONTRACT_END_DATE),
+        # so these endpoints are reachable with nothing to order against.
+        # The ordering rule falls back to today rather than waving the
+        # renewal through -- the "already-expired fixed-term version"
+        # black hole is identical either way.
+        version = self.employee.current_version
+        version.contract_end_date = None
+        version.save(update_fields=["contract_end_date"])
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{version.id}/decide_contract/",
+            {"action": "renew", "end_date": "2017-12-31"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+
+    def test_future_end_date_still_renews(self):
+        # The positive control for the two rejection tests above: a
+        # genuinely later date is still accepted and still executes.
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.employee.current_version.id}/decide_contract/",
+            {"action": "renew", "end_date": "2027-12-31"}, format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(self.employee.current_version.contract_end_date, date(2027, 12, 31))

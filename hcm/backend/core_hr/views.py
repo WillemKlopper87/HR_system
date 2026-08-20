@@ -20,7 +20,6 @@ from rest_framework.response import Response
 from .contracts import ContractDecisionError, decide_contract_action, recommend_contract_action
 from .data_quality import run_data_quality_checks
 from .models import (
-    ContractRenewalDecision,
     DataQualityException,
     Department,
     Employee,
@@ -31,6 +30,7 @@ from .models import (
 )
 from .permissions import IsHRAdmin, IsHRAdminOrReadOnly
 from .serializers import (
+    ContractActionInputSerializer,
     ContractRenewalDecisionSerializer,
     DataQualityExceptionSerializer,
     DepartmentSerializer,
@@ -96,13 +96,12 @@ class EmployeeVersionViewSet(viewsets.ReadOnlyModelViewSet):
         actor = get_request_employee(request)
         if actor is None or not has_role(actor, "line_manager"):
             return Response({"detail": "Only the line manager can recommend a contract action."}, status=403)
-        action_value = request.data.get("action")
-        if action_value not in ContractRenewalDecision.Action.values:
-            return Response({"detail": "Invalid action."}, status=400)
+        payload = ContractActionInputSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
         try:
             decision = recommend_contract_action(
-                version, actor=actor, action=action_value,
-                comment=request.data.get("comment", ""), end_date=request.data.get("end_date") or None,
+                version, actor=actor, action=payload.validated_data["action"],
+                comment=payload.validated_data["comment"], end_date=payload.validated_data.get("end_date"),
             )
         except ContractDecisionError as exc:
             return Response({"detail": str(exc)}, status=400)
@@ -115,13 +114,12 @@ class EmployeeVersionViewSet(viewsets.ReadOnlyModelViewSet):
         actor = get_request_employee(request)
         if actor is None or not has_role(actor, "hr_admin"):
             return Response({"detail": "Only hr_admin can decide a contract action."}, status=403)
-        action_value = request.data.get("action")
-        if action_value not in ContractRenewalDecision.Action.values:
-            return Response({"detail": "Invalid action."}, status=400)
+        payload = ContractActionInputSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
         try:
             decision = decide_contract_action(
-                version, actor=actor, action=action_value,
-                comment=request.data.get("comment", ""), end_date=request.data.get("end_date") or None,
+                version, actor=actor, action=payload.validated_data["action"],
+                comment=payload.validated_data["comment"], end_date=payload.validated_data.get("end_date"),
             )
         except ContractDecisionError as exc:
             return Response({"detail": str(exc)}, status=400)

@@ -23,6 +23,31 @@ from .models import (
 ESS_EDITABLE_FIELDS = {"preferred_name", "personal_email", "phone"}
 
 
+class ContractActionInputSerializer(serializers.Serializer):
+    """Request-body validation for EmployeeVersionViewSet.recommend_contract
+    /decide_contract. Both actions used to read request.data directly and
+    hand `end_date` straight to the ORM, where DateField.get_prep_value()
+    raises django.core.exceptions.ValidationError -- an Exception, not a
+    ValueError, so neither contracts.py's `except ValueError` nor DRF's
+    default exception handler (settings.py sets no EXCEPTION_HANDLER)
+    caught it: an unparseable date was an unhandled 500. Same defect class
+    rbac_audit.drf.int_query_param already hardened the read layer
+    against; is_valid(raise_exception=True) gives the write layer the
+    equivalent clean 400 with per-field errors.
+
+    This also subsumes the hand-rolled `action not in Action.values`
+    check both view methods used to carry -- one validation path, not two.
+    Ordering ("the new end_date must be after the version's current
+    contract_end_date", spec §4) deliberately stays in core_hr/contracts.py:
+    it is a domain-state rule about the target version, not a shape rule
+    about the payload, and belongs with every other ContractDecisionError
+    per that module's docstring."""
+
+    action = serializers.ChoiceField(choices=ContractRenewalDecision.Action.choices)
+    end_date = serializers.DateField(required=False, allow_null=True)
+    comment = serializers.CharField(required=False, allow_blank=True, default="")
+
+
 class ContractRenewalDecisionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContractRenewalDecision
