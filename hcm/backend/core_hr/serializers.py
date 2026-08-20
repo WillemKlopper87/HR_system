@@ -5,6 +5,7 @@ from rbac_audit.permissions import has_role
 from rest_framework import serializers
 
 from .models import (
+    ContractRenewalDecision,
     DataQualityException,
     Department,
     Employee,
@@ -22,15 +23,34 @@ from .models import (
 ESS_EDITABLE_FIELDS = {"preferred_name", "personal_email", "phone"}
 
 
+class ContractRenewalDecisionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContractRenewalDecision
+        fields = [
+            "id", "status",
+            "recommended_action", "recommended_by", "recommended_at", "recommended_comment", "recommended_end_date",
+            "decided_action", "decided_by", "decided_at", "decided_comment", "decided_end_date",
+            "resulting_employee_version",
+        ]
+
+
 class EmployeeVersionSerializer(TieredModelSerializer):
+    contract_renewal_decision = serializers.SerializerMethodField()
+
     class Meta:
         model = EmployeeVersion
         fields = [
             "id", "employee", "valid_from", "valid_to", "department", "job_title",
             "occupational_level", "job_grade", "manager", "employment_status",
-            "citizenship_status", "location", "race", "gender", "disability_status",
-            "disability_detail", "race_source", "disability_source",
+            "citizenship_status", "location", "contract_end_date", "contract_renewal_decision",
+            "race", "gender", "disability_status", "disability_detail", "race_source", "disability_source",
         ]
+
+    def get_contract_renewal_decision(self, obj):
+        try:
+            return ContractRenewalDecisionSerializer(obj.contract_renewal_decision).data
+        except ContractRenewalDecision.DoesNotExist:
+            return None
 
 
 class EmployeeSerializer(TieredModelSerializer):

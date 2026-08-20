@@ -17,10 +17,21 @@ from rest_framework import permissions, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
+from .contracts import ContractDecisionError, decide_contract_action, recommend_contract_action
 from .data_quality import run_data_quality_checks
-from .models import DataQualityException, Department, Employee, EmployeeVersion, JobGrade, Location, OccupationalLevel
+from .models import (
+    ContractRenewalDecision,
+    DataQualityException,
+    Department,
+    Employee,
+    EmployeeVersion,
+    JobGrade,
+    Location,
+    OccupationalLevel,
+)
 from .permissions import IsHRAdmin, IsHRAdminOrReadOnly
 from .serializers import (
+    ContractRenewalDecisionSerializer,
     DataQualityExceptionSerializer,
     DepartmentSerializer,
     EmployeeSerializer,
@@ -50,6 +61,11 @@ class EmployeeVersionViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(employee_id=employee_id)
         if self.request.query_params.get("current") == "true":
             queryset = queryset.current()
+        if self.request.query_params.get("fixed_term") == "true":
+            queryset = queryset.filter(
+                employment_status=EmployeeVersion.EmploymentStatus.FIXED_TERM,
+                contract_end_date__isnull=False,
+            )
 
         if self.action != "list":
             # Detail lookups must NOT be row-scope-filtered here: DRF's
@@ -65,6 +81,51 @@ class EmployeeVersionViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_target_employee(self, obj):
         return obj.employee
+
+    @action(detail=True, methods=["post"])
+    def recommend_contract(self, request, pk=None):
+        """Line manager only (RBAC-Roles.md; C1 part 2 design spec §3.2).
+        get_object() above already ran RowScopePermission.has_object_permission
+        -- an hr_admin/auditor (row_scope=ALL) or the target's own manager
+        (row_scope=own_team, via the reporting chain) reaches this body;
+        anyone else already got a RowScopePermission-driven 403. has_role()
+        narrows further: row access alone doesn't mean "is this specific
+        person's manager" -- an auditor has row access too but must never
+        recommend."""
+        version = self.get_object()
+        actor = get_request_employee(request)
+        if actor is None or not has_role(actor, "line_manager"):
+            return Response({"detail": "Only the line manager can recommend a contract action."}, status=403)
+        action_value = request.data.get("action")
+        if action_value not in ContractRenewalDecision.Action.values:
+            return Response({"detail": "Invalid action."}, status=400)
+        try:
+            decision = recommend_contract_action(
+                version, actor=actor, action=action_value,
+                comment=request.data.get("comment", ""), end_date=request.data.get("end_date") or None,
+            )
+        except ContractDecisionError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return Response(ContractRenewalDecisionSerializer(decision).data)
+
+    @action(detail=True, methods=["post"])
+    def decide_contract(self, request, pk=None):
+        """hr_admin only -- same layering as recommend_contract above."""
+        version = self.get_object()
+        actor = get_request_employee(request)
+        if actor is None or not has_role(actor, "hr_admin"):
+            return Response({"detail": "Only hr_admin can decide a contract action."}, status=403)
+        action_value = request.data.get("action")
+        if action_value not in ContractRenewalDecision.Action.values:
+            return Response({"detail": "Invalid action."}, status=400)
+        try:
+            decision = decide_contract_action(
+                version, actor=actor, action=action_value,
+                comment=request.data.get("comment", ""), end_date=request.data.get("end_date") or None,
+            )
+        except ContractDecisionError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return Response(ContractRenewalDecisionSerializer(decision).data)
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
