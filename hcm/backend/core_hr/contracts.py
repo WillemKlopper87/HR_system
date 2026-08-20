@@ -55,25 +55,42 @@ def decide_contract_action(employee_version, *, actor, action, comment="", end_d
     employee = employee_version.employee
     effective_date = decision.decided_at.date()
 
-    if action == ContractRenewalDecision.Action.RENEW:
-        event = employee.apply_lifecycle_event(
-            event_type=EmploymentEvent.EventType.CONTRACT_RENEWAL, effective_date=effective_date,
-            contract_end_date=end_date,
-        )
-        decision.resulting_employee_version = event.to_version
-    elif action == ContractRenewalDecision.Action.CONVERT_PERMANENT:
-        event = employee.apply_lifecycle_event(
-            event_type=EmploymentEvent.EventType.CONTRACT_CONVERSION, effective_date=effective_date,
-            employment_status=EmployeeVersion.EmploymentStatus.PERMANENT, contract_end_date=None,
-        )
-        decision.resulting_employee_version = event.to_version
-    elif action == ContractRenewalDecision.Action.LET_LAPSE:
-        employee.apply_lifecycle_event(
-            event_type=EmploymentEvent.EventType.TERMINATION, effective_date=effective_date,
-            termination_reason=EmploymentEvent.TerminationReason.CONTRACT_END,
-        )
-    else:
-        raise ContractDecisionError(f"'{action}' is not a valid decision action.")
+    try:
+        if action == ContractRenewalDecision.Action.RENEW:
+            event = employee.apply_lifecycle_event(
+                event_type=EmploymentEvent.EventType.CONTRACT_RENEWAL, effective_date=effective_date,
+                contract_end_date=end_date,
+            )
+            decision.resulting_employee_version = event.to_version
+        elif action == ContractRenewalDecision.Action.CONVERT_PERMANENT:
+            event = employee.apply_lifecycle_event(
+                event_type=EmploymentEvent.EventType.CONTRACT_CONVERSION, effective_date=effective_date,
+                employment_status=EmployeeVersion.EmploymentStatus.PERMANENT, contract_end_date=None,
+            )
+            decision.resulting_employee_version = event.to_version
+        elif action == ContractRenewalDecision.Action.LET_LAPSE:
+            employee.apply_lifecycle_event(
+                event_type=EmploymentEvent.EventType.TERMINATION, effective_date=effective_date,
+                termination_reason=EmploymentEvent.TerminationReason.CONTRACT_END,
+            )
+        else:
+            raise ContractDecisionError(f"'{action}' is not a valid decision action.")
+    except ContractDecisionError:
+        # Pass through unchanged -- the invalid-action branch above raises
+        # its own ContractDecisionError (itself a ValueError subclass); it
+        # must not fall into the generic ValueError handling below and get
+        # double-wrapped with a misleading message.
+        raise
+    except ValueError as exc:
+        # apply_lifecycle_event's own state-machine guards (e.g. a second
+        # same-day decision landing on a version whose valid_from is also
+        # today) raise a bare ValueError it isn't this layer's job to know
+        # about. Translate it into the same 400 path every other
+        # state-machine violation in this module uses, instead of letting
+        # it surface as an unhandled 500.
+        raise ContractDecisionError(
+            "This employee's record already changed today — try again tomorrow."
+        ) from exc
 
     decision.save()
     return decision

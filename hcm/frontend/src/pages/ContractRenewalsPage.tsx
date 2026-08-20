@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { api, ApiError } from '../api/client'
-import { useAllPages } from '../api/hooks'
+import { api, ApiError, fetchAllPages } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import {
   CONTRACT_ACTION_LABELS,
   type ContractAction,
@@ -23,17 +23,23 @@ function daysUntil(dateStr: string): number {
   return Math.round((target.getTime() - today.getTime()) / 86_400_000)
 }
 
-function isDecidedThisMonth(decidedAt: string): boolean {
-  const decided = new Date(decidedAt)
-  const now = new Date()
-  return decided.getFullYear() === now.getFullYear() && decided.getMonth() === now.getMonth()
-}
-
 export function ContractRenewalsPage() {
-  const { data: contracts, error: loadError, reload: load } = useAllPages<EmployeeVersion>(
-    '/employee-versions/?fixed_term=true&current=true', [], 'Failed to load contracts.',
+  // Combined into one fetch (matching CompProposalsPage/BenefitsPage/
+  // EmployeeListPage's established pattern) rather than two independent
+  // useAllPages hooks: one loading state, one error surface, and both
+  // datasets land together instead of the row-name lookup racing the
+  // contracts list on first paint.
+  const { data, error: loadError, reload: load } = useApiQuery(
+    () =>
+      Promise.all([
+        fetchAllPages<EmployeeVersion>('/employee-versions/?fixed_term=true&current=true'),
+        fetchAllPages<Employee>('/employees/'),
+      ]).then(([contracts, employees]) => ({ contracts, employees })),
+    [],
+    { errorMessage: 'Failed to load contracts.' },
   )
-  const { data: employees } = useAllPages<Employee>('/employees/', [], 'Failed to load employees.')
+  const contracts = data?.contracts ?? null
+  const employees = data?.employees ?? null
 
   const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
   const nameFor = (id: number | null) => {
@@ -51,9 +57,15 @@ export function ContractRenewalsPage() {
       c.contract_end_date !== null &&
       daysUntil(c.contract_end_date) <= ESCALATION_THRESHOLD_DAYS,
   ).length ?? 0
-  const decidedThisMonthCount = contracts?.filter(
-    (c) => c.contract_renewal_decision?.status === 'decided' && c.contract_renewal_decision.decided_at !== null &&
-      isDecidedThisMonth(c.contract_renewal_decision.decided_at),
+  // Not "decided this month": decide_contract_action always closes the
+  // just-decided version as of today (core_hr/contracts.py), so it drops
+  // out of this ?current=true list the instant it's decided -- a "decided"
+  // count here would read 0 in practice, permanently. "Awaiting HR
+  // decision" is the equivalent stat the data actually supports:
+  // recommend_contract_action never calls apply_lifecycle_event, so a
+  // RECOMMENDED decision does persist on a still-current version.
+  const awaitingHrDecisionCount = contracts?.filter(
+    (c) => c.contract_renewal_decision?.status === 'recommended',
   ).length ?? 0
 
   return (
@@ -65,7 +77,8 @@ export function ContractRenewalsPage() {
       {contracts && (
         <p className="hint-text">
           {expiringSoonCount} expiring within {REMINDER_THRESHOLD_DAYS} days · {awaitingRecommendationCount} awaiting
-          recommendation (≤{ESCALATION_THRESHOLD_DAYS} days left) · {decidedThisMonthCount} decided this month
+          manager recommendation (≤{ESCALATION_THRESHOLD_DAYS} days left) · {awaitingHrDecisionCount} awaiting HR
+          decision
         </p>
       )}
 

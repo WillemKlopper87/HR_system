@@ -728,3 +728,40 @@ class ContractActionApiTests(TestCase):
         self_view = self.client.get(f"/api/v1/employee-versions/{version_id}/")
         self.assertEqual(self_view.status_code, 200, self_view.data)
         self.assertIsNotNone(self_view.data["contract_renewal_decision"])
+
+    def test_second_same_day_decide_on_resulting_version_is_400_not_500(self):
+        # RENEW/CONVERT_PERMANENT close the current version today and open a
+        # NEW one via apply_lifecycle_event -- that new version's valid_from
+        # is also today. Deciding *that* new version again the same day
+        # used to hit apply_lifecycle_event's own
+        # "effective_date <= current.valid_from" guard, which raises a bare
+        # ValueError decide_contract_action's `except ContractDecisionError`
+        # doesn't catch -- an unhandled 500. task-3-report.md already
+        # flagged this exact failure mode by name (in the different but
+        # related test_deciding_twice_is_400_not_500 scenario: re-deciding
+        # the SAME version) and routed the test around it rather than
+        # fixing the underlying gap; this test targets the fix directly.
+        self.client.force_authenticate(user=self.hr_admin.user)
+        first_version_id = self.employee.current_version.id
+        first = self.client.post(
+            f"/api/v1/employee-versions/{first_version_id}/decide_contract/",
+            {"action": "renew", "end_date": "2027-06-30", "comment": "First renewal."}, format="json",
+        )
+        self.assertEqual(first.status_code, 200, first.data)
+        resulting_version_id = first.data["resulting_employee_version"]
+        self.assertIsNotNone(resulting_version_id)
+
+        second = self.client.post(
+            f"/api/v1/employee-versions/{resulting_version_id}/decide_contract/",
+            {"action": "renew", "end_date": "2027-12-31", "comment": "Second, same-day decide."}, format="json",
+        )
+        self.assertEqual(second.status_code, 400, second.data)
+
+        # The first decision's effects must remain intact -- not rolled
+        # back or corrupted by the second (rejected) attempt's transaction.
+        current = self.employee.current_version
+        self.assertEqual(current.id, resulting_version_id)
+        self.assertEqual(current.contract_end_date, date(2027, 6, 30))
+        first_decision = EmployeeVersion.objects.get(id=first_version_id).contract_renewal_decision
+        self.assertEqual(first_decision.status, "decided")
+        self.assertEqual(first_decision.decided_end_date, date(2027, 6, 30))
