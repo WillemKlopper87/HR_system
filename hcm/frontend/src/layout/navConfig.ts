@@ -25,6 +25,11 @@ const ASSESS = ['ee_manager', 'hr_admin'] as const
 const EE = ['hr_admin', 'ee_manager', 'accounting_officer', 'auditor'] as const
 const AUDIT_ROLES = ['hr_admin', 'auditor'] as const
 const CONTRACTS = ['hr_admin', 'line_manager', 'auditor'] as const
+// `manager` is INTERNAL tier and row-scoping means a plain `employee` (row
+// scope `self`) would see a chart containing only themselves — rather than
+// build a bypass endpoint, the page is limited to roles that can see a
+// meaningful tree (matches App.tsx's RequireRole on /org-chart).
+const ORG_CHART = ['hr_admin', 'line_manager', 'auditor', 'ee_manager', 'recruiter', 'comp_manager', 'accounting_officer'] as const
 
 export const NAV_CATEGORIES: readonly NavCategory[] = [
   {
@@ -32,6 +37,7 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
     items: [
       { to: '/employees', label: 'Employees', roles: [] },
       { to: '/org-structure', label: 'Org Structure', roles: [] },
+      { to: '/org-chart', label: 'Org Chart', roles: ORG_CHART },
       { to: '/data-quality', label: 'Data Quality', roles: HR },
       // Folded in here rather than getting its own top-level category
       // containing a single identically-named item: every other category

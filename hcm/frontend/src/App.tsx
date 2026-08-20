@@ -27,6 +27,7 @@ import { AuditLogPage } from './pages/AuditLogPage'
 import { PerformanceRecordsPage } from './pages/PerformanceRecordsPage'
 import { TeamPerformancePage } from './pages/TeamPerformancePage'
 import { MyPoliciesPage } from './pages/MyPoliciesPage'
+import { OrgChartPage } from './pages/OrgChartPage'
 import { OrgStructurePage } from './pages/OrgStructurePage'
 import { PayBandsPage } from './pages/PayBandsPage'
 import { PolicyComplianceDashboardPage } from './pages/PolicyComplianceDashboardPage'
@@ -59,6 +60,15 @@ export default function App() {
             <Route path="/employees" element={<EmployeeListPage />} />
             <Route path="/employees/:id" element={<EmployeeDetailPage />} />
             <Route path="/org-structure" element={<OrgStructurePage />} />
+            <Route
+              element={
+                <RequireRole
+                  roles={['hr_admin', 'line_manager', 'auditor', 'ee_manager', 'recruiter', 'comp_manager', 'accounting_officer']}
+                />
+              }
+            >
+              <Route path="/org-chart" element={<OrgChartPage />} />
+            </Route>
             <Route element={<RequireRole roles={['hr_admin']} />}>
               <Route path="/data-quality" element={<DataQualityPage />} />
               <Route path="/review-cycles" element={<ReviewCyclesPage />} />
