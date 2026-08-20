@@ -5,6 +5,7 @@ this codebase's established 403-vs-400 split: wrong role is a view-layer
 403, wrong state is a service-layer ContractDecisionError -> 400."""
 from __future__ import annotations
 
+from django.db import transaction
 from django.utils import timezone
 
 from .models import ContractRenewalDecision, EmployeeVersion, EmploymentEvent
@@ -15,6 +16,8 @@ class ContractDecisionError(ValueError):
 
 
 def recommend_contract_action(employee_version, *, actor, action, comment="", end_date=None):
+    if action not in ContractRenewalDecision.Action.values:
+        raise ContractDecisionError(f"'{action}' is not a valid recommendation action.")
     if hasattr(employee_version, "contract_renewal_decision"):
         raise ContractDecisionError("A decision already exists for this contract.")
     if action == ContractRenewalDecision.Action.RENEW and end_date is None:
@@ -30,6 +33,7 @@ def recommend_contract_action(employee_version, *, actor, action, comment="", en
     )
 
 
+@transaction.atomic
 def decide_contract_action(employee_version, *, actor, action, comment="", end_date=None):
     if action == ContractRenewalDecision.Action.RENEW and end_date is None:
         raise ContractDecisionError("end_date is required when deciding to renew.")

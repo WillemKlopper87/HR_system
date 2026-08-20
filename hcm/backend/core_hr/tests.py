@@ -1,5 +1,6 @@
 import io
 from datetime import date
+from unittest.mock import patch
 
 import openpyxl
 from django.db import IntegrityError, transaction
@@ -570,3 +571,36 @@ class ContractDecisionServiceTests(TestCase):
         decide_contract_action(self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.RENEW, end_date=date(2027, 12, 31))
         new_version = self.employee.current_version
         self.assertEqual(new_version.contract_end_date, date(2027, 12, 31))
+
+    def test_recommend_rejects_invalid_action(self):
+        with self.assertRaises(ContractDecisionError):
+            recommend_contract_action(self.version, actor=self.manager, action="not_a_real_action")
+        self.assertFalse(
+            ContractRenewalDecision.objects.filter(employee_version=self.version).exists()
+        )
+
+    def test_decide_rolls_back_lifecycle_changes_if_decision_save_fails(self):
+        """Regression guard for atomicity: decide_contract_action performs
+        get_or_create (write #1), apply_lifecycle_event (write #2), then
+        decision.save() (write #3). If the last write fails, the earlier
+        writes must not be left committed -- otherwise the employee's
+        contract could be silently renewed/converted/terminated while the
+        ContractRenewalDecision row is stuck at RECOMMENDED, and a retry
+        would not be blocked by the status check (it isn't DECIDED yet),
+        compounding the inconsistency."""
+        recommend_contract_action(
+            self.version, actor=self.manager, action=ContractRenewalDecision.Action.RENEW,
+            end_date=date(2027, 12, 31),
+        )
+        with patch.object(ContractRenewalDecision, "save", side_effect=RuntimeError("boom")):
+            with self.assertRaises(RuntimeError):
+                decide_contract_action(
+                    self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.RENEW,
+                    end_date=date(2027, 12, 31),
+                )
+        self.version.refresh_from_db()
+        self.assertIsNone(self.version.valid_to)
+        self.assertEqual(self.employee.current_version, self.version)
+        self.assertFalse(EmploymentEvent.objects.filter(from_version=self.version).exists())
+        decision = ContractRenewalDecision.objects.get(employee_version=self.version)
+        self.assertEqual(decision.status, ContractRenewalDecision.Status.RECOMMENDED)
