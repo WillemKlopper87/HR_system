@@ -266,6 +266,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "performance.tasks.run_performance_reminders_task",
         "schedule": 24 * 60 * 60,  # daily 07:00 SAST once beat has a real broker (crontab)
     },
+    # Fixed-term contract-expiry reminders (C1 part 2) -- notifies the line
+    # manager as a contract's end date approaches, escalating to hr_admin.
+    "run-contract-reminders-daily": {
+        "task": "core_hr.tasks.run_contract_reminders_task",
+        "schedule": 24 * 60 * 60,  # daily; crontab(hour=7) once beat runs against a real broker
+    },
 }
 
 # HMAC signing secret for the inbound assessment-provider webhook
@@ -346,3 +352,12 @@ if SENTRY_DSN:
 POSITION_APPROVAL_CHAIN = os.environ.get(
     "POSITION_APPROVAL_CHAIN", "comp_manager,accounting_officer"
 ).split(",")
+
+# Fixed-term contract-expiry reminders (C1 part 2) -- which offsets (days
+# before contract_end_date) fire a line-manager reminder, and how close to
+# expiry an un-actioned contract escalates to hr_admin. See
+# core_hr/contract_reminders.py.
+CONTRACT_REMINDER_OFFSETS_DAYS = [
+    int(d) for d in os.environ.get("CONTRACT_REMINDER_OFFSETS_DAYS", "60,30,14,7").split(",")
+]
+CONTRACT_ESCALATION_DAYS = int(os.environ.get("CONTRACT_ESCALATION_DAYS", "14"))
