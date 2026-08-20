@@ -28,3 +28,7 @@ hcm/backend/e2e.sqlite3
 hcm/frontend/test-results/
 hcm/frontend/playwright-report/
 hcm/frontend/blob-report/
+
+# Superpowers workspace (SDD ledgers/briefs, brainstorming visual-companion
+# sessions) — process scratch, not project artifacts
+.superpowers/
