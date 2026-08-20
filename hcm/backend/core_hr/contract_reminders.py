@@ -60,7 +60,13 @@ def run_contract_reminders(*, dry_run: bool = False) -> dict:
     if hr_admin_versions:
         hr_admins = list(employees_with_role("hr_admin"))
         for version, employee_name, reason in hr_admin_versions:
-            if hr_admins and not dry_run:
+            # Gate the count on a real recipient existing, same as the
+            # manager path's `if version.manager is not None:` -- a run
+            # with zero hr_admin role assignments sent nothing and must
+            # report that, not a phantom event.
+            if not hr_admins:
+                continue
+            if not dry_run:
                 notify_many(
                     hr_admins, kind="contract_reminder",
                     title=f"{employee_name}'s fixed-term contract ends {version.contract_end_date:%d %b %Y} ({reason})",
