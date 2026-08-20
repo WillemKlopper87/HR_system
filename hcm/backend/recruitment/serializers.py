@@ -50,8 +50,20 @@ class RequisitionSerializer(serializers.ModelSerializer):
             # assume a non-empty list.
             return attrs
         headcount = attrs.get("headcount", self.instance.headcount if self.instance else 1)
+        # Where this requisition is actually hiring, as of THIS write --
+        # from the payload if it's being set/changed, otherwise the stored
+        # value. Passed explicitly because on create there is no instance
+        # for validate_requisition_positions to read them off.
+        department = attrs.get("department", self.instance.department if self.instance else None)
+        location = attrs.get("location", self.instance.location if self.instance else None)
         try:
-            validate_requisition_positions(positions, headcount=headcount, requisition=self.instance)
+            validate_requisition_positions(
+                positions,
+                headcount=headcount,
+                requisition=self.instance,
+                requisition_department_id=department.pk if department is not None else None,
+                requisition_location_id=location.pk if location is not None else None,
+            )
         except ValueError as exc:
             raise serializers.ValidationError({"positions": str(exc)})
         return attrs

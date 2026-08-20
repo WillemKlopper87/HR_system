@@ -13,17 +13,41 @@ class StageTransitionError(ValueError):
     pass
 
 
-def validate_requisition_positions(positions, *, headcount: int, requisition=None) -> None:
+def validate_requisition_positions(
+    positions,
+    *,
+    headcount: int,
+    requisition=None,
+    requisition_department_id=None,
+    requisition_location_id=None,
+) -> None:
     """Raises ValueError (caught by the serializer, surfaced as a 400) if
     the linked positions don't satisfy C1's establishment-control rules.
     Already-linked positions (requisition.positions before this call) are
-    exempt from the approved/vacant/unclaimed checks -- a position this
-    SAME requisition already committed to stays valid even once one of its
-    own hires has since filled it; only newly-added positions are held to
-    the strict bar."""
-    if len(positions) != headcount:
+    exempt from the approved/vacant/unclaimed/same-place checks -- a
+    position this SAME requisition already committed to stays valid even
+    once one of its own hires has since filled it; only newly-added
+    positions are held to the strict bar.
+
+    requisition_department_id/requisition_location_id are what a new
+    position must match. They're passed explicitly because on create there
+    is no `requisition` instance yet to read them from; when a requisition
+    IS given they default to its own. If neither source supplies one, that
+    half of the cross-check is skipped rather than guessed at."""
+    if requisition is not None:
+        if requisition_department_id is None:
+            requisition_department_id = requisition.department_id
+        if requisition_location_id is None:
+            requisition_location_id = requisition.location_id
+
+    # Distinct ids, not len(positions): a payload naming the same position
+    # twice ({"positions": [5, 5], "headcount": 2}) would satisfy a raw
+    # length check while the M2M relation dedupes it to a single link,
+    # silently leaving the requisition a position short.
+    distinct_ids = {position.id for position in positions}
+    if len(distinct_ids) != headcount:
         raise ValueError(
-            f"{len(positions)} position(s) linked but headcount is {headcount} -- they must match."
+            f"{len(distinct_ids)} distinct position(s) linked but headcount is {headcount} -- they must match."
         )
 
     already_linked_ids = set(requisition.positions.values_list("id", flat=True)) if requisition else set()
@@ -35,6 +59,15 @@ def validate_requisition_positions(positions, *, headcount: int, requisition=Non
             raise ValueError(f"Position {position.post_number} is not approved yet.")
         if not position.is_vacant:
             raise ValueError(f"Position {position.post_number} is not vacant.")
+        # A requisition hires into its own department and location:
+        # _complete_hire builds the new EmployeeVersion from the
+        # REQUISITION's fields but stamps it with the POSITION, so a
+        # mismatched link would persist a permanent version whose
+        # department/location silently disagrees with its own post.
+        if requisition_department_id is not None and position.department_id != requisition_department_id:
+            raise ValueError(f"Position {position.post_number} belongs to a different department.")
+        if requisition_location_id is not None and position.location_id != requisition_location_id:
+            raise ValueError(f"Position {position.post_number} is at a different location.")
         claimed_by = position.requisitions.exclude(
             status__in=[Requisition.Status.CLOSED, Requisition.Status.FILLED]
         )

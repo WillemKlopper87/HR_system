@@ -227,6 +227,24 @@ class RequisitionPositionValidationApiTests(RecruitmentApiTestCase):
         }, format="json")
         self.assertEqual(response.status_code, 201, response.data)
 
+    def test_create_with_a_position_from_another_department_is_rejected(self):
+        """Proves the serializer actually threads the requisition's own
+        department/location into validate_requisition_positions -- on
+        create there is no instance for it to read them off."""
+        other_dept = Department.objects.create(name="Finance", code="FIN")
+        foreign = Position.objects.create(
+            post_number="P-00002", title="Analyst", department=other_dept, occupational_level=self.level,
+            job_grade=self.grade, location=self.location, status=Position.Status.APPROVED,
+        )
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.post("/api/v1/requisitions/", {
+            "title": "X", "department": self.dept.id, "occupational_level": self.level.id,
+            "job_grade": self.grade.id, "location": self.location.id, "headcount": 1, "status": "open",
+            "positions": [foreign.id],
+        }, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("different department", str(response.data["positions"]))
+
     def test_status_only_patch_on_a_requisition_with_no_positions_succeeds(self):
         """Requisitions that predate establishment control (and the two in
         the demo seed data) have zero linked positions, and the only

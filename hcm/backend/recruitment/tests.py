@@ -182,6 +182,64 @@ class ValidateRequisitionPositionsTests(TestCase):
         other.positions.add(position)
         validate_requisition_positions([position], headcount=1)  # must not raise
 
+    def test_matching_department_and_location_is_valid(self):
+        """The positive half of the cross-check: a position in the same
+        department and at the same location as the requisition asking for
+        it must still link cleanly."""
+        position = _approved_position("P-00001", self.dept, self.level, self.grade, self.location)
+        validate_requisition_positions(
+            [position], headcount=1,
+            requisition_department_id=self.dept.id, requisition_location_id=self.location.id,
+        )  # must not raise
+
+    def test_position_from_another_department_raises(self):
+        """Without this, _complete_hire would persist a permanent
+        EmployeeVersion whose department silently disagrees with its own
+        linked Position."""
+        other_dept = Department.objects.create(name="Finance", code="FIN")
+        position = _approved_position("P-00001", other_dept, self.level, self.grade, self.location)
+        with self.assertRaises(ValueError) as ctx:
+            validate_requisition_positions(
+                [position], headcount=1,
+                requisition_department_id=self.dept.id, requisition_location_id=self.location.id,
+            )
+        self.assertIn("different department", str(ctx.exception))
+
+    def test_position_at_another_location_raises(self):
+        other_location = Location.objects.create(
+            name="Cape Town Office", code="CPT", province=Location.Province.WESTERN_CAPE
+        )
+        position = _approved_position("P-00001", self.dept, self.level, self.grade, other_location)
+        with self.assertRaises(ValueError) as ctx:
+            validate_requisition_positions(
+                [position], headcount=1,
+                requisition_department_id=self.dept.id, requisition_location_id=self.location.id,
+            )
+        self.assertIn("different location", str(ctx.exception))
+
+    def test_department_and_location_fall_back_to_the_requisition(self):
+        """The serializer passes them explicitly (on create there is no
+        instance to read them from), but a caller holding only the
+        requisition must not silently lose the check."""
+        other_dept = Department.objects.create(name="Finance", code="FIN")
+        position = _approved_position("P-00001", other_dept, self.level, self.grade, self.location)
+        requisition = Requisition.objects.create(
+            title="Req", department=self.dept, occupational_level=self.level, job_grade=self.grade,
+            location=self.location, headcount=1, status=Requisition.Status.OPEN,
+        )
+        with self.assertRaises(ValueError) as ctx:
+            validate_requisition_positions([position], headcount=1, requisition=requisition)
+        self.assertIn("different department", str(ctx.exception))
+
+    def test_duplicate_position_ids_do_not_satisfy_headcount(self):
+        """`positions: [5, 5]` with headcount 2 passed a raw len() check,
+        but the M2M relation dedupes to a single link -- silently leaving
+        the requisition one position short of its own headcount."""
+        position = _approved_position("P-00001", self.dept, self.level, self.grade, self.location)
+        with self.assertRaises(ValueError) as ctx:
+            validate_requisition_positions([position, position], headcount=2)
+        self.assertIn("distinct", str(ctx.exception))
+
     def test_already_linked_position_is_allowed_even_once_filled(self):
         """A position this SAME requisition already claimed stays valid
         even after it's since been filled by one of the requisition's own
