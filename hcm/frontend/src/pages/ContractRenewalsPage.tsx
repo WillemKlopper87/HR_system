@@ -128,6 +128,13 @@ function ContractRow({
   const decision = version.contract_renewal_decision
   const daysRemaining = version.contract_end_date !== null ? daysUntil(version.contract_end_date) : null
 
+  // Deliberately stricter than the API, which since the final review
+  // requires `has_role('line_manager') && is_in_reporting_chain(...)` --
+  // and is_in_reporting_chain is transitive, so a skip-level manager may
+  // recommend too. The UI offers the affordance only to the DIRECT
+  // manager (the person who actually knows the contract), while the API
+  // permits the whole chain; a skip-level manager acting is a deliberate
+  // exception, not the default path, so it doesn't need a button.
   const canRecommend = hasRole('line_manager') && version.manager === (user?.employee_id ?? null) && decision === null
   const canDecide = hasRole('hr_admin') && decision?.status !== 'decided'
 

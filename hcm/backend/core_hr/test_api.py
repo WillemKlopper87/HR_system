@@ -963,3 +963,35 @@ class ContractActionApiTests(TestCase):
         # The current version must be untouched — not closed by an event
         # recorded against a different row.
         self.assertEqual(self.employee.current_version.id, current_id)
+
+    def test_all_scope_role_holder_who_is_also_a_line_manager_cannot_recommend_outside_their_chain(self):
+        # Final-review finding 5. has_role() is scope-blind and
+        # RowScopePermission grants object access if ANY active role covers
+        # the target, so `has_role(actor, "line_manager")` alone let an
+        # actor holding line_manager PLUS any row_scope=all role recommend
+        # for every employee in the organisation — contradicting spec §6
+        # and re-opening the cross-role composition hazard
+        # can_access_tier_for_target exists to close. Not hypothetical:
+        # RBAC-Roles.md derives line_manager from having direct reports, so
+        # in production an hr_head/ee_manager with reports holds both.
+        RoleAssignment.objects.create(employee=self.auditor, role=Role.objects.get(name="line_manager"))
+        self.client.force_authenticate(user=self.auditor.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.employee.current_version.id}/recommend_contract/",
+            {"action": "renew", "end_date": "2027-12-31"}, format="json",
+        )
+        self.assertEqual(response.status_code, 403, response.data)
+        self.assertFalse(ContractRenewalDecision.objects.filter(
+            employee_version=self.employee.current_version).exists())
+
+    def test_line_manager_holding_an_extra_all_scope_role_can_still_recommend_for_own_report(self):
+        # The other direction of the same fix: narrowing to the reporting
+        # chain must not strip a genuine manager of their own reports just
+        # because they also hold a wider role.
+        RoleAssignment.objects.create(employee=self.manager, role=Role.objects.get(name="auditor"))
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.employee.current_version.id}/recommend_contract/",
+            {"action": "renew", "end_date": "2027-12-31"}, format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)

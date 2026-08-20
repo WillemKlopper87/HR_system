@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
+from notifications.models import Notification
 from rbac_audit.models import Role, RoleAssignment
 
 from .contract_reminders import run_contract_reminders
@@ -14,7 +15,11 @@ from .models import ContractRenewalDecision, Department, Employee, EmployeeVersi
 _UNSET = object()
 
 
-class ContractRemindersTests(TestCase):
+class ContractReminderFixtureMixin:
+    """Shared fixture for both reminder test classes below (mixin rather
+    than a base TestCase, so subclassing doesn't re-run the parent's
+    tests)."""
+
     def setUp(self):
         self.dept = Department.objects.create(code="ENG", name="Engineering")
         # order=3 collides with the "PQ" level seeded by
@@ -53,6 +58,8 @@ class ContractRemindersTests(TestCase):
             contract_end_date=end_date, manager=manager,
         )
 
+
+class ContractRemindersTests(ContractReminderFixtureMixin, TestCase):
     @override_settings(CONTRACT_REMINDER_OFFSETS_DAYS=[30], CONTRACT_ESCALATION_DAYS=14)
     @patch("core_hr.contract_reminders.notify_many")
     @patch("core_hr.contract_reminders.notify")
@@ -185,3 +192,50 @@ class ContractRemindersTests(TestCase):
         from django.conf import settings
 
         self.assertIn("run-contract-reminders-daily", settings.CELERY_BEAT_SCHEDULE)
+
+
+class ContractReminderNotificationTests(ContractReminderFixtureMixin, TestCase):
+    """Every other test in this module mocks `notify`/`notify_many`
+    outright, so no real `Notification` row is ever constructed — which is
+    exactly why Task 4's suite could not catch the final review's finding
+    that `kind="contract_reminder"` was not a registered
+    `Notification.Kind` member at all. Django does not validate `choices`
+    on save, so the value wrote silently and `get_kind_display()` fell
+    back to the raw slug in `__str__`, Django admin, and
+    `NotificationSerializer.kind_display`. These tests deliberately do NOT
+    mock, closing that gap."""
+
+    @override_settings(CONTRACT_REMINDER_OFFSETS_DAYS=[14], CONTRACT_ESCALATION_DAYS=14)
+    def test_reminder_writes_a_real_notification_with_a_registered_kind(self):
+        today = date(2026, 6, 1)
+        self._hire_fixed_term(number="E900", end_date=today + timedelta(days=14))
+        with patch("core_hr.contract_reminders.timezone.localdate", return_value=today):
+            result = run_contract_reminders()
+        self.assertEqual(result["manager_reminders"], 1)
+        self.assertEqual(result["hr_admin_reminders"], 1)
+
+        # Both call sites (notify -> manager, notify_many -> hr_admin).
+        manager_notification = Notification.objects.get(recipient=self.manager)
+        hr_admin_notification = Notification.objects.get(recipient=self.hr_admin)
+        for notification in (manager_notification, hr_admin_notification):
+            self.assertEqual(notification.kind, "contract_reminder")
+            self.assertIn("contract_reminder", Notification.Kind.values)
+            self.assertEqual(notification.get_kind_display(), "Contract expiry reminder")
+
+    @override_settings(CONTRACT_REMINDER_OFFSETS_DAYS=[14], CONTRACT_ESCALATION_DAYS=14)
+    @patch("core_hr.contract_reminders.notify_many")
+    @patch("core_hr.contract_reminders.notify")
+    def test_dry_run_suppresses_sends_but_still_counts(self, mock_notify, mock_notify_many):
+        # dry_run is a parameter on the Celery task's public signature
+        # (tasks.py) — an operator will reach for it during an incident, so
+        # "sends nothing, still reports accurate counts" needs to be
+        # pinned, not assumed.
+        today = date(2026, 6, 1)
+        self._hire_fixed_term(number="E900", end_date=today + timedelta(days=14))
+        with patch("core_hr.contract_reminders.timezone.localdate", return_value=today):
+            result = run_contract_reminders(dry_run=True)
+        self.assertEqual(result["manager_reminders"], 1)
+        self.assertEqual(result["hr_admin_reminders"], 1)
+        mock_notify.assert_not_called()
+        mock_notify_many.assert_not_called()
+        self.assertEqual(Notification.objects.count(), 0)

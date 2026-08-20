@@ -11,7 +11,7 @@ from rbac_audit.audit import log_access
 from rbac_audit.consent import has_active_consent, record_consent
 from rbac_audit.drf import RowScopePermission, get_request_employee, int_query_param, row_scoped_queryset
 from rbac_audit.models import AuditLogEntry, ConsentRecord
-from rbac_audit.permissions import can_see_unsuppressed_aggregates, has_role
+from rbac_audit.permissions import can_see_unsuppressed_aggregates, has_role, is_in_reporting_chain
 from rbac_audit.tiers import FieldTier
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -84,17 +84,36 @@ class EmployeeVersionViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"])
     def recommend_contract(self, request, pk=None):
-        """Line manager only (RBAC-Roles.md; C1 part 2 design spec §3.2).
-        get_object() above already ran RowScopePermission.has_object_permission
-        -- an hr_admin/auditor (row_scope=ALL) or the target's own manager
-        (row_scope=own_team, via the reporting chain) reaches this body;
-        anyone else already got a RowScopePermission-driven 403. has_role()
-        narrows further: row access alone doesn't mean "is this specific
-        person's manager" -- an auditor has row access too but must never
-        recommend."""
+        """Line manager of THIS employee only (RBAC-Roles.md; C1 part 2
+        design spec §6). get_object() above already ran
+        RowScopePermission.has_object_permission -- an hr_admin/auditor
+        (row_scope=ALL) or the target's own manager (row_scope=own_team,
+        via the reporting chain) reaches this body; anyone else already
+        got a RowScopePermission-driven 403.
+
+        The narrowing is deliberately `has_role(...) AND
+        is_in_reporting_chain(...)`, not has_role() alone: has_role() is
+        scope-blind, and RowScopePermission grants object access if ANY
+        active role covers the target, so an actor holding line_manager
+        *plus* any row_scope=all role could otherwise recommend for every
+        employee in the organisation. Not hypothetical -- RBAC-Roles.md
+        derives line_manager from having direct reports, so in production
+        an hr_head/ee_manager with reports holds both. This is the same
+        cross-role composition hazard
+        rbac_audit.permissions.can_access_tier_for_target exists to close,
+        and the same idiom serializers.py already uses for this feature's
+        subject-visibility gate.
+
+        is_in_reporting_chain is transitive (skip-level) rather than
+        direct-manager-only; that is the codebase-wide convention for "own
+        team" (it backs row_scope=own_team itself), and the spec's §6
+        wording was amended from "direct reports only" to "reporting
+        chain" to match. The frontend keeps a stricter direct-manager
+        check on the Recommend button -- a deliberate asymmetry noted
+        there."""
         version = self.get_object()
         actor = get_request_employee(request)
-        if actor is None or not has_role(actor, "line_manager"):
+        if actor is None or not (has_role(actor, "line_manager") and is_in_reporting_chain(actor, version.employee)):
             return Response({"detail": "Only the line manager can recommend a contract action."}, status=403)
         payload = ContractActionInputSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
