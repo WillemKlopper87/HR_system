@@ -2,8 +2,9 @@
 generalized beyond core_hr's own models, the same way retention execution
 generalized in H1). Two kinds of check:
 
-* **Built-in** — core_hr's own Sprint 1 checks (orphan record, missing
-  grade, missing demographics), inline below since they own the model.
+* **Built-in** — core_hr's own checks (orphan record, missing grade,
+  missing demographics, and — since C1 part 2 — missing contract end
+  date), inline below since they own the model.
 * **Registered** — every other app's checks, registered from that app's
   own `AppConfig.ready()` via `register(exception_type, handler)`, the
   same registry shape as `rbac_audit/retention.py`. This module never
@@ -68,8 +69,12 @@ def temporary_handler(exception_type: str, handler: Handler):
 
 
 def _builtin_core_hr_checks() -> Iterable[tuple[Employee, str, str]]:
-    """Sprint 1's original three checks — inline, not registered, since
-    core_hr owns DataQualityException itself."""
+    """core_hr's four built-in checks — inline, not registered, since
+    core_hr owns DataQualityException itself. Three came from Sprint 1
+    (orphan record, missing grade, missing demographics); C1 part 2 added
+    MISSING_CONTRACT_END_DATE, which is the whole migration-safety story
+    for fixed-term employees already in service when it shipped (design
+    spec §7: no backfill migration, surfaced by this check instead)."""
     for employee in Employee.objects.all():
         current = employee.current_version
         if current is None:

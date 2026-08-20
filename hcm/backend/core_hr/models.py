@@ -474,6 +474,15 @@ class ContractRenewalDecision(TimestampedModel):
 
     history = HistoricalRecords()
 
+    class Meta:
+        # Every sibling model in this file declares an ordering
+        # (EmployeeVersion, EmploymentEvent, DataQualityException); this
+        # one had no Meta at all, leaving ContractRenewalDecisionAdmin's
+        # changelist unordered. Newest first, matching the other
+        # queue-shaped tables (DataQualityException, Notification) -- an
+        # hr_admin opening this list wants the decisions just taken.
+        ordering = ["-created_at"]
+
     def __str__(self):
         return f"{self.employee_version.employee.employee_number}: {self.status}"
 

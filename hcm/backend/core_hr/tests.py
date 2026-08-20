@@ -312,6 +312,86 @@ class DataQualityChecksTests(TestCase):
         )
 
 
+    def test_missing_contract_end_date_fires_for_fixed_term_and_clears_once_set(self):
+        # Spec §10 requires this test explicitly, and spec §7 makes this
+        # check the ENTIRE migration-safety story for fixed-term employees
+        # already in service when C1 part 2 shipped ("No backfill
+        # migration... surfaced by a new check"). It had no test anywhere
+        # -- the one mechanism protecting pre-existing production data was
+        # unverified.
+        employee = Employee.objects.hire(
+            employee_number="E0032",
+            first_name="Fixed",
+            last_name="Termer",
+            date_of_birth=date(1990, 1, 1),
+            work_email="fixed.termer@example.com",
+            hire_date=date(2024, 1, 1),
+            department=self.dept_a,
+            occupational_level=self.level_top,
+            job_grade=self.grade,
+            location=self.location,
+            employment_status=EmployeeVersion.EmploymentStatus.FIXED_TERM,
+        )
+
+        run_data_quality_checks()
+        self.assertTrue(
+            DataQualityException.objects.filter(
+                employee=employee,
+                exception_type=DataQualityException.ExceptionType.MISSING_CONTRACT_END_DATE,
+                resolved_at__isnull=True,
+            ).exists()
+        )
+
+        version = employee.current_version
+        version.contract_end_date = date(2027, 6, 30)
+        version.save(update_fields=["contract_end_date"])
+
+        run_data_quality_checks()
+        self.assertFalse(
+            DataQualityException.objects.filter(
+                employee=employee,
+                exception_type=DataQualityException.ExceptionType.MISSING_CONTRACT_END_DATE,
+                resolved_at__isnull=True,
+            ).exists()
+        )
+        self.assertTrue(
+            DataQualityException.objects.filter(
+                employee=employee,
+                exception_type=DataQualityException.ExceptionType.MISSING_CONTRACT_END_DATE,
+                resolved_at__isnull=False,
+            ).exists()
+        )
+
+    def test_missing_contract_end_date_does_not_fire_for_a_permanent_employee(self):
+        # contract_end_date is "meaningful only when employment_status ==
+        # FIXED_TERM; ignored otherwise" (spec §3.1), so a permanent
+        # employee with none must not be flagged -- otherwise the check
+        # would fire on the entire workforce and the data-quality queue
+        # would be useless.
+        employee = Employee.objects.hire(
+            employee_number="E0033",
+            first_name="Perma",
+            last_name="Nent",
+            date_of_birth=date(1990, 1, 1),
+            work_email="perma.nent@example.com",
+            hire_date=date(2024, 1, 1),
+            department=self.dept_a,
+            occupational_level=self.level_top,
+            job_grade=self.grade,
+            location=self.location,
+            employment_status=EmployeeVersion.EmploymentStatus.PERMANENT,
+        )
+
+        run_data_quality_checks()
+        self.assertIsNone(employee.current_version.contract_end_date)
+        self.assertFalse(
+            DataQualityException.objects.filter(
+                employee=employee,
+                exception_type=DataQualityException.ExceptionType.MISSING_CONTRACT_END_DATE,
+            ).exists()
+        )
+
+
 class EmployeeVersionConstraintTests(TestCase):
     def test_valid_to_must_be_after_valid_from(self):
         dept_a, _, level_top, grade, location = _seed_reference_data()
