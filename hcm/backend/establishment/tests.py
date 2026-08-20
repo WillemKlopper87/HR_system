@@ -92,6 +92,27 @@ class PositionModelTests(TestCase):
         self.assertFalse(position.is_vacant)
         self.assertIsNotNone(position.current_occupant)
 
+    def test_current_occupant_is_queried_once_per_instance(self):
+        """The Positions page's serializer reads current_occupant twice per
+        row -- once for is_vacant, once for current_incumbent_number -- on
+        the one page whose entire job is listing every post (151+ at the
+        design spec's own stated scale). Caching it per instance halves
+        that; every request builds fresh instances from a fresh queryset,
+        so nothing carries over between them."""
+        position = Position.objects.create(
+            post_number="P-00001", title="A", department=self.dept, occupational_level=self.level,
+            job_grade=self.grade, location=self.location, status=Position.Status.APPROVED,
+        )
+        Employee.objects.hire(
+            employee_number="E001", first_name="Alex", last_name="Employee", date_of_birth=date(1990, 1, 1),
+            work_email="alex@example.com", hire_date=date(2024, 1, 1), department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location, position=position,
+        )
+        fresh = Position.objects.get(pk=position.pk)
+        with self.assertNumQueries(1):
+            self.assertFalse(fresh.is_vacant)
+            self.assertEqual(fresh.current_occupant.employee.employee_number, "E001")
+
     def test_vacant_queryset_excludes_occupied_and_unapproved(self):
         occupied = Position.objects.create(
             post_number="P-00001", title="A", department=self.dept, occupational_level=self.level,

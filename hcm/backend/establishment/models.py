@@ -16,6 +16,7 @@ from __future__ import annotations
 from core_hr.base import TimestampedModel
 from core_hr.models import Department, Employee, EmployeeVersion, JobGrade, Location, OccupationalLevel
 from django.db import models
+from django.utils.functional import cached_property
 from simple_history.models import HistoricalRecords
 
 
@@ -59,8 +60,13 @@ class Position(TimestampedModel):
     def __str__(self):
         return f"{self.post_number}: {self.title} ({self.get_status_display()})"
 
-    @property
+    @cached_property
     def current_occupant(self) -> EmployeeVersion | None:
+        """Cached per instance: PositionSerializer reads this twice for
+        every row it renders (is_vacant, then current_incumbent_number),
+        and the Positions page's whole job is listing every post on the
+        establishment. Each request builds its rows from a fresh queryset,
+        so a cached value never outlives the request that computed it."""
         return (
             EmployeeVersion.objects.filter(valid_to__isnull=True, position=self)
             .select_related("employee")
