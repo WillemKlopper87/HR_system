@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from rbac_audit.models import AuditLogEntry, Role, RoleAssignment
 from rest_framework.test import APIClient
 
@@ -862,3 +863,103 @@ class ContractActionApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(self.employee.current_version.contract_end_date, date(2027, 12, 31))
+
+    def _promote_to_close_current_version(self):
+        """Closes self.employee's current version and opens a successor,
+        returning the now-historical version's id — the shape
+        apply_lifecycle_event leaves behind after ANY version change.
+
+        Dated yesterday, not today, deliberately: a successor whose
+        valid_from is today would make apply_lifecycle_event's own
+        "effective_date must be after valid_from" guard reject a
+        same-day decide anyway, so the test would pass without the
+        current-version guard actually doing anything."""
+        closed_id = self.employee.current_version.id
+        self.employee.apply_lifecycle_event(
+            event_type=EmploymentEvent.EventType.PROMOTION,
+            effective_date=timezone.localdate() - timedelta(days=1),
+        )
+        return closed_id
+
+    def _make_permanent_report(self):
+        """A PERMANENT employee reporting to self.manager — the target the
+        fixed-term guard exists to protect."""
+        dept = self.employee.current_version.department
+        permanent = Employee.objects.hire(
+            employee_number="E302", first_name="Perma", last_name="Nent",
+            date_of_birth=date(1991, 1, 1), work_email="permanent3@example.com",
+            hire_date=date(2020, 1, 1), department=dept,
+            occupational_level=self.employee.current_version.occupational_level,
+            job_grade=self.employee.current_version.job_grade,
+            location=self.employee.current_version.location,
+        )
+        version = permanent.current_version
+        version.manager = self.manager
+        version.save(update_fields=["manager"])
+        return permanent
+
+    def test_cannot_recommend_on_a_permanent_version(self):
+        # Final-review finding 3. Neither service function checked
+        # employment_status, so the FIXED_TERM scoping the spec assumes
+        # throughout (§3.1/§5/§7/§9) existed nowhere in code. Recommending
+        # a renewal on a PERMANENT version is meaningless.
+        permanent = self._make_permanent_report()
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{permanent.current_version.id}/recommend_contract/",
+            {"action": "renew", "end_date": "2027-12-31"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(ContractRenewalDecision.objects.filter(
+            employee_version=permanent.current_version).exists())
+
+    def test_cannot_let_lapse_a_permanent_employee(self):
+        # The severe case: these two actions are the only API-reachable
+        # callers of apply_lifecycle_event in the entire backend, so
+        # without this guard an hr_admin could terminate a PERMANENT
+        # employee with termination_reason=CONTRACT_END — corrupt EEA2
+        # statutory workforce-movement data, from a UI-unreachable but
+        # fully API-reachable path.
+        permanent = self._make_permanent_report()
+        version_id = permanent.current_version.id
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{version_id}/decide_contract/",
+            {"action": "let_lapse"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(EmploymentEvent.objects.filter(
+            employee=permanent, event_type=EmploymentEvent.EventType.TERMINATION).exists())
+        # Still employed, on the same still-open version.
+        self.assertIsNotNone(permanent.current_version)
+        self.assertEqual(permanent.current_version.id, version_id)
+        self.assertFalse(ContractRenewalDecision.objects.filter(employee_version_id=version_id).exists())
+
+    def test_cannot_recommend_on_a_historical_closed_version(self):
+        closed_id = self._promote_to_close_current_version()
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{closed_id}/recommend_contract/",
+            {"action": "renew", "end_date": "2027-12-31"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(ContractRenewalDecision.objects.filter(employee_version_id=closed_id).exists())
+
+    def test_cannot_decide_on_a_historical_closed_version(self):
+        # apply_lifecycle_event always acts on the employee's CURRENT open
+        # version, while the decision row is written against the
+        # employee_version argument — so deciding on a closed V1 recorded
+        # the decision on V1 while the event closed V2: one act split
+        # across two rows of the audit trail.
+        closed_id = self._promote_to_close_current_version()
+        current_id = self.employee.current_version.id
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{closed_id}/decide_contract/",
+            {"action": "convert_permanent"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(ContractRenewalDecision.objects.filter(employee_version_id=closed_id).exists())
+        # The current version must be untouched — not closed by an event
+        # recorded against a different row.
+        self.assertEqual(self.employee.current_version.id, current_id)
