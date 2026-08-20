@@ -24,10 +24,8 @@ const COMP = ['comp_manager', 'hr_admin'] as const
 const ASSESS = ['ee_manager', 'hr_admin'] as const
 const EE = ['hr_admin', 'ee_manager', 'accounting_officer', 'auditor'] as const
 const AUDIT_ROLES = ['hr_admin', 'auditor'] as const
+const CONTRACTS = ['hr_admin', 'line_manager', 'auditor'] as const
 
-/** A future task adds an 8th category ("Contract Renewals") once that page
- * exists — don't add it speculatively ahead of there being anything to
- * link to. */
 export const NAV_CATEGORIES: readonly NavCategory[] = [
   {
     label: 'Workforce',
@@ -81,6 +79,12 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       { to: '/dashboards/equity', label: 'Equity Dashboard', roles: EE },
       { to: '/ee-configuration', label: 'EE Configuration', roles: EE },
       { to: '/ee-reports', label: 'EE Reports', roles: EE },
+    ],
+  },
+  {
+    label: 'Contract Renewals',
+    items: [
+      { to: '/contract-renewals', label: 'Contract Renewals', roles: CONTRACTS },
     ],
   },
   {

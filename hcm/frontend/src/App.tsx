@@ -10,6 +10,7 @@ import { ApplicantsPage } from './pages/ApplicantsPage'
 import { AssessmentsPage } from './pages/AssessmentsPage'
 import { BenefitsPage } from './pages/BenefitsPage'
 import { CompProposalsPage } from './pages/CompProposalsPage'
+import { ContractRenewalsPage } from './pages/ContractRenewalsPage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { EEConfigurationPage } from './pages/EEConfigurationPage'
 import { EEReportsPage } from './pages/EEReportsPage'
@@ -72,6 +73,9 @@ export default function App() {
             </Route>
             <Route element={<RequireRole roles={['hr_admin', 'comp_manager', 'accounting_officer', 'auditor', 'recruiter']} />}>
               <Route path="/positions" element={<PositionsPage />} />
+            </Route>
+            <Route element={<RequireRole roles={['hr_admin', 'line_manager', 'auditor']} />}>
+              <Route path="/contract-renewals" element={<ContractRenewalsPage />} />
             </Route>
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/reviews/:id" element={<ReviewDetailPage />} />

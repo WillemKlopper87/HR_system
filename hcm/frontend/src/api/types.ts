@@ -46,6 +46,35 @@ export interface EmployeeVersion {
   disability_detail?: string
   race_source?: string
   disability_source?: string
+  contract_end_date: string | null
+  contract_renewal_decision: ContractRenewalDecision | null
+}
+
+// ---- Contract end-date tracking & renewal decisions (C1 part 2) ----
+
+export type ContractAction = 'renew' | 'convert_permanent' | 'let_lapse'
+export type ContractDecisionStatus = 'recommended' | 'decided'
+
+export interface ContractRenewalDecision {
+  id: number
+  status: ContractDecisionStatus
+  recommended_action: ContractAction | null
+  recommended_by: number | null
+  recommended_at: string | null
+  recommended_comment: string
+  recommended_end_date: string | null
+  decided_action: ContractAction | null
+  decided_by: number | null
+  decided_at: string | null
+  decided_comment: string
+  decided_end_date: string | null
+  resulting_employee_version: number | null
+}
+
+export const CONTRACT_ACTION_LABELS: Record<ContractAction, string> = {
+  renew: 'Renew',
+  convert_permanent: 'Convert to permanent',
+  let_lapse: 'Let lapse',
 }
 
 export interface Department {
