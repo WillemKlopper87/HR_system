@@ -11,7 +11,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core_hr.data_quality import run_data_quality_checks
-from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
+from core_hr.models import Department, Employee, EmployeeVersion, JobGrade, Location, OccupationalLevel
 from rbac_audit.consent import record_consent
 from rbac_audit.models import ConsentRecord, Role, RoleAssignment
 
@@ -167,7 +167,7 @@ class Command(BaseCommand):
             # as every RBAC test's setUp does.
             base_role = Role.objects.get(name="employee")
 
-            def hire(*, department, level, location, manager, hire_date):
+            def hire(*, department, level, location, manager, hire_date, employment_status=None, contract_end_date=None):
                 nonlocal employee_counter
                 employee_counter += 1
                 n = employee_counter
@@ -186,6 +186,8 @@ class Command(BaseCommand):
                     job_grade=grade,
                     location=location,
                     manager=manager,
+                    employment_status=employment_status,
+                    contract_end_date=contract_end_date,
                     race=_weighted_choice(RACE_WEIGHTS, rng),
                     gender=_weighted_choice(GENDER_WEIGHTS, rng),
                     disability_status=_weighted_choice(DISABILITY_WEIGHTS, rng),
@@ -270,6 +272,35 @@ class Command(BaseCommand):
             RoleAssignment.objects.create(employee=auditor_employee, role=auditor_role)
             auditor_employee.user = User.objects.create_user(username="auditor", password="auditor123")
             auditor_employee.save(update_fields=["user"])
+
+            # --- Contract end-date tracking & renewal decisions (C1 part 2) --
+            # Two of eng_head's direct reports, fixed-term with a
+            # contract_end_date set -- nothing in the random hire() loop
+            # above ever sets employment_status/contract_end_date, so
+            # without these /contract-renewals (and its e2e coverage,
+            # Task 6) would have no rows to exercise the recommend/decide
+            # flow against. Distinct first names keep e2e row locators
+            # unambiguous even though both share a last name.
+            eng_dept = other_depts[dept_codes.index("ENG")]
+            contract_renewal_employee = hire(
+                department=eng_dept, level=mid_level, location=locations[0], manager=eng_head,
+                hire_date=date(2023, 6, 1),
+                employment_status=EmployeeVersion.EmploymentStatus.FIXED_TERM,
+                contract_end_date=timezone.localdate() + timedelta(days=45),
+            )
+            contract_renewal_employee.first_name = "Renewal"
+            contract_renewal_employee.last_name = "Contractor"
+            contract_renewal_employee.save(update_fields=["first_name", "last_name"])
+
+            contract_lapse_employee = hire(
+                department=eng_dept, level=mid_level, location=locations[0], manager=eng_head,
+                hire_date=date(2023, 6, 1),
+                employment_status=EmployeeVersion.EmploymentStatus.FIXED_TERM,
+                contract_end_date=timezone.localdate() + timedelta(days=20),
+            )
+            contract_lapse_employee.first_name = "Lapse"
+            contract_lapse_employee.last_name = "Contractor"
+            contract_lapse_employee.save(update_fields=["first_name", "last_name"])
 
             demo_requisitions = self._seed_recruitment_demo_data(
                 departments=departments, levels=levels, grades_by_level=grades_by_level,
