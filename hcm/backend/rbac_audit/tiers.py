@@ -41,6 +41,19 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
         "job_title": FieldTier.PUBLIC,
         "position": FieldTier.PUBLIC,
         "contract_end_date": FieldTier.PUBLIC,
+        # ContractRenewalDecisionSerializer is a plain ModelSerializer, not
+        # a TieredModelSerializer, so per-field tiering never applies
+        # inside it (core_hr.ContractRenewalDecision's own
+        # recommended_comment/decided_comment INTERNAL entries below are
+        # otherwise dead for reads through this endpoint) -- gating the
+        # OUTER contract_renewal_decision field here is what actually
+        # controls read access to the whole nested object. INTERNAL was
+        # chosen, not a stricter tier, because every intended consumer
+        # (line_manager, hr_admin, auditor -- design spec §6) holds
+        # I:read=True in the seeded role matrix (0002_seed_roles.py), while
+        # sysadmin (I:read=False, "no standing access to S/R business
+        # data") does not -- exactly the exposure this closes.
+        "contract_renewal_decision": FieldTier.INTERNAL,
         "occupational_level": FieldTier.INTERNAL,
         "job_grade": FieldTier.INTERNAL,
         "manager": FieldTier.INTERNAL,

@@ -466,6 +466,37 @@ class ContractActionApiTests(TestCase):
         # narrowing rather than being rejected earlier by RowScopePermission.
         RoleAssignment.objects.create(employee=self.employee, role=Role.objects.get(name="employee"))
 
+        # Not anyone's report and not authenticated in any test -- exists
+        # purely as a target OUTSIDE self.manager's reporting chain, for
+        # test_manager_outside_reporting_chain_cannot_recommend.
+        self.other_employee = Employee.objects.hire(
+            employee_number="E301", first_name="Some", last_name="Stranger", date_of_birth=date(1990, 1, 1),
+            work_email="stranger3@example.com", hire_date=date(2019, 1, 1), department=dept,
+            occupational_level=level, job_grade=grade, location=location,
+        )
+
+        # sysadmin/auditor: both row_scope=all (rbac_audit/migrations/
+        # 0002_seed_roles.py), so RowScopePermission lets either read any
+        # EmployeeVersion -- but sysadmin has I:read=False while auditor has
+        # I:read=True, and neither holds hr_admin/line_manager. Used to prove
+        # the two permission layers (row-scope, then role/tier) compose
+        # correctly rather than either one alone deciding access.
+        self.sysadmin = Employee.objects.hire(
+            employee_number="SYS3", first_name="Sys", last_name="Admin", date_of_birth=date(1988, 1, 1),
+            work_email="sysadmin3@example.com", hire_date=date(2016, 1, 1), department=dept,
+            occupational_level=level, job_grade=grade, location=location,
+            user=User.objects.create_user(username="sysadmin3", password="x"),
+        )
+        RoleAssignment.objects.create(employee=self.sysadmin, role=Role.objects.get(name="sysadmin"))
+
+        self.auditor = Employee.objects.hire(
+            employee_number="AUD3", first_name="Audrey", last_name="Auditor", date_of_birth=date(1983, 1, 1),
+            work_email="auditor3@example.com", hire_date=date(2017, 1, 1), department=dept,
+            occupational_level=level, job_grade=grade, location=location,
+            user=User.objects.create_user(username="auditor3", password="x"),
+        )
+        RoleAssignment.objects.create(employee=self.auditor, role=Role.objects.get(name="auditor"))
+
         # Employee.current_version re-queries the DB on every access (it's
         # a plain property, not cached) -- fetch once into a local so all
         # three field changes land on the SAME in-memory instance before
@@ -555,3 +586,74 @@ class ContractActionApiTests(TestCase):
         self.client.force_authenticate(user=self.hr_admin.user)
         response = self.client.get(f"/api/v1/employee-versions/{self.employee.current_version.id}/")
         self.assertIsNone(response.data["contract_renewal_decision"])
+
+    def test_manager_outside_reporting_chain_cannot_recommend(self):
+        # self.other_employee is NOT self.manager's report -- get_object()
+        # runs RowScopePermission.has_object_permission() before this
+        # action's body (and its has_role() check) ever executes, so this
+        # must 403 at the row-scope layer, distinct from
+        # test_non_manager_cannot_recommend's has_role()-layer 403.
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.other_employee.current_version.id}/recommend_contract/",
+            {"action": "renew", "end_date": "2027-12-31"}, format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_auditor_all_scope_row_access_cannot_decide(self):
+        # auditor holds an ALL row-scope role, so get_object() succeeds --
+        # RowScopePermission alone would let this through. It must still be
+        # rejected by decide_contract's has_role(actor, "hr_admin") check:
+        # broad row access is not the same as holding the specific role
+        # this action requires. Proves the two layers compose (row access
+        # without the right role is still refused; see
+        # test_manager_outside_reporting_chain_cannot_recommend for the
+        # opposite composition -- the right role without row access).
+        self.client.force_authenticate(user=self.auditor.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.employee.current_version.id}/decide_contract/",
+            {"action": "convert_permanent"}, format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_line_manager_sees_decision_comments_but_sysadmin_does_not(self):
+        # Finding from task review: ContractRenewalDecisionSerializer is a
+        # plain ModelSerializer (not TieredModelSerializer), so per-field
+        # tiering never applies inside it -- the gate has to be the OUTER
+        # contract_renewal_decision field on EmployeeVersionSerializer,
+        # registered INTERNAL in rbac_audit/tiers.py. Seeded role matrix
+        # (rbac_audit/migrations/0002_seed_roles.py): line_manager/hr_admin/
+        # auditor all have I:read=True (so the design spec's three intended
+        # consumers are unaffected); sysadmin has I:read=False (P:read is
+        # also False, but PUBLIC-tier fields bypass the grant check
+        # entirely per can_access_tier_for_target, so only INTERNAL-and-up
+        # fields are actually at stake here) despite row_scope=all putting
+        # every record within RowScopePermission's reach -- exactly the
+        # over-exposure this fix closes.
+        self.client.force_authenticate(user=self.hr_admin.user)
+        version_id = self.employee.current_version.id
+        decide_response = self.client.post(
+            f"/api/v1/employee-versions/{version_id}/decide_contract/",
+            {"action": "convert_permanent", "comment": "Approved after performance review."}, format="json",
+        )
+        self.assertEqual(decide_response.status_code, 200, decide_response.data)
+
+        # Intended consumer: the report's own line_manager (own_team
+        # row-scope) sees the nested decision, comment included.
+        self.client.force_authenticate(user=self.manager.user)
+        manager_view = self.client.get(f"/api/v1/employee-versions/{version_id}/")
+        self.assertEqual(manager_view.status_code, 200, manager_view.data)
+        self.assertIsNotNone(manager_view.data["contract_renewal_decision"])
+        self.assertEqual(
+            manager_view.data["contract_renewal_decision"]["decided_comment"],
+            "Approved after performance review.",
+        )
+
+        # sysadmin: row_scope=all so the record itself is reachable (200),
+        # but I:read=False means the whole INTERNAL-tier
+        # contract_renewal_decision field must be stripped from the
+        # response entirely -- not merely its comment sub-field.
+        self.client.force_authenticate(user=self.sysadmin.user)
+        sysadmin_view = self.client.get(f"/api/v1/employee-versions/{version_id}/")
+        self.assertEqual(sysadmin_view.status_code, 200, sysadmin_view.data)
+        self.assertNotIn("contract_renewal_decision", sysadmin_view.data)
