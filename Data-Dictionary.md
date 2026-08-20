@@ -40,6 +40,7 @@
 | employment_status | enum | ✔ | I | permanent / fixed-term / temporary / learner. **Temporary = employed to work < 3 months** (EEA definition; drives the separate "Temporary employees" row in every EEA2/EEA4 matrix) |
 | citizenship_status | enum | ✔ | S | sa_citizen_birth_descent / sa_naturalised_pre_1994 / sa_naturalised_post_1994 / foreign_national. **EEA matrices race only citizens; Foreign Nationals are separate M/F columns** (see `EEA-Form-Spec-Notes.md`) |
 | location | FK location | ✔ | I | Province needed for EEA2 |
+| position | FK position, null | | P | *(roadmap C1)* The specific approved post this version occupies (`establishment.position`, §3); `SET_NULL`. **This column is what makes occupancy derivable** — a post is filled iff a current version points at it. Carried forward across promotions/transfers (`VERSION_CARRY_FIELDS`) so a version change never silently vacates the post; a partial unique index (`one_current_occupant_per_position`, on `valid_to IS NULL`) enforces at most one current occupant per post. Null = predates establishment control, or holds no numbered post |
 | race | enum | ✔* | S | **EEA categories: African / Coloured / Indian / White** (+ foreign national flags per EEA2). *Required for EE reporting (legal obligation); "not disclosed" allowed pending self-ID |
 | gender | enum | ✔* | S | Male / Female per current EEA2 spec (verify against A3; store separately from self-described gender identity if captured) |
 | disability_status | enum + detail | | S | Self-ID only; consent-gated |
@@ -99,7 +100,62 @@ Seeded with the six EEA occupational levels confirmed from the received forms (p
 
 Per-entity retention metadata (entity, period_months, action: anonymise/delete/retain) executed by scheduled job; e.g. unsuccessful applicants → anonymise after 12 months.
 
-## 3. Later-sprint entities (summary — detail in the owning sprint)
+## 3. establishment (roadmap C1 part 1 — position / establishment control)
+
+A **position** is an approved, individually-numbered post that exists independently of whoever holds it — the
+PFMA-style establishment control an SOE needs for approved-vs-filled visibility, post numbering and a vacancy rate.
+Spec: `docs/superpowers/specs/2026-08-19-position-establishment-design.md`.
+
+Occupancy is **derived, never stored**: a post is filled iff some current `employee_version` points at it
+(`employee_version.position`, §1), so it can never drift out of sync with who is actually employed — the same
+reasoning as `employee.current_version`. `recruitment.requisition` gains a `positions` M2M (one requisition, N
+identical posts, since `headcount` can exceed 1) linking an open vacancy to the specific approved, vacant posts it
+is hiring into; the hire flow then stamps the consumed post onto the new `employee_version`.
+
+### position
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| post_number | varchar(20), unique | ✔ | P | Auto-assigned sequentially at creation (`P-00001`, `P-00002`, …). Survives every change of incumbent and a reject/revise cycle — it is the post's identity, never re-issued |
+| title | varchar(200) | ✔ | P | Mirrors `employee_version.job_title` / `requisition.title` |
+| department | FK department | ✔ | P | `PROTECT` |
+| occupational_level | FK occupational_level | ✔ | I | `PROTECT`; the statutory EEA level the post sits at |
+| job_grade | FK job_grade, null | | I | `PROTECT`; nullable, matching `requisition.job_grade`'s existing nullability |
+| location | FK location | ✔ | I | `PROTECT`; province needed for EEA2 |
+| status | enum | ✔ | I | draft / in_review / approved / rejected. Only `approved` posts are on the establishment and can be linked to a requisition |
+| current_step | smallint | ✔ | I | Index into `settings.POSITION_APPROVAL_CHAIN`; meaningful only while `in_review` |
+| proposed_by | FK employee, null | | I | `SET_NULL`; the hr_admin who proposed the post |
+
+Derived, not columns: `current_occupant` (the current `employee_version` pointing here), `is_vacant` (`approved`
+**and** no current occupant), and the `vacant()` queryset behind the recruiter's position picker and the Positions
+page's vacancy-rate stat.
+
+Tiers above are the sensitivity of the data, for consistency with §1 — but unlike `employee_version`, these tables
+carry **no per-field tier enforcement**: they have no `rbac_audit/tiers.py` entry, and nothing here is more
+sensitive than Internal. Access is gated whole-endpoint and per-action instead (`RBAC-Roles.md`), with the
+recruiter's list scoped to approved posts only.
+
+### position_approval_step (append-only)
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| position | FK position | ✔ | I | `CASCADE`; `related_name="approval_steps"` |
+| step_index | smallint | ✔ | I | Which step of the chain this decision resolved |
+| role | varchar(40) | ✔ | I | **Snapshot** of the role the step required, read from settings at decision time — deliberately not a live reference, so lengthening/reordering the chain later can never rewrite history |
+| actor | FK employee, null | | I | `SET_NULL`; who decided |
+| decision | enum | ✔ | I | approved / rejected. A rejection stops the chain immediately |
+| comment | text | | I | The reviewer's reason |
+
+One row per decision, never updated or deleted; `created_at` (see Conventions) is the decision timestamp.
+`revise_and_resubmit` starts a fresh cycle on the same `post_number` and keeps every prior row.
+
+The chain itself is **deployment-time configuration, not a table**: `settings.POSITION_APPROVAL_CHAIN`, an ordered
+list of role names (default `["comp_manager", "accounting_officer"]`). Changing it changes who approves and how
+many steps, with no code or schema change — see `RBAC-Roles.md` for who may act at each step. Backfilled posts (one
+per employee already in service when C1 shipped) carry **no** approval-step rows: that is already-real employment,
+not a proposal that went through review.
+
+## 4. Later-sprint entities (summary — detail in the owning sprint)
 
 | Module | Entities (tier of most sensitive field) | Detailed in |
 |---|---|---|

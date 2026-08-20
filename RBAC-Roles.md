@@ -25,6 +25,24 @@
 4. **Segregation of duties:** the proposer of a comp change cannot be its approver; sign-off chains enforce distinct actors (ApprovalChain primitive).
 5. Role changes are themselves R-tier audited events.
 
+## Module access: establishment / positions (roadmap C1)
+
+The `Position` endpoints are the one set whose write access is decided **per record and per step** rather than per
+role, so they don't reduce to a row in the table above. Enforced by `establishment/permissions.py` (the coarse
+gate) plus per-action checks in `establishment/views.py`.
+
+| Action | Roles allowed |
+|---|---|
+| Read — `GET /api/v1/positions/` | hr_admin · comp_manager · accounting_officer · auditor · recruiter. **recruiter sees `status=approved` only** — they need vacant posts to build a requisition, not the approval-chain detail of in-review ones. Every other role (line_manager, employee, ee_manager, sysadmin) gets 403 |
+| Propose (`POST /positions/`), submit (`/submit/`), revise (`/revise/`) | **hr_admin only** |
+| Decide a chain step (`POST /positions/{id}/decide/`) | Whichever role `settings.POSITION_APPROVAL_CHAIN[current_step]` names — by default comp_manager at step 0, then accounting_officer. Any other role gets 403, *including* one that appears elsewhere in the same chain |
+
+The `WRITE_ROLES` gate in `permissions.py` (hr_admin · comp_manager · accounting_officer) is deliberately coarser
+than these rules: it only decides who may reach a POST at all, and the per-action checks then decide who may
+actually perform it — wrong role at a step is a 403, wrong *state* is a 400. Changing `POSITION_APPROVAL_CHAIN`
+changes the decide row with no code change and no edit here; the frontend reads the required role off the API
+(`next_approver_role`) rather than re-deriving it, so a different chain shape needs no UI change either.
+
 ## Entra ID group mapping (draft — confirm names with IT, ADR-004)
 
 | Entra group | Role |
