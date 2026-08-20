@@ -11,6 +11,12 @@ interface OrgNode {
   jobTitle: string
   departmentName: string
   children: OrgNode[]
+  /** Set only when this node's link to its real manager had to be cut to
+   * break a reporting-chain cycle — see buildForest's cycle scan. Carries
+   * the cut-off manager's name so it can be surfaced on the card: a person
+   * silently vanishing from the chart would be worse than a visible flag
+   * that the underlying manager assignment needs correcting. */
+  brokenLoopManagerName?: string
 }
 
 /**
@@ -22,11 +28,28 @@ interface OrgNode {
  * a node is a root if its manager is null OR its manager isn't one of the
  * employees we actually have a node for.
  *
- * A defensive reachability pass then covers the pathological case of a
- * manager cycle entirely disconnected from any natural root (A manages B
- * manages A, neither of whose managers is null or missing) — without it
- * such a pair would silently vanish from the tree instead of just being an
- * unusual pair of roots.
+ * `EmployeeVersion.manager` is a plain nullable FK with no DB constraint,
+ * `clean()`, or serializer validation against self-reference or a cycle —
+ * so "A manages A" or "A manages B manages A" is bad data the backend does
+ * not prevent, and this builder has to guarantee an acyclic result itself
+ * rather than assume the manager graph already is one (a cycle picked up
+ * by a naive "root chain never reaches a natural root" pass would, left
+ * unguarded, recurse forever in every consumer that walks `children` —
+ * search, depth, and render alike).
+ *
+ * The fix lives here, once, at construction time: each node has at most
+ * one outgoing edge (its manager), so the manager graph is a classic
+ * "functional graph" and a single pass of 3-colour DFS finds every cycle
+ * in O(n). WHITE = unvisited, GRAY = on the chain currently being walked,
+ * BLACK = fully resolved. Walking a chain and landing on a GRAY node means
+ * it loops back on itself; that node's edge to its manager is the one cut,
+ * turning it into that loop's sole synthetic root with the rest of the
+ * (former) cycle hanging off it as an ordinary chain — never two members
+ * of the same loop both claiming root status while still listing each
+ * other as a report. Every node is visited at most once (BLACK short-
+ * circuits immediately), and — because this determines root/child
+ * placement itself rather than filtering after the fact — every node still
+ * gets placed exactly once, so nobody drops out of the chart.
  */
 function buildForest(employees: Employee[], versions: EmployeeVersion[], departmentName: (id: number) => string) {
   const versionByEmployee = new Map<number, EmployeeVersion>()
@@ -48,30 +71,42 @@ function buildForest(employees: Employee[], versions: EmployeeVersion[], departm
     })
   })
 
+  const WHITE = 0
+  const GRAY = 1
+  const BLACK = 2
+  const state = new Map<number, 0 | 1 | 2>()
+  const brokenEdge = new Set<number>()
+
+  function resolveChain(startId: number) {
+    const chain: number[] = []
+    let id: number | undefined = startId
+    while (id !== undefined) {
+      const st = state.get(id) ?? WHITE
+      if (st === BLACK) break // already resolved via some other chain — done
+      if (st === GRAY) {
+        brokenEdge.add(id) // this chain looped back on `id` — cut its edge to its manager
+        break
+      }
+      state.set(id, GRAY)
+      chain.push(id)
+      const managerId: number | null = versionByEmployee.get(id)?.manager ?? null
+      id = managerId !== null && nodeById.has(managerId) ? managerId : undefined
+    }
+    chain.forEach((cid) => state.set(cid, BLACK))
+  }
+  joined.forEach(({ employee }) => resolveChain(employee.id))
+
   const roots: OrgNode[] = []
   joined.forEach(({ employee, version }) => {
     const node = nodeById.get(employee.id)!
     const managerId = version.manager
     const managerNode = managerId !== null ? nodeById.get(managerId) : undefined
-    if (managerNode) {
+    if (managerNode && !brokenEdge.has(employee.id)) {
       managerNode.children.push(node)
     } else {
+      if (managerNode) node.brokenLoopManagerName = managerNode.name
       roots.push(node)
     }
-  })
-
-  // Reachability pass: pick up any node whose manager chain never reaches
-  // a natural root (i.e. a pure cycle among managers we do have).
-  const reached = new Set<number>()
-  const stack = [...roots]
-  while (stack.length > 0) {
-    const node = stack.pop()!
-    if (reached.has(node.employeeId)) continue
-    reached.add(node.employeeId)
-    stack.push(...node.children)
-  }
-  nodeById.forEach((node) => {
-    if (!reached.has(node.employeeId)) roots.push(node)
   })
 
   const byName = (a: OrgNode, b: OrgNode) => a.name.localeCompare(b.name)
@@ -82,12 +117,16 @@ function buildForest(employees: Employee[], versions: EmployeeVersion[], departm
   roots.sort(byName)
   roots.forEach(sortTree)
 
-  return { roots, totalShown: joined.length }
+  const brokenLoopCount = joined.filter(({ employee }) => nodeById.get(employee.id)!.brokenLoopManagerName).length
+
+  return { roots, totalShown: joined.length, brokenLoopCount }
 }
 
-/** Max depth of the forest (roots = depth 0). Guards against a node
- * appearing in its own ancestor chain (a manager cycle) so a pathological
- * data shape can't recurse forever. */
+/** Max depth of the forest (roots = depth 0). buildForest already
+ * guarantees the tree it hands back is acyclic (see its cycle scan), so
+ * this ancestor-path guard should never fire — kept as cheap belt-and-
+ * braces against a future bug in that construction, not as the thing
+ * standing between a bad manager chain and a hung tab. */
 function maxDepth(roots: OrgNode[]): number {
   let deepest = 0
   const walk = (node: OrgNode, depth: number, ancestors: Set<number>) => {
@@ -209,6 +248,14 @@ export function OrgChartPage() {
           <p className="hint-text">
             {forest.totalShown} {forest.totalShown === 1 ? 'person' : 'people'} shown · {forest.roots.length}{' '}
             root{forest.roots.length === 1 ? '' : 's'} · max depth {depth}
+            {forest.brokenLoopCount > 0 && (
+              <>
+                {' '}
+                · <span className="warning-badge">
+                  {forest.brokenLoopCount} reporting loop{forest.brokenLoopCount === 1 ? '' : 's'} detected
+                </span>
+              </>
+            )}
           </p>
 
           {searchState && searchState.matches.size === 0 ? (
@@ -282,6 +329,11 @@ function OrgNodeItem({
           <div className="hint-text">
             {node.children.length} direct report{node.children.length === 1 ? '' : 's'}
           </div>
+          {node.brokenLoopManagerName && (
+            <span className="warning-badge">
+              Reporting loop detected — link to manager &ldquo;{node.brokenLoopManagerName}&rdquo; was cut to show this person
+            </span>
+          )}
         </div>
       </div>
       {hasChildren && expanded && (
