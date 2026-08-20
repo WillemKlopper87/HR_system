@@ -226,3 +226,34 @@ class RequisitionPositionValidationApiTests(RecruitmentApiTestCase):
             "positions": [self.position.id],
         }, format="json")
         self.assertEqual(response.status_code, 201, response.data)
+
+    def test_status_only_patch_on_a_requisition_with_no_positions_succeeds(self):
+        """Requisitions that predate establishment control (and the two in
+        the demo seed data) have zero linked positions, and the only
+        requisition-mutation UI is a status-only PATCH. Enforcing
+        "at least one position" on a write that isn't touching `positions`
+        would lock every such requisition out of ever changing status
+        again. Only writes that actually supply `positions` -- and
+        creations, which always must -- are held to that bar."""
+        self.assertEqual(self.requisition.positions.count(), 0)
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.patch(
+            f"/api/v1/requisitions/{self.requisition.id}/",
+            {"status": Requisition.Status.ON_HOLD},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.requisition.refresh_from_db()
+        self.assertEqual(self.requisition.status, Requisition.Status.ON_HOLD)
+
+    def test_patch_that_does_supply_an_empty_positions_list_is_still_rejected(self):
+        """The grandfather clause is narrow: deliberately clearing the
+        positions of a requisition IS a write to `positions`, so it stays
+        rejected -- otherwise a client could empty a linked requisition and
+        break the headcount/positions invariant the whole feature rests on."""
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.patch(
+            f"/api/v1/requisitions/{self.requisition.id}/", {"positions": []}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("positions", response.data)

@@ -29,16 +29,29 @@ class RequisitionSerializer(serializers.ModelSerializer):
         read_only_fields = ["created_by", "closed_at"]
 
     def validate(self, attrs):
-        positions = attrs.get("positions")
-        if positions is None:
-            positions = list(self.instance.positions.all()) if self.instance else []
-        headcount = attrs.get("headcount", self.instance.headcount if self.instance else 1)
-        if not positions:
+        # `positions` missing from the payload means this write isn't
+        # touching the link at all (the only requisition-mutation UI is a
+        # status-only PATCH). Requisitions that predate establishment
+        # control -- and the seeded demo ones -- have zero linked
+        # positions; enforcing "at least one" on every write would lock
+        # them out of ever changing status again. So the non-empty rule
+        # applies only when `positions` is actually being written, or on
+        # create (where a requisition must always name its posts).
+        positions_supplied = "positions" in attrs
+        positions = list(attrs["positions"]) if positions_supplied else list(
+            self.instance.positions.all() if self.instance else []
+        )
+        if not positions and (positions_supplied or self.instance is None):
             raise serializers.ValidationError(
                 {"positions": "At least one approved, vacant position is required."}
             )
+        if not positions:
+            # Grandfathered: nothing to validate, and the checks below all
+            # assume a non-empty list.
+            return attrs
+        headcount = attrs.get("headcount", self.instance.headcount if self.instance else 1)
         try:
-            validate_requisition_positions(list(positions), headcount=headcount, requisition=self.instance)
+            validate_requisition_positions(positions, headcount=headcount, requisition=self.instance)
         except ValueError as exc:
             raise serializers.ValidationError({"positions": str(exc)})
         return attrs
