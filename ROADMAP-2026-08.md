@@ -4,9 +4,9 @@
 Sprint 16–17 plan, §7 missing capabilities), `KPI-Contracting-Investigation.md` (PC-0…PC-3),
 `docs/superpowers/specs/2026-08-18-kpi-contracting-design.md`, ADR-010/011.
 **How to use:** each row below is one autonomous sprint loop (build → `manage.py test` → real-browser verify across
-roles → update `Sprint-Plan-HCM-System.md` + `hcm/README.md` → commit → push → next). The matching sprint headers
-with `[ ]` tasks are appended to `Sprint-Plan-HCM-System.md` ("Backlog additions 2026-08-18") so the normal loop can
-execute them; this file holds the reasoning, ordering and dependencies.
+roles → update the sprint's `docs/sprints/*.md` file + `hcm/README.md` → commit → push → next). The matching sprint
+headers with `[ ]` tasks live in `docs/sprints/*.md`, linked from `Sprint-Plan-HCM-System.md`'s "Backlog additions
+2026-08-18" table; this file holds the reasoning, ordering and dependencies.
 
 Legend: **H** = hardening (was Sprint 16–17) · **PC** = performance/KPI contracting · **X** = collab-platform work
 (other repo) · **C** = capability from brief §7. Sizes are relative (S ≈ half a loop, M ≈ one, L ≈ one and a half).

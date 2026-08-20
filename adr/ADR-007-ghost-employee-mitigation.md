@@ -11,5 +11,5 @@ Same reasoning as ADR-003 extended further: facial recognition has well-document
 Client-side face descriptor matching (no 3rd-party biometric vendor), human-review-required for every non-match
 
 ## Consequences
-See the corresponding entry in `Sprint-Plan-HCM-System.md` (implementation notes, design-tension callout, verification)
+See the corresponding entry in `docs/sprints/sprint-12c-workforce-integrity.md` (implementation notes, design-tension callout, verification)
 and the module rules in `hcm/README.md` for how the decision constrains later work.

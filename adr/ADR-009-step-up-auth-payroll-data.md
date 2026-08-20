@@ -11,5 +11,5 @@ Requested for `compensation.pay_band`/`comp_proposal` and `ee_reporting.remunera
 TOTP-based (RFC 6238) step-up MFA + mandatory business-justification reason, both required together in one request, time-boxed to a 15-minute grant — layered on top of the existing role check, not instead of it
 
 ## Consequences
-See the corresponding entry in `Sprint-Plan-HCM-System.md` (implementation notes, design-tension callout, verification)
+See the corresponding entry in `docs/sprints/step-up-authentication-payroll.md` (implementation notes, design-tension callout, verification)
 and the module rules in `hcm/README.md` for how the decision constrains later work.

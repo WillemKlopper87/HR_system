@@ -104,11 +104,11 @@ Severity: **HIGH** = exploitable or blocks prod · **MED** = real defect · **LO
 | D4 | MED | **Policy upload validated by filename extension only** (`extraction.py:18`) — no content sniffing, no explicit per-file size cap beyond the global 20 MB `FILE_UPLOAD_MAX_MEMORY_SIZE`. A malformed PDF is caught by `pypdf` raising, which is fine, but a `.txt` renamed `.pdf` etc. gives a confusing error rather than a clean 400. | `policies/extraction.py`, `policies/services.py:41` |
 | D5 | MED | **`RetentionRule` has no executor** — model + admin exist since Sprint 2; the scheduled job that acts on it was deferred to "post-Sprint-16 hardening" and depends on Celery beat (D2). Documented, but it's now due. | `rbac_audit/models.py:247` |
 | D6 | MED | **Docker Compose has no frontend/nginx service** — ADR-005 says "nginx added at staging"; there is currently no documented way to serve the built SPA in prod, and `MEDIA_ROOT` files are only served when `DEBUG=1`. | `hcm/docker-compose.yml`, `config/settings.py` |
-| D7 | MED | **`recruitment.Offer` pay fields are Restricted-tier but not step-up gated** — deliberately deferred in ADR-009 because it needs field-level rather than viewset-level gating. Still open. | `Sprint-Plan-HCM-System.md` L299 |
+| D7 | MED | **`recruitment.Offer` pay fields are Restricted-tier but not step-up gated** — deliberately deferred in ADR-009 because it needs field-level rather than viewset-level gating. Still open. | `docs/sprints/step-up-authentication-payroll.md` |
 | D8 | LOW | Stale comment: `rbac_audit/tiers.py:80` refers to `performance/permissions.py`, which does not exist (perf checks live in `performance/views.py`). | `rbac_audit/tiers.py:80` |
 | D9 | LOW | Verbatim duplicates in the frontend: `Field` (Restricted-badge renderer) is byte-identical in `EmployeeDetailPage.tsx:14-32` and `ApplicantDetailPage.tsx:27-45`; `formatZAR` in `CompProposalsPage.tsx:5-9` and `PayBandsPage.tsx:6-10`; 27 hand-written `NavLink` entries in `AppShell.tsx:102-205` (adding a page means editing `App.tsx` + `AppShell.tsx` + role gates). | as listed |
 | D10 | LOW | Test files cross the "no peer imports" boundary (`assessments/test_api.py:12` → `recruitment.models`; `ee_reporting/tests.py:8` → `learning.models`), so the rule can't be enforced with import-linter without a test carve-out. Nobody added a linter; the rule is review-only. | as listed |
-| D11 | LOW | ZAP's 141 Low / 1 021 Informational alerts from the 2026-08-13 scan were never triaged (only High/Medium were). | `Sprint-Plan-HCM-System.md` security-pass entry |
+| D11 | LOW | ZAP's 141 Low / 1 021 Informational alerts from the 2026-08-13 scan were never triaged (only High/Medium were). | `docs/sprints/h2-test-harness-frontend-consolidation.md` (moved to UAT-1's security pass) |
 
 Checked and **fine** (so you don't re-check): zero `any` / non-null assertions in the frontend; `ee-reporting/constants.ts`
 has not drifted from `ee_reporting/constants.py` (only display-label strings differ); zero TODO/FIXME in the codebase;
@@ -135,7 +135,8 @@ production-code peer-app imports except the sanctioned `learning/queries.py`; th
 > **Superseded 2026-08-18 by `ROADMAP-2026-08.md`** — the consolidated, sequenced plan for *everything* outstanding
 > (H1–H3 hardening split, X0/PC-0…PC-3 KPI contracting per ADR-010/011 and
 > `docs/superpowers/specs/2026-08-18-kpi-contracting-design.md`, C1–C7 capabilities, UAT gate). The matching
-> `[ ]` backlog entries are in `Sprint-Plan-HCM-System.md` → "Backlog additions 2026-08-18". **Start with H1.**
+> `[ ]` backlog entries are in `docs/sprints/*.md` (linked from `Sprint-Plan-HCM-System.md`'s "Backlog additions
+> 2026-08-18" table). **Start with H1.**
 > The list below is kept for the reasoning behind the ordering.
 
 Order chosen so each step de-risks the next:
@@ -241,8 +242,9 @@ If forced to pick three for the next unplanned sprint after Hardening: **(1) not
 ## 8. Working conventions that were in force (keep them)
 
 - Build fully → `manage.py test` → **drive it in a real browser across every relevant role** before calling it done
-  (this caught real bugs every time it was skipped) → update `Sprint-Plan-HCM-System.md` status block + `hcm/README.md`
-  layout/module-rules → detailed commit → push → next backlog item without asking.
+  (this caught real bugs every time it was skipped) → update the sprint's `docs/sprints/*.md` status block (plus this
+  file's one-line status + link in `Sprint-Plan-HCM-System.md`) + `hcm/README.md` layout/module-rules → detailed
+  commit → push → next backlog item without asking.
 - New module: one Django app; import only `core_hr`/`rbac_audit` (peer data via a `queries.py` seam); compose permission
   classes from `rbac_audit.permissions` primitives; sensitive models either into `FIELD_TIERS` or an explicit
   permission class with the reasoning written in the README module rules.
