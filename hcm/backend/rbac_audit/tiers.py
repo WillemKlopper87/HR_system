@@ -40,6 +40,7 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
         "department": FieldTier.PUBLIC,
         "job_title": FieldTier.PUBLIC,
         "position": FieldTier.PUBLIC,
+        "contract_end_date": FieldTier.PUBLIC,
         "occupational_level": FieldTier.INTERNAL,
         "job_grade": FieldTier.INTERNAL,
         "manager": FieldTier.INTERNAL,
@@ -52,6 +53,10 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
         "disability_detail": FieldTier.SENSITIVE,
         "race_source": FieldTier.SENSITIVE,
         "disability_source": FieldTier.SENSITIVE,
+    },
+    "core_hr.ContractRenewalDecision": {
+        "recommended_comment": FieldTier.INTERNAL,
+        "decided_comment": FieldTier.INTERNAL,
     },
     "recruitment.Applicant": {
         "first_name": FieldTier.PUBLIC,

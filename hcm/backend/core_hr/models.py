@@ -115,6 +115,7 @@ class EmployeeManager(models.Manager):
         job_grade=None,
         manager=None,
         position=None,
+        contract_end_date=None,
         race=None,
         gender=None,
         disability_status=None,
@@ -159,6 +160,7 @@ class EmployeeManager(models.Manager):
             or EmployeeVersion.CitizenshipStatus.SA_CITIZEN_BIRTH_DESCENT,
             location=location,
             position=position,
+            contract_end_date=contract_end_date,
             race=race or EmployeeVersion.Race.NOT_DISCLOSED,
             gender=gender or EmployeeVersion.Gender.NOT_DISCLOSED,
             disability_status=disability_status or EmployeeVersion.DisabilityStatus.NOT_DISCLOSED,
@@ -179,6 +181,7 @@ class EmployeeManager(models.Manager):
 VERSION_CARRY_FIELDS = (
     "department", "job_title", "occupational_level", "job_grade", "manager",
     "employment_status", "citizenship_status", "location", "position",
+    "contract_end_date",
     "race", "gender", "disability_status", "disability_detail",
     "race_source", "disability_source",
 )
@@ -340,6 +343,13 @@ class EmployeeVersion(TimestampedModel):
         related_name="employee_versions",
     )
 
+    # Meaningful only when employment_status == FIXED_TERM. Nullable by
+    # design (no forced backfill for existing fixed-term employees — see
+    # data_quality.py's MISSING_CONTRACT_END_DATE check instead). IS in
+    # VERSION_CARRY_FIELDS: an unrelated version change (e.g. a promotion)
+    # must not silently wipe a still-active contract's end date.
+    contract_end_date = models.DateField(null=True, blank=True)
+
     race = models.CharField(max_length=20, choices=Race.choices, default=Race.NOT_DISCLOSED)
     gender = models.CharField(max_length=20, choices=Gender.choices, default=Gender.NOT_DISCLOSED)
     disability_status = models.CharField(
@@ -394,6 +404,7 @@ class EmploymentEvent(TimestampedModel):
         GRADE_CHANGE = "grade_change", "Grade change"
         TERMINATION = "termination", "Termination"
         CONTRACT_CONVERSION = "contract_conversion", "Contract conversion"
+        CONTRACT_RENEWAL = "contract_renewal", "Contract renewal"
 
     class TerminationReason(models.TextChoices):
         RESIGNATION = "resignation", "Resignation"
@@ -426,11 +437,53 @@ class EmploymentEvent(TimestampedModel):
         return f"{self.employee.employee_number}: {self.get_event_type_display()} on {self.effective_date}"
 
 
+class ContractRenewalDecision(TimestampedModel):
+    """One row per upcoming fixed-term contract expiry, created the moment
+    someone (manager or hr_admin) first acts — there is no synthetic
+    'pending, nothing happened yet' row. See design spec §3.2/§4."""
+
+    class Status(models.TextChoices):
+        RECOMMENDED = "recommended", "Recommended"
+        DECIDED = "decided", "Decided"
+
+    class Action(models.TextChoices):
+        RENEW = "renew", "Renew"
+        CONVERT_PERMANENT = "convert_permanent", "Convert to permanent"
+        LET_LAPSE = "let_lapse", "Let lapse"
+
+    employee_version = models.OneToOneField(
+        EmployeeVersion, on_delete=models.CASCADE, related_name="contract_renewal_decision",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices)
+
+    recommended_action = models.CharField(max_length=20, choices=Action.choices, null=True, blank=True)
+    recommended_by = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    recommended_at = models.DateTimeField(null=True, blank=True)
+    recommended_comment = models.TextField(blank=True)
+    recommended_end_date = models.DateField(null=True, blank=True)
+
+    decided_action = models.CharField(max_length=20, choices=Action.choices, null=True, blank=True)
+    decided_by = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decided_comment = models.TextField(blank=True)
+    decided_end_date = models.DateField(null=True, blank=True)
+
+    resulting_employee_version = models.ForeignKey(
+        EmployeeVersion, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+
+    history = HistoricalRecords()
+
+    def __str__(self):
+        return f"{self.employee_version.employee.employee_number}: {self.status}"
+
+
 class DataQualityException(TimestampedModel):
     class ExceptionType(models.TextChoices):
         MISSING_GRADE = "missing_grade", "Missing job grade"
         MISSING_DEMOGRAPHICS = "missing_demographics", "Missing demographics"
         ORPHAN_RECORD = "orphan_record", "Orphan record (no version history)"
+        MISSING_CONTRACT_END_DATE = "missing_contract_end_date", "Fixed-term employee missing contract end date"
         # H3: org-wide checks registered from other apps' AppConfig.ready()
         # (data_quality.py's registry — same shape as rbac_audit/retention.py).
         # New types are added here, the shared-kernel model, rather than each

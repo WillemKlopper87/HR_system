@@ -29,7 +29,7 @@ from typing import Callable, Iterable
 from django.db import transaction
 from django.utils import timezone
 
-from .models import DataQualityException, Employee
+from .models import DataQualityException, Employee, EmployeeVersion
 
 Handler = Callable[[], Iterable[tuple[Employee, str]]]
 _HANDLERS: dict[str, Handler] = {}
@@ -95,6 +95,12 @@ def _builtin_core_hr_checks() -> Iterable[tuple[Employee, str, str]]:
             yield (
                 employee, DataQualityException.ExceptionType.MISSING_DEMOGRAPHICS,
                 f"Not disclosed: {', '.join(missing_demo)}.",
+            )
+
+        if current.employment_status == EmployeeVersion.EmploymentStatus.FIXED_TERM and current.contract_end_date is None:
+            yield (
+                employee, DataQualityException.ExceptionType.MISSING_CONTRACT_END_DATE,
+                "Fixed-term employee has no contract end date recorded.",
             )
 
 

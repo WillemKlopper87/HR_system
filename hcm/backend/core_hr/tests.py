@@ -2,13 +2,14 @@ import io
 from datetime import date
 
 import openpyxl
-from django.db.utils import IntegrityError
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from establishment.models import Position
 
 from .data_quality import run_data_quality_checks
 from .imports import import_employees_csv, import_employees_xlsx
 from .models import (
+    ContractRenewalDecision,
     DataQualityException,
     Department,
     Employee,
@@ -414,3 +415,66 @@ class EmployeeVersionPositionTests(TestCase):
         )
         self.assertEqual(successor.current_version.position_id, self.position.id)
         self.assertEqual(self.position.employee_versions.count(), 2)
+
+
+class ContractEndDateFieldTests(TestCase):
+    def setUp(self):
+        self.dept = Department.objects.create(code="ENG", name="Engineering")
+        self.level = OccupationalLevel.objects.create(code="P", name="Professional", order=99)
+        self.location = Location.objects.create(code="JHB", name="Johannesburg", province="Gauteng")
+        self.employee = Employee.objects.hire(
+            employee_number="E900", first_name="Test", last_name="Contractor",
+            date_of_birth=date(1990, 1, 1), work_email="contractor@sentech.example.com",
+            hire_date=date(2026, 1, 1), department=self.dept, occupational_level=self.level,
+            location=self.location, employment_status=EmployeeVersion.EmploymentStatus.FIXED_TERM,
+            contract_end_date=date(2026, 12, 31),
+        )
+
+    def test_contract_end_date_stored_on_hire(self):
+        self.assertEqual(self.employee.current_version.contract_end_date, date(2026, 12, 31))
+
+    def test_contract_end_date_carries_forward_on_unrelated_promotion(self):
+        self.employee.apply_lifecycle_event(
+            event_type=EmploymentEvent.EventType.PROMOTION, effective_date=date(2026, 6, 1),
+            job_title="Senior Contractor",
+        )
+        self.assertEqual(self.employee.current_version.contract_end_date, date(2026, 12, 31))
+
+    def test_contract_end_date_null_for_permanent_employee(self):
+        permanent = Employee.objects.hire(
+            employee_number="E901", first_name="Test", last_name="Permanent",
+            date_of_birth=date(1990, 1, 1), work_email="permanent@sentech.example.com",
+            hire_date=date(2026, 1, 1), department=self.dept, occupational_level=self.level,
+            location=self.location, employment_status=EmployeeVersion.EmploymentStatus.PERMANENT,
+        )
+        self.assertIsNone(permanent.current_version.contract_end_date)
+
+
+class ContractRenewalDecisionModelTests(TestCase):
+    def setUp(self):
+        self.dept = Department.objects.create(code="ENG", name="Engineering")
+        self.level = OccupationalLevel.objects.create(code="P", name="Professional", order=98)
+        self.location = Location.objects.create(code="JHB", name="Johannesburg", province="Gauteng")
+        self.manager = Employee.objects.hire(
+            employee_number="E800", first_name="Line", last_name="Manager",
+            date_of_birth=date(1980, 1, 1), work_email="linemanager@sentech.example.com",
+            hire_date=date(2020, 1, 1), department=self.dept, occupational_level=self.level,
+            location=self.location, employment_status=EmployeeVersion.EmploymentStatus.PERMANENT,
+        )
+        self.employee = Employee.objects.hire(
+            employee_number="E900", first_name="Test", last_name="Contractor",
+            date_of_birth=date(1990, 1, 1), work_email="contractor2@sentech.example.com",
+            hire_date=date(2026, 1, 1), department=self.dept, occupational_level=self.level,
+            location=self.location, employment_status=EmployeeVersion.EmploymentStatus.FIXED_TERM,
+            contract_end_date=date(2026, 12, 31), manager=self.manager,
+        )
+
+    def test_one_decision_row_per_version(self):
+        version = self.employee.current_version
+        ContractRenewalDecision.objects.create(employee_version=version, status=ContractRenewalDecision.Status.RECOMMENDED)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                ContractRenewalDecision.objects.create(employee_version=version, status=ContractRenewalDecision.Status.RECOMMENDED)
+
+    def test_no_row_created_by_default(self):
+        self.assertFalse(ContractRenewalDecision.objects.filter(employee_version=self.employee.current_version).exists())

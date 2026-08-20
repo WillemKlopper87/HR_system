@@ -2,6 +2,7 @@ from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
 from .models import (
+    ContractRenewalDecision,
     DataQualityException,
     Department,
     Employee,
@@ -19,7 +20,7 @@ class EmployeeVersionInline(admin.TabularInline):
     extra = 0
     fields = (
         "valid_from", "valid_to", "department", "occupational_level", "job_grade",
-        "manager", "employment_status", "location",
+        "manager", "employment_status", "location", "contract_end_date",
     )
     show_change_link = True
     can_delete = False
@@ -68,6 +69,13 @@ class JobGradeAdmin(SimpleHistoryAdmin):
 class LocationAdmin(SimpleHistoryAdmin):
     list_display = ("code", "name", "province", "active")
     search_fields = ("code", "name")
+
+
+@admin.register(ContractRenewalDecision)
+class ContractRenewalDecisionAdmin(SimpleHistoryAdmin):
+    list_display = ("employee_version", "status", "recommended_action", "decided_action")
+    list_filter = ("status",)
+    search_fields = ("employee_version__employee__employee_number",)
 
 
 @admin.register(DataQualityException)
