@@ -33,6 +33,40 @@ test.describe('notifications (H3)', () => {
     expect(after).toBeLessThan(before)
   })
 
+  /** Regression for the bug the test above couldn't reliably catch: the
+   * original click handler fired mark-read fire-and-forget with no local
+   * state update, so the badge only reflected reality once that request's
+   * own reload happened to finish before whatever read the badge next --
+   * unbounded, and lost under any real latency. That race was invisible on
+   * a fast/idle machine (the request usually won), which is exactly what
+   * made it slip through. Delay the response so a fix that's merely
+   * "usually fast enough" fails here, and read the badge with a raw,
+   * un-retried `textContent()` -- not an auto-retrying `expect().toHaveText()`
+   * -- so only a truly synchronous (optimistic) update passes. */
+  test('the badge decrements immediately even when mark-read is slow', async ({ page }) => {
+    await login(page, 'employee')
+    await expectHeading(page, 'Employees')
+    const bell = page.getByRole('button', { name: /Notifications/ })
+    const before = Number(await bell.locator('.notification-badge').textContent())
+    expect(before).toBeGreaterThan(0)
+
+    await page.route('**/mark-read/', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await route.continue()
+    })
+
+    await bell.click()
+    await expect(page.locator('.notification-dropdown')).toBeVisible()
+    // The dropdown lists every notification (read and unread) newest-first,
+    // not just unread ones -- a prior test in this file can leave an
+    // already-read item on top, so target an actually-unread row rather
+    // than assuming `.first()` is one.
+    await page.locator('.notification-unread .notification-item').first().click()
+
+    const after = Number((await bell.locator('.notification-badge').textContent()) ?? '0')
+    expect(after).toBe(before - 1)
+  })
+
   test('hr_admin publishes a draft policy and every current employee is notified', async ({ page }) => {
     await login(page, 'hradmin')
     await page.goto('/policies')
