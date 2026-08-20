@@ -363,7 +363,23 @@ class EmployeeVersion(TimestampedModel):
             models.CheckConstraint(
                 condition=models.Q(valid_to__isnull=True) | models.Q(valid_to__gt=models.F("valid_from")),
                 name="employeeversion_valid_to_after_valid_from",
-            )
+            ),
+            # Establishment control (C1) derives occupancy rather than
+            # storing it: Position.current_occupant/is_vacant/vacant() and
+            # recruitment's vacancy check all assume at most one CURRENT
+            # version can claim a post. Nothing but this enforced it, and
+            # current_occupant's .first() would silently pick one of two
+            # concurrent claimants instead of surfacing the conflict.
+            # Partial (valid_to IS NULL) on purpose -- a post persists
+            # across incumbents, so closed versions of former occupants
+            # must never block the next hire into it. NULL position is
+            # exempt in both engines' unique semantics, so the many
+            # employees holding no post at all are unaffected.
+            models.UniqueConstraint(
+                fields=["position"],
+                condition=models.Q(valid_to__isnull=True),
+                name="one_current_occupant_per_position",
+            ),
         ]
 
     def __str__(self):

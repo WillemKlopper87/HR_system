@@ -373,3 +373,44 @@ class EmployeeVersionPositionTests(TestCase):
             event_type=EmploymentEvent.EventType.GRADE_CHANGE, effective_date=date(2025, 1, 1),
         )
         self.assertEqual(employee.current_version.position_id, self.position.id)
+
+    def test_two_current_versions_cannot_share_one_position(self):
+        """The whole derived-occupancy design — Position.current_occupant,
+        is_vacant, Position.objects.vacant(), the hire flow's position
+        assignment, and recruitment's vacancy check — assumes at most one
+        current occupant per post. current_occupant's .first() would
+        silently pick one of two concurrent claimants rather than surface
+        the violation, so the schema has to be what enforces it."""
+        Employee.objects.hire(
+            employee_number="E0053", first_name="First", last_name="Occupant", date_of_birth=date(1990, 1, 1),
+            work_email="first.occupant@example.com", hire_date=date(2024, 1, 1), department=self.dept_a,
+            occupational_level=self.level_top, job_grade=self.grade, location=self.location, position=self.position,
+        )
+        with self.assertRaises(IntegrityError):
+            Employee.objects.hire(
+                employee_number="E0054", first_name="Second", last_name="Occupant", date_of_birth=date(1991, 1, 1),
+                work_email="second.occupant@example.com", hire_date=date(2024, 6, 1), department=self.dept_a,
+                occupational_level=self.level_top, job_grade=self.grade, location=self.location,
+                position=self.position,
+            )
+
+    def test_a_position_freed_by_a_termination_can_be_reoccupied(self):
+        """The constraint is partial (valid_to IS NULL) on purpose: a post
+        persists across incumbents (design spec §2.1/§4.4), so the closed
+        version of a leaver must never block the next hire into their old
+        post."""
+        leaver = Employee.objects.hire(
+            employee_number="E0055", first_name="Departing", last_name="Occupant", date_of_birth=date(1990, 1, 1),
+            work_email="departing.occupant@example.com", hire_date=date(2024, 1, 1), department=self.dept_a,
+            occupational_level=self.level_top, job_grade=self.grade, location=self.location, position=self.position,
+        )
+        leaver.apply_lifecycle_event(
+            event_type=EmploymentEvent.EventType.TERMINATION, effective_date=date(2025, 1, 1),
+        )
+        successor = Employee.objects.hire(
+            employee_number="E0056", first_name="Next", last_name="Occupant", date_of_birth=date(1991, 1, 1),
+            work_email="next.occupant@example.com", hire_date=date(2025, 2, 1), department=self.dept_a,
+            occupational_level=self.level_top, job_grade=self.grade, location=self.location, position=self.position,
+        )
+        self.assertEqual(successor.current_version.position_id, self.position.id)
+        self.assertEqual(self.position.employee_versions.count(), 2)
