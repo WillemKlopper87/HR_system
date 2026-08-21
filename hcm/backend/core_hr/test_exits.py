@@ -24,6 +24,7 @@ from .exits import (
     propose_employment_change,
 )
 from .models import (
+    ContractRenewalDecision,
     Department,
     Employee,
     EmployeeVersion,
@@ -589,3 +590,92 @@ class RetentionRuleSeedTests(TestCase):
             rule = RetentionRule.objects.get(entity_type=entity_type)
             self.assertEqual(rule.action, RetentionRule.Action.RETAIN)
             self.assertTrue(rule.active)
+
+
+class ContractLapseRoutesThroughCascadeTests(ExitTestCase):
+    """C1 part 2's `let_lapse` closes employment for an expiring fixed-term
+    contract. It originally called `apply_lifecycle_event` directly, so it
+    closed the employment while leaving roles, login and biometric
+    enrolment fully live -- the exact hole this cascade exists to close,
+    open for an entire class of leavers. It now routes through
+    `exits.record_executed_exit`."""
+
+    def setUp(self):
+        super().setUp()
+        version = self.employee.current_version
+        version.employment_status = EmployeeVersion.EmploymentStatus.FIXED_TERM
+        version.contract_end_date = timezone.localdate() + timedelta(days=30)
+        version.save(update_fields=["employment_status", "contract_end_date"])
+        self.version = self.employee.current_version
+
+    def _decide(self, action, **kwargs):
+        from .contracts import decide_contract_action
+
+        return decide_contract_action(self.version, actor=self.hr_admin_1, action=action, **kwargs)
+
+    def test_let_lapse_withdraws_access(self):
+        self.assertEqual(active_roles_for(self.employee).count(), 2)
+        self._decide(ContractRenewalDecision.Action.LET_LAPSE)
+
+        self.assertEqual(active_roles_for(self.employee).count(), 0)
+        self.employee.user.refresh_from_db()
+        self.assertFalse(self.employee.user.is_active)
+
+    def test_let_lapse_records_an_employment_change_for_provenance(self):
+        self._decide(ContractRenewalDecision.Action.LET_LAPSE)
+        change = EmploymentChange.objects.get(employee=self.employee)
+        self.assertEqual(change.change_type, EmploymentChange.ChangeType.CONTRACT_END)
+        self.assertEqual(change.state, EmploymentChange.State.EXECUTED)
+        # The reason is required on EmploymentChange and this workflow only
+        # collects an optional comment, so it must still name the cause.
+        self.assertIn("lapsed", change.reason.lower())
+        self.assertEqual(change.revoked_role_assignments.count(), 2)
+
+    def test_let_lapse_still_preserves_history(self):
+        self._decide(ContractRenewalDecision.Action.LET_LAPSE)
+        self.version.refresh_from_db()
+        self.assertIsNotNone(self.version.valid_to)  # closed, not deleted
+        event = EmploymentEvent.objects.get(from_version=self.version)
+        self.assertEqual(event.termination_reason, EmploymentEvent.TerminationReason.CONTRACT_END)
+        # Revoked, not deleted -- "what access did they hold" stays answerable.
+        self.assertEqual(
+            RoleAssignment.objects.filter(employee=self.employee, revoked_at__isnull=False).count(), 2
+        )
+
+    def test_renew_leaves_access_untouched(self):
+        self._decide(
+            ContractRenewalDecision.Action.RENEW,
+            end_date=timezone.localdate() + timedelta(days=400),
+        )
+        self.assertEqual(active_roles_for(self.employee).count(), 2)
+        self.employee.user.refresh_from_db()
+        self.assertTrue(self.employee.user.is_active)
+        self.assertFalse(EmploymentChange.objects.filter(employee=self.employee).exists())
+
+    def test_convert_permanent_leaves_access_untouched(self):
+        self._decide(ContractRenewalDecision.Action.CONVERT_PERMANENT)
+        self.assertEqual(active_roles_for(self.employee).count(), 2)
+        self.employee.user.refresh_from_db()
+        self.assertTrue(self.employee.user.is_active)
+        self.assertFalse(EmploymentChange.objects.filter(employee=self.employee).exists())
+
+    def test_open_employment_change_blocks_the_lapse_with_a_clear_message(self):
+        """Someone mid-decision about this person (a suspension pending a
+        hearing, say) is a genuine conflict for a human to resolve. It must
+        surface as a clean domain error, not as an IntegrityError from the
+        one-open-change constraint, and not wearing the generic
+        'already changed today' message the ValueError handler applies."""
+        from .contracts import ContractDecisionError
+
+        self._propose(change_type=EmploymentChange.ChangeType.SUSPENSION)
+        with self.assertRaises(ContractDecisionError) as ctx:
+            self._decide(ContractRenewalDecision.Action.LET_LAPSE)
+        message = str(ctx.exception).lower()
+        self.assertIn("employment change", message)
+        # The point of the dedicated EmploymentChangeError clause: without
+        # it the generic ValueError handler swallows this and substitutes an
+        # unrelated explanation, sending HR to look at the wrong problem.
+        self.assertNotIn("already changed today", message)
+        # And the lapse genuinely did not happen.
+        self.version.refresh_from_db()
+        self.assertIsNone(self.version.valid_to)

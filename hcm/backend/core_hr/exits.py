@@ -258,6 +258,49 @@ def execute_employment_change(change: EmploymentChange) -> EmploymentChange:
     return change
 
 
+@transaction.atomic
+def record_executed_exit(employee, *, actor, change_type, effective_date, reason) -> EmploymentChange:
+    """Record an exit that is *already decided elsewhere* and execute it
+    immediately, skipping propose->confirm.
+
+    This is not a back door around spec §5's review gate; it is for callers
+    that carry their own, equivalent governance and would otherwise impose a
+    second approval on one decision. The only such caller today is
+    `contracts.py`'s `let_lapse`: a fixed-term contract expiring has already
+    been through C1 part 2's recommend->decide handshake, which is a
+    two-actor review of exactly this question. Making HR then confirm an
+    `EmploymentChange` as well would be asking the same question twice.
+
+    What it deliberately does NOT skip is the cascade: it runs the identical
+    `execute_employment_change` path every other exit runs, so access
+    withdrawal, audit logging and the `EmploymentEvent` are byte-for-byte the
+    same however the exit arrived. That is the point -- before this existed,
+    `let_lapse` closed employment while leaving roles, login and biometric
+    enrolment fully live.
+
+    Anything genuinely originating in HR (dismissals, suspensions,
+    resignations) must still go through `propose_employment_change`."""
+    if change_type not in EmploymentChange.ENDING_CHANGE_TYPES:
+        raise EmploymentChangeError(
+            f"'{change_type}' is not an ending change type; only exits that are already "
+            "decided elsewhere may skip the review gate."
+        )
+    # An open proposal means someone is mid-decision about this person (a
+    # suspension pending a hearing, say). Surfacing that as a domain error
+    # beats letting the one_open_employment_change_per_employee constraint
+    # fire as an IntegrityError -- and it is a genuine conflict a human
+    # should resolve rather than something to resolve automatically.
+    _assert_no_open_change(employee)
+    change = EmploymentChange.objects.create(
+        employee=employee, change_type=change_type,
+        state=EmploymentChange.State.CONFIRMED,
+        effective_date=effective_date, reason=reason,
+        proposed_by=actor, proposed_at=timezone.now(),
+        confirmed_by=actor, confirmed_at=timezone.now(),
+    )
+    return execute_employment_change(change)
+
+
 def execute_due_employment_changes() -> dict:
     """The scheduled half of spec §2.3: every CONFIRMED change whose
     effective_date has arrived (today or already past). Called from the

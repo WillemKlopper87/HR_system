@@ -8,7 +8,9 @@ from __future__ import annotations
 from django.db import transaction
 from django.utils import timezone
 
-from .models import ContractRenewalDecision, EmployeeVersion, EmploymentEvent
+from . import exits
+from .exits import EmploymentChangeError
+from .models import ContractRenewalDecision, EmployeeVersion, EmploymentChange, EmploymentEvent
 
 
 class ContractDecisionError(ValueError):
@@ -173,22 +175,29 @@ def decide_contract_action(employee_version, *, actor, action, comment="", end_d
             )
             decision.resulting_employee_version = event.to_version
         elif action == ContractRenewalDecision.Action.LET_LAPSE:
-            # Known, deliberate gap (C1 part 3 — design spec
-            # docs/superpowers/specs/2026-08-20-employment-exit-states-design.md):
-            # this still calls apply_lifecycle_event directly rather than
-            # going through core_hr/exits.py's EmploymentChange cascade, so
-            # a lapsed contract closes employment correctly but does NOT
-            # revoke role assignments, disable the login, or suspend the
-            # biometric enrolment the way every other termination path now
-            # does. Not routed through EmploymentChange yet because that
-            # service requires a non-blank `reason` (this workflow only
-            # ever collects an optional `comment`) and can raise a new
-            # EmploymentChangeError this call site and its callers don't
-            # handle -- see Data-Dictionary.md's employment_change section
-            # for the full reasoning and the intended follow-up.
-            employee.apply_lifecycle_event(
-                event_type=EmploymentEvent.EventType.TERMINATION, effective_date=effective_date,
-                termination_reason=EmploymentEvent.TerminationReason.CONTRACT_END,
+            # Routed through exits.py so a lapsed contract withdraws access
+            # exactly like every other termination (C1 part 3, spec §6.1):
+            # closing employment without revoking roles, disabling the login
+            # and suspending the biometric enrolment would leave the precise
+            # hole that cascade exists to close, open for an entire class of
+            # leavers.
+            #
+            # record_executed_exit, not propose+confirm: this decision has
+            # already been through C1 part 2's recommend->decide handshake,
+            # which is a two-actor review of exactly this question. Asking HR
+            # to confirm an EmploymentChange as well would be asking it twice.
+            # The cascade itself is not skipped -- only the redundant gate.
+            exits.record_executed_exit(
+                employee, actor=actor,
+                change_type=EmploymentChange.ChangeType.CONTRACT_END,
+                effective_date=effective_date,
+                # EmploymentChange.reason is required and this workflow only
+                # collects an optional comment, so name the cause and point
+                # at the decision that made it rather than storing a blank.
+                reason=(
+                    f"Fixed-term contract lapsed (contract renewal decision #{decision.pk})."
+                    + (f" {comment}" if comment else "")
+                ),
             )
         else:
             raise ContractDecisionError(f"'{action}' is not a valid decision action.")
@@ -198,6 +207,13 @@ def decide_contract_action(employee_version, *, actor, action, comment="", end_d
         # must not fall into the generic ValueError handling below and get
         # double-wrapped with a misleading message.
         raise
+    except EmploymentChangeError as exc:
+        # Same hazard, different exception: EmploymentChangeError is also a
+        # ValueError subclass, so without this clause the generic handler
+        # below would swallow a precise message ("this employee already has
+        # an open employment change") and replace it with the unrelated
+        # "already changed today". Carry the real reason through as a 400.
+        raise ContractDecisionError(str(exc)) from exc
     except ValueError as exc:
         # apply_lifecycle_event raises a bare ValueError for two
         # conditions, and this message is specific to one of them, so it
