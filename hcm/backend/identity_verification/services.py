@@ -36,8 +36,11 @@ def _has_biometric_consent(employee) -> bool:
 def enroll_employee(*, employee, descriptor: list[float], actor=None) -> BiometricEnrollment:
     if not _has_biometric_consent(employee):
         raise ConsentRequiredError(CONSENT_HINT)
+    # active=True in defaults: a fresh enrol/re-enrol always (re)activates
+    # -- e.g. a rehired employee whose old enrolment was deactivated by
+    # C1 part 3's exit cascade must not stay locked out forever.
     enrollment, _ = BiometricEnrollment.objects.update_or_create(
-        employee=employee, defaults={"descriptor": descriptor, "enrolled_by": actor}
+        employee=employee, defaults={"descriptor": descriptor, "enrolled_by": actor, "active": True}
     )
     return enrollment
 
@@ -65,6 +68,12 @@ def run_liveness_check(
     enrollment = BiometricEnrollment.objects.filter(employee=employee).first()
     if enrollment is None:
         raise EnrollmentRequiredError("This employee has no biometric enrollment on file yet.")
+    if not enrollment.active:
+        # C1 part 3: a suspension or exit deactivates the enrolment
+        # (identity_verification/exit_handlers.py) so a departed or
+        # suspended person genuinely cannot pass a check, not just "loses
+        # role-gated access to the result".
+        raise EnrollmentRequiredError("This employee's biometric enrollment is suspended.")
 
     if descriptor is None:
         outcome = LivenessCheck.Outcome.NO_FACE_DETECTED

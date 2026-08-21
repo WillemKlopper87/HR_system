@@ -26,6 +26,16 @@ class BiometricEnrollment(TimestampedModel):
     enrolled_by = models.ForeignKey(
         Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name="enrollments_captured"
     )
+    # C1 part 3 (employment exit access cascade, design spec §6.1/§6.3):
+    # deactivated -- never deleted -- when a person is suspended or exits,
+    # so a departed or suspended employee can't pass a liveness check
+    # (services.py::run_liveness_check checks this). "The one thing that
+    # is deactivated rather than kept usable is the biometric descriptor
+    # ... there is no audit reason to keep a departed person's face
+    # template live" -- the descriptor value itself is left untouched
+    # (not wiped), simple_history already preserves prior values, and a
+    # LIFT_SUSPENSION flips this back to True.
+    active = models.BooleanField(default=True)
     history = HistoricalRecords()
 
     class Meta:

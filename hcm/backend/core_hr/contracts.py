@@ -173,6 +173,19 @@ def decide_contract_action(employee_version, *, actor, action, comment="", end_d
             )
             decision.resulting_employee_version = event.to_version
         elif action == ContractRenewalDecision.Action.LET_LAPSE:
+            # Known, deliberate gap (C1 part 3 — design spec
+            # docs/superpowers/specs/2026-08-20-employment-exit-states-design.md):
+            # this still calls apply_lifecycle_event directly rather than
+            # going through core_hr/exits.py's EmploymentChange cascade, so
+            # a lapsed contract closes employment correctly but does NOT
+            # revoke role assignments, disable the login, or suspend the
+            # biometric enrolment the way every other termination path now
+            # does. Not routed through EmploymentChange yet because that
+            # service requires a non-blank `reason` (this workflow only
+            # ever collects an optional `comment`) and can raise a new
+            # EmploymentChangeError this call site and its callers don't
+            # handle -- see Data-Dictionary.md's employment_change section
+            # for the full reasoning and the intended follow-up.
             employee.apply_lifecycle_event(
                 event_type=EmploymentEvent.EventType.TERMINATION, effective_date=effective_date,
                 termination_reason=EmploymentEvent.TerminationReason.CONTRACT_END,

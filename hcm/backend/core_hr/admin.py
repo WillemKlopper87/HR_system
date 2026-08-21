@@ -7,6 +7,7 @@ from .models import (
     Department,
     Employee,
     EmployeeVersion,
+    EmploymentChange,
     EmploymentEvent,
     JobGrade,
     Location,
@@ -83,3 +84,11 @@ class DataQualityExceptionAdmin(admin.ModelAdmin):
     list_display = ("employee", "exception_type", "detected_at", "resolved_at")
     list_filter = ("exception_type",)
     search_fields = ("employee__employee_number",)
+
+
+@admin.register(EmploymentChange)
+class EmploymentChangeAdmin(SimpleHistoryAdmin):
+    list_display = ("employee", "change_type", "state", "effective_date", "proposed_by", "confirmed_by")
+    list_filter = ("change_type", "state")
+    search_fields = ("employee__employee_number",)
+    readonly_fields = ("revoked_role_assignments", "resulting_event")

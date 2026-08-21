@@ -7,6 +7,7 @@ from django.test import TestCase
 from rbac_audit.consent import record_consent
 from rbac_audit.models import ConsentRecord
 
+from .exit_handlers import restore_biometric_enrollment, suspend_biometric_enrollment
 from .geo import OFFICE_GEOFENCE_RADIUS_M, haversine_distance_m
 from .matching import DescriptorError, MATCH_THRESHOLD, euclidean_distance
 from .models import BiometricEnrollment, LivenessCheck
@@ -153,6 +154,71 @@ class EnrollAndCheckServiceTests(TestCase):
         enroll_employee(employee=other, descriptor=self.descriptor)
         check = run_liveness_check(employee=other, descriptor=self.descriptor, latitude=-26.2041, longitude=28.0473)
         self.assertIsNone(check.at_office)
+
+
+class SuspendedEnrollmentTests(TestCase):
+    """C1 part 3 (employment exit access cascade): a deactivated
+    BiometricEnrollment must actually block a liveness check, not just sit
+    inert in the database -- otherwise "suspend the enrolment" (design spec
+    §6.1 step 3) has no real effect."""
+
+    def setUp(self):
+        self.dept, self.level, self.grade, self.location = _seed_reference_data()
+        self.employee = _hire("E010", dept=self.dept, level=self.level, grade=self.grade, location=self.location)
+        self.descriptor = [0.1] * 128
+        _consent(self.employee)
+        enroll_employee(employee=self.employee, descriptor=self.descriptor)
+
+    def test_a_suspended_enrollment_cannot_pass_a_liveness_check(self):
+        BiometricEnrollment.objects.filter(employee=self.employee).update(active=False)
+        with self.assertRaises(EnrollmentRequiredError):
+            run_liveness_check(employee=self.employee, descriptor=self.descriptor)
+
+    def test_a_reactivated_enrollment_can_pass_a_liveness_check_again(self):
+        BiometricEnrollment.objects.filter(employee=self.employee).update(active=False)
+        BiometricEnrollment.objects.filter(employee=self.employee).update(active=True)
+        check = run_liveness_check(employee=self.employee, descriptor=self.descriptor)
+        self.assertEqual(check.outcome, LivenessCheck.Outcome.MATCH)
+
+    def test_re_enrollment_reactivates_a_suspended_enrollment(self):
+        """A rehired employee's old, deactivated enrolment must not stay
+        locked out forever."""
+        BiometricEnrollment.objects.filter(employee=self.employee).update(active=False)
+        enroll_employee(employee=self.employee, descriptor=[0.2] * 128)
+        self.assertTrue(BiometricEnrollment.objects.get(employee=self.employee).active)
+
+
+class ExitHandlerTests(TestCase):
+    """Unit coverage for the functions core_hr/access_cascade.py dispatches
+    to (registered from IdentityVerificationConfig.ready()) -- separate
+    from core_hr/test_exits.py's end-to-end coverage of the full cascade."""
+
+    def setUp(self):
+        self.dept, self.level, self.grade, self.location = _seed_reference_data()
+        self.employee = _hire("E011", dept=self.dept, level=self.level, grade=self.grade, location=self.location)
+
+    def test_suspend_deactivates_an_active_enrollment_and_reports_one_affected(self):
+        _consent(self.employee)
+        enroll_employee(employee=self.employee, descriptor=[0.1] * 128)
+        affected = suspend_biometric_enrollment(self.employee)
+        self.assertEqual(affected, 1)
+        self.assertFalse(BiometricEnrollment.objects.get(employee=self.employee).active)
+
+    def test_suspend_with_no_enrollment_on_file_is_a_harmless_no_op(self):
+        affected = suspend_biometric_enrollment(self.employee)
+        self.assertEqual(affected, 0)
+
+    def test_restore_reactivates_a_suspended_enrollment(self):
+        _consent(self.employee)
+        enroll_employee(employee=self.employee, descriptor=[0.1] * 128)
+        suspend_biometric_enrollment(self.employee)
+        affected = restore_biometric_enrollment(self.employee)
+        self.assertEqual(affected, 1)
+        self.assertTrue(BiometricEnrollment.objects.get(employee=self.employee).active)
+
+    def test_restore_with_nothing_suspended_is_a_harmless_no_op(self):
+        affected = restore_biometric_enrollment(self.employee)
+        self.assertEqual(affected, 0)
 
 
 class ReviewServiceTests(TestCase):

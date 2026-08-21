@@ -98,6 +98,53 @@ statutory data) or a decision recorded against a historical version while the ev
 `EmployeeVersionSerializer` (registered Internal in `rbac_audit/tiers.py`) plus a row-relational check that hides
 it from the subject of the decision — see `RBAC-Roles.md` for who can actually read and write it.
 
+### employment_change (C1 part 3 — exit state machine & access cascade)
+
+The propose → confirm → execute object for a suspension or an employment exit. Spec:
+`docs/superpowers/specs/2026-08-20-employment-exit-states-design.md`.
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| employee | FK employee | ✔ | — | `CASCADE` |
+| change_type | enum | ✔ | I | suspension / lift_suspension / dismissal_summary / dismissal_misconduct / dismissal_incapacity / operational_requirements / resignation / retirement / contract_end / death |
+| state | enum | ✔ | I | proposed → confirmed → executed, or cancelled from either non-terminal state. DB-enforced: at most one non-terminal row per employee (`one_open_employment_change_per_employee`) |
+| effective_date | date | ✔ | I | When the cascade runs. Forced to today for `dismissal_summary` (immediate by definition); execution is scheduled otherwise — see `core_hr/tasks.py`'s daily sweep |
+| reason | text | ✔ | I | Free text; enforced non-blank in the service layer, not the column. "A dismissal without a recorded reason is not defensible" |
+| proposed_by / proposed_at | FK employee / datetime | ✔ | I | `PROTECT` |
+| confirmed_by / confirmed_at | FK employee, null / datetime, null | | I | `PROTECT`. Tiered types (suspension, lift, and every dismissal ground) require a *different* person from `proposed_by`; routine leavers (resignation/retirement/contract_end/death) may self-confirm |
+| executed_at | datetime, null | | I | Set when the cascade runs |
+| cancelled_by / cancelled_at / cancellation_reason | FK employee, null / datetime, null / text | | I | `PROTECT`. Only reachable from `proposed`/`confirmed` |
+| lifts_suspension | FK employment_change (self), null | | I | `PROTECT`. Set only for `lift_suspension` — the suspension row being reversed |
+| revoked_role_assignments | M2M role_assignment | | — | The assignments THIS execution revoked, so a lift restores precisely those (a restored grant is a **new** `role_assignment` row, not an un-revocation of the old one) |
+| resulting_event | FK employment_event, null | | — | `SET_NULL`. Null for suspension/lift_suspension, which create no lifecycle event — **suspension is deliberately not a lifecycle event** (§2.1 of the spec): `valid_to` stays null and no `employment_event` row is written, or the EEA2 termination count would be corrupted |
+
+Execution (spec §6) revokes every active `role_assignment`, disables `employee.user.is_active` where a login
+exists, suspends the biometric enrolment (`identity_verification.biometric_enrollment.active`, via a registry in
+`core_hr/access_cascade.py` so `core_hr` never imports that domain app), and — ending types only — closes
+employment through the existing `Employee.apply_lifecycle_event()`. Every step writes an `audit_log_entry`
+(`rbac_audit`). **Nothing is deleted**: versions are closed, role assignments are revoked (not removed), and the
+`employment_change` row itself is permanent provenance — see the retention note below.
+
+**Retention:** `employment_event` and `employment_change` are both seeded as explicit `retain` rows in
+`retention_rule` (`core_hr/migrations/0011_seed_employment_retention_rules.py`) — see spec §7. A dismissal can
+reach the CCMA well after the fact, and BCEA practice keeps employment records for three years post-termination at
+a minimum; the executor honours only what a rule states, so this turns "nobody has proposed deleting these yet"
+into a recorded decision. **Any future rule against `employee`, `employee_version`, `employment_event`, or
+`employment_change` other than `retain` is a decision with real legal exposure and belongs in an ADR, not a bare
+migration.**
+
+**Known gap, decided deliberately (not silently):** C1 part 2's `decide_contract_action(..., action=let_lapse)`
+still calls `apply_lifecycle_event(TERMINATION, termination_reason=CONTRACT_END)` directly — it does **not** create
+an `employment_change` row and does not run the access cascade. A contract left to lapse today still ends
+employment correctly (the `employment_event`/EEA2 side is unaffected) but does **not** revoke roles, disable
+login, or suspend biometric enrolment. Routing it through `employment_change` was considered and deferred: doing
+so would require `decide_contract_action` to start requiring a non-blank `reason` (it currently only takes an
+optional `comment`) and would introduce a new failure mode (`EmploymentChangeError` if another change is already
+in flight) into a workflow whose contract and view layer weren't built with either in mind. The clean fix is a
+follow-up once `employment_change` has its own view/API layer: have the `let_lapse` branch construct-and-
+immediately-execute a `contract_end` `employment_change` (deriving `reason` from `comment`, defaulting if blank)
+in the same transaction.
+
 ### department / job_grade / location
 
 Standard reference tables (name, code, active). `department.parent` (FK self) forms the org tree. `job_grade.occupational_level` maps internal grades to EEA levels.
