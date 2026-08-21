@@ -21,22 +21,17 @@ pushed** — `origin/master` is current.
 | Sidebar redesign, audit-log flake, notification badge, H3 docs split | various | Done, pushed |
 | `docs/MVP-Backlog.md`, org-chart visibility decision | `3527db9`, `b228543` | Done, pushed |
 
-**Full backend suite: 768 passing** as of `cdfbac4`; `core_hr` + API + exits
-(130 tests) passing as of `74e2697`. The full suite has **not** been re-run
-since `74e2697` — do that first (see below).
+**Full backend suite: 774 passing, verified at `74e2697`** (2026-08-21, ~10 min
+run). No fallout from routing contract lapse through the cascade.
 
 ## Do this first in a new session
 
-1. **Re-run the full backend suite** (`python manage.py test` in `hcm/backend`).
-   It takes ~12 minutes. `74e2697` touched `contracts.py`, which every
-   contract test flows through; the targeted 130 passed but the full sweep
-   hasn't run since.
-2. **Run the e2e suite** (`npm test` in `hcm/frontend`). Ports 8000/5173 are
+1. **Run the e2e suite** (`npm test` in `hcm/frontend`). Ports 8000/5173 are
    often held by an unrelated project — repoint `playwright.config.ts`,
    `vite.config.ts` and `e2e/backend-server.mjs` to free ports, set
    `DJANGO_CSRF_TRUSTED_ORIGINS` via env, then **revert all three** and confirm
    byte-identical before committing.
-3. `manage.py check` and `makemigrations --check --dry-run`.
+2. `manage.py check` and `makemigrations --check --dry-run`.
 
 ## Next up (agreed sequence)
 
