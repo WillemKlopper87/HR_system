@@ -229,6 +229,20 @@ class Command(BaseCommand):
             hr_head.user = User.objects.create_user(username="hradmin", password="hradmin123")
             hr_head.save(update_fields=["user"])
 
+            # A SECOND hr_admin, so the four-eyes control on suspensions and
+            # dismissals (C1 part 3, spec §4.2 -- confirmed_by must differ from
+            # proposed_by) is actually demonstrable. With one hr_admin seeded,
+            # every tiered change is proposable but unconfirmable, so the
+            # control could only ever be seen failing.
+            hr_second = next(
+                (v.employee for v in hr_head.direct_reports.filter(valid_to__isnull=True).select_related("employee")),
+                None,
+            )
+            if hr_second is not None:
+                RoleAssignment.objects.create(employee=hr_second, role=hr_admin_role)
+                hr_second.user = User.objects.create_user(username="hradmin2", password="hradmin123")
+                hr_second.save(update_fields=["user"])
+
             eng_head = dept_heads[dept_codes.index("ENG")]
             RoleAssignment.objects.create(employee=eng_head, role=line_manager_role)
             eng_head.user = User.objects.create_user(username="manager", password="manager123")
@@ -334,7 +348,8 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"Seeded {employee_counter} employees across {len(departments)} departments."))
         self.stdout.write(
-            "Demo logins — hradmin/hradmin123 (HR Admin), manager/manager123 (Line Manager), "
+            "Demo logins — hradmin/hradmin123 (HR Admin), hradmin2/hradmin123 (second HR Admin, "
+            "for two-person confirmation), manager/manager123 (Line Manager), "
             "recruiter/recruiter123 (Recruiter), compmanager/compmanager123 (Comp Manager), "
             "eemanager/eemanager123 (EE Manager), accountingofficer/accountingofficer123 (Accounting Officer), "
             "auditor/auditor123 (Auditor), employee/employee123 (Employee). Local development only."
