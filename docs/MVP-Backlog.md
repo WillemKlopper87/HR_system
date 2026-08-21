@@ -20,7 +20,35 @@ Two distinct things live here:
 |---|---|---|---|
 | 1 | **HR helpdesk / case management** | Unplanned | Ticketing, query routing, SLAs. Would pair naturally with C4's approvals inbox. |
 | 2 | **Engagement / pulse surveys / eNPS** | Unplanned | No module, no backlog entry. Doesn't touch compliance, payroll integrity, or establishment control — the three themes this system is organised around. |
-| 3 | **Org chart visualisation** | Unplanned | The *data* exists (`EmployeeVersion.manager`, snapshotted per version). There is no visual hierarchy anywhere — Org Structure renders departments/grades/locations as tables. High demo value, low build cost. |
+| 3 | **Org chart visualisation** | ✅ Built (HR side) — staff-facing view assigned to collab | `/org-chart` shipped 2026-08-20: collapsible tree over `EmployeeVersion.manager`, search with ancestor reveal, cycle-safe by construction. **Role-gated** — see the decision below. |
+
+#### Decision (2026-08-20): who sees the org chart, and where it lives
+
+The HR-system chart is gated to roles that can see a meaningful tree (`hr_admin`, `line_manager`,
+`auditor`, `ee_manager`, `recruiter`, `comp_manager`, `accounting_officer`). A plain `employee` has
+`row_scope=self`, so they would see a chart containing only themselves.
+
+Opening it to everyone *inside HR_system* was considered and rejected. `manager` is **INTERNAL** tier
+(`rbac_audit/tiers.py`), so a company-wide tree would mean either declassifying that field or carving a
+bypass around row-scoping — in a system whose stated differentiator is exactly that access model. Neither
+is worth a convenience feature.
+
+**User decision:** every staff member *should* be able to see the org chart, but that view belongs on the
+**collab platform**, not here — so it doesn't disturb an access model already built and reviewed. Today
+collab carries only a high-level picture, not granular reporting lines; the full picture stays with HR.
+
+Consequences for whoever picks that up (cross-repo, not HR_system work):
+
+- HR_system remains **system of record** for reporting lines. Collab renders; it does not own.
+- `integrations/collab.py` is deliberately **outbound-only** and, per its own docstring, "never reads back
+  state that would drive HCM decisions." A push of org structure fits that direction; a collab-initiated
+  pull would not.
+- Exporting the tree to a platform where everyone can see it is a **deliberate declassification** of an
+  INTERNAL-tier field. That is defensible — org charts are normally internal-public — but it should be a
+  recorded decision (an ADR), not a side effect of an integration.
+- Sync shape needs designing: what is pushed (name, title, department, manager — almost certainly not
+  grade, location or employment status), how it stays current as people move, and what happens to a
+  terminated or suspended person's node.
 | 4 | **Workforce planning — budget half** | Unplanned | Positions/establishment shipped (C1 ①). Budget/establishment cost modelling against those posts did not, and isn't on the backlog. |
 
 ### A2. Workflows
