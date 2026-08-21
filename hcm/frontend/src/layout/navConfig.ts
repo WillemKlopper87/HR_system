@@ -25,6 +25,9 @@ const ASSESS = ['ee_manager', 'hr_admin'] as const
 const EE = ['hr_admin', 'ee_manager', 'accounting_officer', 'auditor'] as const
 const AUDIT_ROLES = ['hr_admin', 'auditor'] as const
 const CONTRACTS = ['hr_admin', 'line_manager', 'auditor'] as const
+// Narrower than CONTRACTS on purpose: line managers do not see or propose
+// exits (design spec §8) — those originate from a disciplinary process (C5).
+const EXITS = ['hr_admin', 'auditor'] as const
 // `manager` is INTERNAL tier and row-scoping means a plain `employee` (row
 // scope `self`) would see a chart containing only themselves — rather than
 // build a bypass endpoint, the page is limited to roles that can see a
@@ -46,6 +49,7 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       // audience (alongside Employees / Data Quality) better than
       // Recruitment does.
       { to: '/contract-renewals', label: 'Contract Renewals', roles: CONTRACTS },
+      { to: '/employment-changes', label: 'Employment Changes', roles: EXITS },
       { to: '/dashboards/headcount', label: 'Headcount', roles: [] },
     ],
   },

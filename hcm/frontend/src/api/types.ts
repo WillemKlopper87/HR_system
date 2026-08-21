@@ -77,6 +77,82 @@ export const CONTRACT_ACTION_LABELS: Record<ContractAction, string> = {
   let_lapse: 'Let lapse',
 }
 
+// ---- Employment exit states & access cascade (C1 part 3) ----
+
+export type EmploymentChangeType =
+  | 'suspension'
+  | 'lift_suspension'
+  | 'dismissal_summary'
+  | 'dismissal_misconduct'
+  | 'dismissal_incapacity'
+  | 'operational_requirements'
+  | 'resignation'
+  | 'retirement'
+  | 'contract_end'
+  | 'death'
+
+export type EmploymentChangeState = 'proposed' | 'confirmed' | 'executed' | 'cancelled'
+
+export interface EmploymentChange {
+  id: number
+  employee: number
+  change_type: EmploymentChangeType
+  state: EmploymentChangeState
+  effective_date: string
+  reason: string
+  proposed_by: number | null
+  proposed_at: string | null
+  confirmed_by: number | null
+  confirmed_at: string | null
+  executed_at: string | null
+  cancelled_by: number | null
+  cancelled_at: string | null
+  cancellation_reason: string
+  lifts_suspension: number | null
+  resulting_event: number | null
+}
+
+export const EMPLOYMENT_CHANGE_TYPE_LABELS: Record<EmploymentChangeType, string> = {
+  suspension: 'Suspension (pending investigation)',
+  lift_suspension: 'Lift suspension',
+  dismissal_summary: 'Summary dismissal',
+  dismissal_misconduct: 'Dismissal — misconduct',
+  dismissal_incapacity: 'Dismissal — incapacity',
+  operational_requirements: 'Operational requirements',
+  resignation: 'Resignation',
+  retirement: 'Retirement',
+  contract_end: 'Contract end',
+  death: 'Death',
+}
+
+/** Types that require a *different* hr_admin to confirm (design spec §4.2 —
+ * the ones with CCMA exposure or that are hardest to undo). Mirrored here so
+ * the form can warn before submission; the backend is the actual authority
+ * and rejects a same-person confirmation regardless of what the UI shows. */
+export const TIERED_CHANGE_TYPES: readonly EmploymentChangeType[] = [
+  'suspension',
+  'lift_suspension',
+  'dismissal_summary',
+  'dismissal_misconduct',
+  'dismissal_incapacity',
+  'operational_requirements',
+]
+
+/** Change types a user proposes directly. `contract_end` is excluded on
+ * purpose: it is produced by the contract renewal workflow's `let_lapse`
+ * (which carries its own two-actor review), never captured by hand here. */
+export const PROPOSABLE_CHANGE_TYPES: readonly EmploymentChangeType[] = [
+  'suspension',
+  'lift_suspension',
+  'resignation',
+  'retirement',
+  'dismissal_summary',
+  'dismissal_misconduct',
+  'dismissal_incapacity',
+  'operational_requirements',
+  'death',
+]
+
 export interface Department {
   id: number
   name: string

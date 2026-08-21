@@ -11,6 +11,7 @@ import { AssessmentsPage } from './pages/AssessmentsPage'
 import { BenefitsPage } from './pages/BenefitsPage'
 import { CompProposalsPage } from './pages/CompProposalsPage'
 import { ContractRenewalsPage } from './pages/ContractRenewalsPage'
+import { EmploymentChangesPage } from './pages/EmploymentChangesPage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { EEConfigurationPage } from './pages/EEConfigurationPage'
 import { EEReportsPage } from './pages/EEReportsPage'
@@ -86,6 +87,12 @@ export default function App() {
             </Route>
             <Route element={<RequireRole roles={['hr_admin', 'line_manager', 'auditor']} />}>
               <Route path="/contract-renewals" element={<ContractRenewalsPage />} />
+            </Route>
+            {/* Narrower than the contract-renewals set above: line managers
+                do not see or propose exits (design spec §8) — suspensions and
+                dismissals originate from a disciplinary process (C5). */}
+            <Route element={<RequireRole roles={['hr_admin', 'auditor']} />}>
+              <Route path="/employment-changes" element={<EmploymentChangesPage />} />
             </Route>
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/reviews/:id" element={<ReviewDetailPage />} />
