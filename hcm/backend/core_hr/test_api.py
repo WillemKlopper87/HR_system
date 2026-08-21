@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 from rbac_audit.models import AuditLogEntry, Role, RoleAssignment
+from rbac_audit.permissions import active_roles_for
 from rest_framework.test import APIClient
 
 from .data_quality import run_data_quality_checks
@@ -15,6 +16,7 @@ from .models import (
     Department,
     Employee,
     EmployeeVersion,
+    EmploymentChange,
     EmploymentEvent,
     JobGrade,
     Location,
@@ -1019,3 +1021,135 @@ class ContractActionApiTests(TestCase):
             {"action": "renew", "end_date": "2027-12-31"}, format="json",
         )
         self.assertEqual(response.status_code, 200, response.data)
+
+
+class EmploymentChangeApiTests(TestCase):
+    """C1 part 3 slice 2: the HTTP surface over exits.py. The service layer
+    already owns every state rule, so these assert the things only the API
+    layer can get wrong — who may reach it (403), and that a domain refusal
+    arrives as a 400 rather than a 500 or a silent success."""
+
+    def setUp(self):
+        self.client = APIClient()
+        dept, level, grade, location = _seed_reference_data()
+
+        def _hire(number, username, email, first="Test", last="Person"):
+            return Employee.objects.hire(
+                employee_number=number, first_name=first, last_name=last,
+                date_of_birth=date(1985, 1, 1), work_email=email, hire_date=date(2015, 1, 1),
+                department=dept, occupational_level=level, job_grade=grade, location=location,
+                user=User.objects.create_user(username=username, password="x"),
+            )
+
+        # Two hr_admins, so the tiered "different person" rule has a real
+        # second actor rather than being untestable.
+        self.hr_admin = _hire("HRX1", "hrx1", "hrx1@example.com", "First", "Admin")
+        self.hr_admin_2 = _hire("HRX2", "hrx2", "hrx2@example.com", "Second", "Admin")
+        for admin in (self.hr_admin, self.hr_admin_2):
+            RoleAssignment.objects.create(employee=admin, role=Role.objects.get(name="hr_admin"))
+
+        self.auditor = _hire("AUDX", "audx", "audx@example.com", "Aud", "Itor")
+        RoleAssignment.objects.create(employee=self.auditor, role=Role.objects.get(name="auditor"))
+
+        self.staff = _hire("EX900", "ex900", "ex900@example.com", "Departing", "Person")
+        RoleAssignment.objects.create(employee=self.staff, role=Role.objects.get(name="employee"))
+
+    def _propose(self, change_type, actor=None):
+        self.client.force_authenticate(user=(actor or self.hr_admin).user)
+        return self.client.post(
+            "/api/v1/employment-changes/",
+            {
+                "employee": self.staff.id, "change_type": change_type,
+                "effective_date": timezone.localdate().isoformat(), "reason": "Under investigation.",
+            },
+            format="json",
+        )
+
+    # --- who may reach it at all (spec §8) ---
+
+    def test_hr_admin_can_propose(self):
+        response = self._propose(EmploymentChange.ChangeType.SUSPENSION)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(EmploymentChange.objects.filter(employee=self.staff).count(), 1)
+
+    def test_auditor_can_read_but_not_propose(self):
+        self._propose(EmploymentChange.ChangeType.SUSPENSION)
+        self.client.force_authenticate(user=self.auditor.user)
+        self.assertEqual(self.client.get("/api/v1/employment-changes/").status_code, 200)
+        response = self._propose(EmploymentChange.ChangeType.RESIGNATION, actor=self.auditor)
+        self.assertEqual(response.status_code, 403, response.data)
+
+    def test_plain_employee_cannot_read_or_propose(self):
+        self.client.force_authenticate(user=self.staff.user)
+        self.assertEqual(self.client.get("/api/v1/employment-changes/").status_code, 403)
+        response = self._propose(EmploymentChange.ChangeType.RESIGNATION, actor=self.staff)
+        self.assertEqual(response.status_code, 403, response.data)
+
+    # --- the four-eyes rule, through the API, both directions (spec §4.2) ---
+
+    def test_tiered_type_rejects_same_person_confirming(self):
+        """A dismissal proposed and confirmed by one person is the control
+        failing silently. It must be refused, and as a 400 (a state rule)
+        rather than a 403 — the actor's *role* is fine, their identity is
+        not."""
+        change_id = self._propose(EmploymentChange.ChangeType.DISMISSAL_MISCONDUCT).data["id"]
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(f"/api/v1/employment-changes/{change_id}/confirm/", {}, format="json")
+        self.assertEqual(response.status_code, 400, response.data)
+        change = EmploymentChange.objects.get(pk=change_id)
+        self.assertEqual(change.state, EmploymentChange.State.PROPOSED)
+        # And crucially the cascade did not run.
+        self.assertEqual(active_roles_for(self.staff).count(), 1)
+
+    def test_tiered_type_accepts_a_different_hr_admin(self):
+        change_id = self._propose(EmploymentChange.ChangeType.DISMISSAL_MISCONDUCT).data["id"]
+        self.client.force_authenticate(user=self.hr_admin_2.user)
+        response = self.client.post(f"/api/v1/employment-changes/{change_id}/confirm/", {}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        # Effective today, so it executes immediately and access is gone.
+        self.assertEqual(active_roles_for(self.staff).count(), 0)
+        self.staff.user.refresh_from_db()
+        self.assertFalse(self.staff.user.is_active)
+
+    def test_routine_type_may_be_self_confirmed(self):
+        """The other half of "tiered": an ordinary resignation must not be
+        bottlenecked on finding a second HR person."""
+        change_id = self._propose(EmploymentChange.ChangeType.RESIGNATION).data["id"]
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(f"/api/v1/employment-changes/{change_id}/confirm/", {}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+
+    # --- cancellation keeps a mistake recoverable (spec §5) ---
+
+    def test_cancel_leaves_access_untouched(self):
+        change_id = self._propose(EmploymentChange.ChangeType.DISMISSAL_SUMMARY).data["id"]
+        self.client.force_authenticate(user=self.hr_admin_2.user)
+        response = self.client.post(
+            f"/api/v1/employment-changes/{change_id}/cancel/", {"reason": "Captured in error."}, format="json"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(
+            EmploymentChange.objects.get(pk=change_id).state, EmploymentChange.State.CANCELLED
+        )
+        self.assertEqual(active_roles_for(self.staff).count(), 1)
+        self.staff.user.refresh_from_db()
+        self.assertTrue(self.staff.user.is_active)
+
+    # --- domain refusals arrive as 400, not 500 ---
+
+    def test_second_open_change_is_400_not_500(self):
+        self._propose(EmploymentChange.ChangeType.SUSPENSION)
+        response = self._propose(EmploymentChange.ChangeType.RESIGNATION)
+        self.assertEqual(response.status_code, 400, response.data)
+
+    def test_missing_reason_is_400(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            "/api/v1/employment-changes/",
+            {
+                "employee": self.staff.id, "change_type": EmploymentChange.ChangeType.RESIGNATION,
+                "effective_date": timezone.localdate().isoformat(), "reason": "   ",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)

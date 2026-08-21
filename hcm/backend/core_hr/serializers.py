@@ -10,6 +10,7 @@ from .models import (
     Department,
     Employee,
     EmployeeVersion,
+    EmploymentChange,
     JobGrade,
     Location,
     OccupationalLevel,
@@ -166,6 +167,34 @@ class LocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location
         fields = ["id", "name", "code", "province", "active"]
+
+
+class EmploymentChangeSerializer(serializers.ModelSerializer):
+    """employee/change_type/effective_date/reason are the only
+    client-writable fields on create ('propose' — see
+    EmploymentChangeViewSet.perform_create) — state, the proposer/
+    confirmer/canceller trail, and the lift's link back to the suspension
+    it restores are all computed server-side by exits.py's service layer,
+    never trusted from client input (same shape as
+    compensation.CompProposalSerializer). effective_date is genuinely
+    client-writable for every OTHER change type, but for
+    DISMISSAL_SUMMARY the service layer overwrites whatever is submitted
+    with today's date regardless (spec §4.2) — nothing to enforce here,
+    that rule lives in exits.py alongside the rest of the state machine."""
+
+    class Meta:
+        model = EmploymentChange
+        fields = [
+            "id", "employee", "change_type", "state", "effective_date", "reason",
+            "proposed_by", "proposed_at", "confirmed_by", "confirmed_at", "executed_at",
+            "cancelled_by", "cancelled_at", "cancellation_reason",
+            "lifts_suspension", "resulting_event",
+        ]
+        read_only_fields = [
+            "state", "proposed_by", "proposed_at", "confirmed_by", "confirmed_at", "executed_at",
+            "cancelled_by", "cancelled_at", "cancellation_reason",
+            "lifts_suspension", "resulting_event",
+        ]
 
 
 class DataQualityExceptionSerializer(serializers.ModelSerializer):

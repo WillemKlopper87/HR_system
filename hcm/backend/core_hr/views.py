@@ -15,20 +15,23 @@ from rbac_audit.permissions import can_see_unsuppressed_aggregates, has_role, is
 from rbac_audit.tiers import FieldTier
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .contracts import ContractDecisionError, decide_contract_action, recommend_contract_action
 from .data_quality import run_data_quality_checks
+from .exits import EmploymentChangeError, cancel_employment_change, confirm_employment_change, propose_employment_change
 from .models import (
     DataQualityException,
     Department,
     Employee,
     EmployeeVersion,
+    EmploymentChange,
     JobGrade,
     Location,
     OccupationalLevel,
 )
-from .permissions import IsHRAdmin, IsHRAdminOrReadOnly
+from .permissions import EmploymentChangePermission, IsHRAdmin, IsHRAdminOrReadOnly
 from .serializers import (
     ContractActionInputSerializer,
     ContractRenewalDecisionSerializer,
@@ -36,6 +39,7 @@ from .serializers import (
     DepartmentSerializer,
     EmployeeSerializer,
     EmployeeVersionSerializer,
+    EmploymentChangeSerializer,
     JobGradeSerializer,
     LocationSerializer,
     OccupationalLevelSerializer,
@@ -273,6 +277,73 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # (EmployeeVersionViewSet's own get_target_employee shape).
         version_context = {"request": request, "view": SimpleNamespace(get_target_employee=lambda obj: obj.employee)}
         return Response(EmployeeVersionSerializer(version, context=version_context).data)
+
+
+class EmploymentChangeViewSet(viewsets.ModelViewSet):
+    """The exit state machine's HTTP surface (C1 part 3, design spec
+    docs/superpowers/specs/2026-08-20-employment-exit-states-design.md).
+    exits.py's service layer already enforces every state rule; this
+    viewset's job is EmploymentChangePermission's role gate (spec §8) and
+    translating EmploymentChangeError -> 400, never re-implementing
+    domain logic (exits.py's own module docstring on the 403-vs-400
+    split, and contracts.py's decide_contract_action for the worked
+    example of NOT letting a bare `except ValueError` swallow it).
+
+    No PATCH/PUT/DELETE — a change only ever moves forward through
+    propose -> confirm(/cancel) -> execute (execute itself has no
+    endpoint: it happens inside confirm when due, or via the daily beat
+    job otherwise), the same shape as CompProposalViewSet/PositionViewSet."""
+
+    queryset = EmploymentChange.objects.select_related(
+        "employee", "proposed_by", "confirmed_by", "cancelled_by", "lifts_suspension", "resulting_event"
+    )
+    serializer_class = EmploymentChangeSerializer
+    permission_classes = [EmploymentChangePermission]
+    http_method_names = ["get", "post", "head", "options"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        employee_id = int_query_param(self.request, "employee")
+        if employee_id is not None:
+            queryset = queryset.filter(employee_id=employee_id)
+        return queryset.order_by("-proposed_at")
+
+    def perform_create(self, serializer):
+        try:
+            serializer.instance = propose_employment_change(
+                employee=serializer.validated_data["employee"],
+                actor=get_request_employee(self.request),
+                change_type=serializer.validated_data["change_type"],
+                effective_date=serializer.validated_data["effective_date"],
+                reason=serializer.validated_data["reason"],
+            )
+        except EmploymentChangeError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+
+    @action(detail=True, methods=["post"])
+    def confirm(self, request, pk=None):
+        """hr_admin only (EmploymentChangePermission); the tiered-type
+        "must be a different person" rule (spec §4.2) is decided from
+        identity alone, not role, so it stays in exits.py and surfaces
+        here as the 400 branch, not a second 403 check."""
+        change = self.get_object()
+        actor = get_request_employee(request)
+        try:
+            confirm_employment_change(change, actor=actor)
+        except EmploymentChangeError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return Response(self.get_serializer(change).data)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        """Any hr_admin, not just the proposer (spec §8)."""
+        change = self.get_object()
+        actor = get_request_employee(request)
+        try:
+            cancel_employment_change(change, actor=actor, reason=request.data.get("reason", ""))
+        except EmploymentChangeError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return Response(self.get_serializer(change).data)
 
 
 class ProtectedDeleteMixin:

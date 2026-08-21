@@ -6,6 +6,7 @@ from .views import (
     DepartmentViewSet,
     EmployeeVersionViewSet,
     EmployeeViewSet,
+    EmploymentChangeViewSet,
     JobGradeViewSet,
     LocationViewSet,
     OccupationalLevelViewSet,
@@ -15,6 +16,7 @@ from .views import (
 router = DefaultRouter()
 router.register("employees", EmployeeViewSet, basename="employee")
 router.register("employee-versions", EmployeeVersionViewSet, basename="employee-version")
+router.register("employment-changes", EmploymentChangeViewSet, basename="employment-change")
 router.register("departments", DepartmentViewSet, basename="department")
 router.register("occupational-levels", OccupationalLevelViewSet, basename="occupational-level")
 router.register("job-grades", JobGradeViewSet, basename="job-grade")
