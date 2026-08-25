@@ -69,7 +69,7 @@ from onboarding.services import create_template as create_checklist_template
 from onboarding.services import publish_template as publish_checklist_template
 from identity_verification.models import LivenessCheck
 from identity_verification.services import enroll_employee, run_liveness_check
-from learning.models import Certification, EmployeeSkill, Skill, TrainingRecord
+from learning.models import Certification, Course, CourseRequirement, EmployeeSkill, Skill, TrainingRecord
 from performance.models import Feedback, Goal, Review, ReviewCycle
 from performance.services import launch_review_cycle
 from policies.models import Policy
@@ -680,6 +680,57 @@ class Command(BaseCommand):
                 employee=direct_report, title="Advanced Python for Data Engineers", provider="Internal L&D",
                 status=TrainingRecord.Status.IN_PROGRESS, start_date=date(2026, 7, 1), hours="16.0",
             )
+
+        # --- C6: mandatory-training compliance -- course catalogue +
+        # requirement rules, with a deliberate mix of compliant/overdue
+        # people so the dashboard, the row-scoped overdue list, and the
+        # data-quality sweep all have something real to show.
+        today = timezone.localdate()
+        popia_course = Course.objects.create(
+            name="POPIA Awareness Refresher", provider="Internal L&D", hours="2.0", mandatory=True,
+            validity_days=365,
+        )
+        safety_course = Course.objects.create(
+            name="Workplace Safety Induction", provider="Internal L&D", hours="4.0", mandatory=True,
+        )
+        Course.objects.create(name="Advanced Excel", provider="Internal L&D", hours="8.0", mandatory=False)
+
+        # Org-wide: everyone must have a current POPIA refresher.
+        CourseRequirement.objects.create(
+            course=popia_course, effective_from=today - timedelta(days=400), due_within_days=90,
+        )
+        # Department-scoped: only manager's own department (Engineering)
+        # must complete the safety induction -- exercises the by-department
+        # breakdown and the row-scoped overdue list's department-narrower
+        # population, distinct from the org-wide rule above.
+        eng_dept = manager.current_version.department
+        CourseRequirement.objects.create(
+            course=safety_course, department=eng_dept, effective_from=today - timedelta(days=200),
+            due_within_days=60,
+        )
+
+        if direct_report is not None:
+            # Compliant on the org-wide course, overdue on the department
+            # one -- both states visible for the one demo employee whose
+            # login (employee/employee123) e2e coverage drives directly.
+            TrainingRecord.objects.create(
+                employee=direct_report, course=popia_course, title=popia_course.name, provider=popia_course.provider,
+                status=TrainingRecord.Status.COMPLETED, completion_date=today - timedelta(days=30), hours="2.0",
+            )
+
+        # A realistic completion rate on the org-wide course: roughly a
+        # third of the sampled workforce slice is compliant, the rest sit
+        # overdue (the rule's effective_from is far enough in the past
+        # that due_within_days has already elapsed for everyone).
+        for employee in sampled:
+            if employee is direct_report:
+                continue
+            if rng.random() < 0.35:
+                TrainingRecord.objects.create(
+                    employee=employee, course=popia_course, title=popia_course.name,
+                    provider=popia_course.provider, status=TrainingRecord.Status.COMPLETED,
+                    completion_date=today - timedelta(days=rng.randint(10, 300)), hours="2.0",
+                )
 
     def _seed_compensation_demo_data(self, *, levels, grades_by_level, comp_manager, hr_admin, direct_report, rng):
         """Pay bands scaled by seniority (order 1 = top management = highest
