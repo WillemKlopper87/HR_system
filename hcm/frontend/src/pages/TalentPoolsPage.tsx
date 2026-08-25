@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import { useReferenceData } from '../api/ReferenceDataContext'
@@ -356,7 +357,9 @@ function CandidateRow({
 
   return (
     <tr>
-      <td>{employeeName(candidate.employee)}</td>
+      <td>
+        <Link to={`/employees/${candidate.employee}`}>{employeeName(candidate.employee)}</Link>
+      </td>
       <td>
         <select
           value={candidate.readiness} disabled={busy}
