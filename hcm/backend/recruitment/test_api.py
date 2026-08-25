@@ -9,7 +9,8 @@ from establishment.models import Position
 from rbac_audit.models import ConsentRecord, Role, RoleAssignment
 from rest_framework.test import APIClient
 
-from .models import Applicant, Offer, Requisition
+from .models import Applicant, BackgroundCheck, InterviewScorecard, InterviewSession, Offer, Requisition
+from .services import transition_applicant
 
 User = get_user_model()
 
@@ -275,3 +276,243 @@ class RequisitionPositionValidationApiTests(RecruitmentApiTestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("positions", response.data)
+
+
+def _hire_employee(dept, level, grade, location, *, number, first, last, email, username):
+    return Employee.objects.hire(
+        employee_number=number, first_name=first, last_name=last, date_of_birth=date(1988, 5, 5),
+        work_email=email, hire_date=date(2019, 1, 1), department=dept, occupational_level=level,
+        job_grade=grade, location=location, user=User.objects.create_user(username=username, password="x"),
+    )
+
+
+class InterviewSchedulingApiTestCase(RecruitmentApiTestCase):
+    """Base for InterviewSession/InterviewScorecard tests: two interviewer
+    employees (holding no recruitment-module role at all -- being tapped as
+    a panelist is a row-level, ad-hoc assignment, not tied to a role) and
+    the shared applicant moved to the 'interview' stage."""
+
+    def setUp(self):
+        super().setUp()
+        self.interviewer1 = _hire_employee(
+            self.dept, self.level, self.grade, self.location,
+            number="E200", first="Ivy", last="Interviewer", email="ivy@example.com", username="ivy",
+        )
+        self.interviewer2 = _hire_employee(
+            self.dept, self.level, self.grade, self.location,
+            number="E201", first="Ian", last="Panelist", email="ian@example.com", username="ian",
+        )
+        transition_applicant(self.applicant, to_stage=Applicant.Stage.SCREENED, actor=self.recruiter)
+        transition_applicant(self.applicant, to_stage=Applicant.Stage.INTERVIEW, actor=self.recruiter)
+
+
+class InterviewSessionApiTests(InterviewSchedulingApiTestCase):
+    def test_scheduling_requires_applicant_at_interview_stage(self):
+        not_ready = Applicant.objects.create(
+            requisition=self.requisition, first_name="Not", last_name="Ready",
+            email="notready@example.com", date_of_birth=date(1990, 1, 1),
+        )
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.post("/api/v1/interview-sessions/", {
+            "applicant": not_ready.id, "scheduled_at": "2026-09-01T10:00:00Z",
+            "interviewers": [self.interviewer1.id],
+        }, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("applicant", response.data)
+
+    def test_at_least_one_interviewer_required(self):
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.post("/api/v1/interview-sessions/", {
+            "applicant": self.applicant.id, "scheduled_at": "2026-09-01T10:00:00Z", "interviewers": [],
+        }, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("interviewers", response.data)
+
+    def test_recruiter_can_schedule_session_with_narrow_applicant_summary(self):
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.post("/api/v1/interview-sessions/", {
+            "applicant": self.applicant.id, "scheduled_at": "2026-09-01T10:00:00Z", "round_number": 1,
+            "location": "Boardroom 2", "interviewers": [self.interviewer1.id, self.interviewer2.id],
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        summary = response.data["applicant_summary"]
+        self.assertEqual(summary["first_name"], "Alex")
+        self.assertEqual(summary["current_stage"], "interview")
+        # Deliberately narrow -- no demographics, no email/phone/date_of_birth.
+        self.assertNotIn("race", summary)
+        self.assertNotIn("email", summary)
+        self.assertNotIn("date_of_birth", summary)
+
+    def test_plain_employee_with_no_panel_membership_sees_empty_list(self):
+        session = InterviewSession.objects.create(applicant=self.applicant, scheduled_at="2026-09-01T10:00:00Z")
+        session.interviewers.set([self.interviewer1])
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.get("/api/v1/interview-sessions/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 0)
+
+    def test_non_panel_employee_cannot_retrieve_directly(self):
+        """interviewer2 holds no recruitment role and isn't on THIS
+        session's panel -- get_queryset's row-filtering excludes it before
+        object-level permissions are even checked, so this is a 404 (object
+        not in their filtered queryset), not a 403 -- same "filtered out,
+        not merely permission-denied" shape succession's own self-exclusion
+        uses."""
+        session = InterviewSession.objects.create(applicant=self.applicant, scheduled_at="2026-09-01T10:00:00Z")
+        session.interviewers.set([self.interviewer1])
+        self.client.force_authenticate(user=self.interviewer2.user)
+        response = self.client.get(f"/api/v1/interview-sessions/{session.id}/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_assigned_interviewer_can_read_but_not_write_own_session(self):
+        session = InterviewSession.objects.create(applicant=self.applicant, scheduled_at="2026-09-01T10:00:00Z")
+        session.interviewers.set([self.interviewer1])
+        self.client.force_authenticate(user=self.interviewer1.user)
+
+        read = self.client.get(f"/api/v1/interview-sessions/{session.id}/")
+        self.assertEqual(read.status_code, 200)
+
+        write = self.client.patch(f"/api/v1/interview-sessions/{session.id}/", {"notes": "x"}, format="json")
+        self.assertEqual(write.status_code, 403)
+
+
+class InterviewScorecardApiTests(InterviewSchedulingApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.session = InterviewSession.objects.create(applicant=self.applicant, scheduled_at="2026-09-01T10:00:00Z")
+        self.session.interviewers.set([self.interviewer1, self.interviewer2])
+
+    def _submit(self, user, *, rating=4, recommendation="hire", extra=None):
+        self.client.force_authenticate(user=user)
+        payload = {
+            "session": self.session.id, "skill_rating": rating, "communication_rating": rating,
+            "culture_fit_rating": rating, "comments": "Solid.", "recommendation": recommendation,
+        }
+        payload.update(extra or {})
+        return self.client.post("/api/v1/interview-scorecards/", payload, format="json")
+
+    def test_non_panel_employee_cannot_submit(self):
+        response = self._submit(self.plain_employee.user)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("session", response.data)
+
+    def test_interviewer_field_is_forced_server_side_not_client_supplied(self):
+        response = self._submit(self.interviewer1.user, extra={"interviewer": self.interviewer2.id})
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["interviewer"], self.interviewer1.id)
+
+    def test_duplicate_scorecard_for_same_session_rejected(self):
+        first = self._submit(self.interviewer1.user)
+        self.assertEqual(first.status_code, 201, first.data)
+        second = self._submit(self.interviewer1.user)
+        self.assertEqual(second.status_code, 400)
+
+    def test_blind_review_hides_peer_score_until_own_submitted(self):
+        submitted = self._submit(self.interviewer1.user, rating=5, recommendation="strong_hire")
+        self.assertEqual(submitted.status_code, 201, submitted.data)
+
+        self.client.force_authenticate(user=self.interviewer2.user)
+        before = self.client.get("/api/v1/interview-scorecards/")
+        self.assertEqual(before.status_code, 200)
+        peer_row = next(r for r in before.data["results"] if r["interviewer"] == self.interviewer1.id)
+        self.assertNotIn("recommendation", peer_row)
+        self.assertNotIn("skill_rating", peer_row)
+        self.assertNotIn("comments", peer_row)
+        # Existence is still visible -- only content is masked.
+        self.assertEqual(peer_row["session"], self.session.id)
+
+        own = self._submit(self.interviewer2.user, rating=3, recommendation="hire")
+        self.assertEqual(own.status_code, 201, own.data)
+
+        after = self.client.get("/api/v1/interview-scorecards/")
+        peer_row_after = next(r for r in after.data["results"] if r["interviewer"] == self.interviewer1.id)
+        self.assertEqual(peer_row_after["recommendation"], "strong_hire")
+        self.assertEqual(peer_row_after["skill_rating"], 5)
+
+    def test_recruiter_always_sees_full_detail_without_submitting_own(self):
+        self._submit(self.interviewer1.user, rating=5, recommendation="strong_hire")
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.get("/api/v1/interview-scorecards/")
+        self.assertEqual(response.status_code, 200)
+        row = response.data["results"][0]
+        self.assertIn("recommendation", row)
+        self.assertEqual(row["recommendation"], "strong_hire")
+
+    def test_non_panel_employee_sees_no_scorecards_at_all(self):
+        self._submit(self.interviewer1.user, rating=5, recommendation="strong_hire")
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.get("/api/v1/interview-scorecards/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 0)
+
+    def test_not_even_hr_admin_can_author_on_anothers_behalf(self):
+        """No proxy-entry (design spec §2.2) -- hr_admin can READ every
+        scorecard but creating one always attributes to the authenticated
+        actor, and hr_admin isn't an assigned interviewer on this session at
+        all, so a create attempt is rejected the same way plain_employee's is."""
+        response = self._submit(self.hr_admin.user)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("session", response.data)
+
+
+class BackgroundCheckApiTests(RecruitmentApiTestCase):
+    def test_recruiter_can_create_and_requested_by_is_forced_server_side(self):
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.post("/api/v1/background-checks/", {
+            "applicant": self.applicant.id, "check_type": "reference", "status": "requested",
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["requested_by"], self.recruiter.id)
+
+    def test_status_can_move_non_monotonically(self):
+        """No ALLOWED_TRANSITIONS state machine (unlike Applicant.Stage) --
+        a flagged result can legitimately be revised to cleared after a
+        documented review (design spec §2.3)."""
+        self.client.force_authenticate(user=self.hr_admin.user)
+        check = BackgroundCheck.objects.create(
+            applicant=self.applicant, check_type=BackgroundCheck.CheckType.CRIMINAL_RECORD,
+            status=BackgroundCheck.Status.FLAGGED,
+        )
+        response = self.client.patch(
+            f"/api/v1/background-checks/{check.id}/",
+            {"status": "cleared", "notes": "False-positive name match, verified with SAPS."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["status"], "cleared")
+
+    def test_plain_employee_forbidden(self):
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.get("/api/v1/background-checks/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_assigned_interviewer_has_no_access_at_all(self):
+        """Unlike InterviewSession/InterviewScorecard, an interviewer gets
+        nothing here -- background-check outcomes are exactly the kind of
+        thing an interviewer forming their own independent impression
+        should not see (design spec §2.3)."""
+        interviewer = _hire_employee(
+            self.dept, self.level, self.grade, self.location,
+            number="E202", first="Ivy", last="Interviewer", email="ivy2@example.com", username="ivy2",
+        )
+        session = InterviewSession.objects.create(applicant=self.applicant, scheduled_at="2026-09-01T10:00:00Z")
+        session.interviewers.set([interviewer])
+        self.client.force_authenticate(user=interviewer.user)
+        response = self.client.get("/api/v1/background-checks/")
+        self.assertEqual(response.status_code, 403)
+
+
+class RequisitionExternalPostingFieldTests(RecruitmentApiTestCase):
+    def test_external_posting_defaults_false(self):
+        self.assertFalse(self.requisition.external_posting)
+
+    def test_recruiter_can_flag_a_requisition_externally_postable(self):
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.patch(
+            f"/api/v1/requisitions/{self.requisition.id}/",
+            {"external_posting": True, "description": "Great team, great work."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["external_posting"])
+        self.assertEqual(response.data["description"], "Great team, great work.")
