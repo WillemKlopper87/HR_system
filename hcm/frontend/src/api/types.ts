@@ -1276,6 +1276,7 @@ export interface PerformanceAgreement {
   improvement_plans: ImprovementPlan[]
   signatures: AgreementSignature[]
   documents: AgreementDocument[]
+  calibration_adjustments: CalibrationAdjustment[]
 }
 
 export interface CanSignResponse {
@@ -1523,4 +1524,113 @@ export interface SuccessionCandidate {
   latest_performance: SuccessionPerformanceContext | null
   created_at: string
   updated_at: string
+}
+
+// ---- Performance calibration/moderation + 360 feedback (C6) ----
+// docs/superpowers/specs/2026-08-25-performance-calibration-360-design.md
+
+export type CalibrationSessionStatus = 'open' | 'completed'
+
+export interface CalibrationAdjustment {
+  id: number
+  session: number
+  agreement: number
+  agreement_employee_name: string
+  previous_score: string | null
+  new_score: string | null
+  reason: string
+  adjusted_by: number | null
+  adjusted_by_name: string | null
+  created_at: string
+}
+
+export interface CalibrationSession {
+  id: number
+  period: number
+  period_name: string
+  department: number | null
+  department_name: string | null
+  status: CalibrationSessionStatus
+  status_display: string
+  meeting_date: string | null
+  participants_note: string
+  summary: string
+  convened_by: number | null
+  convened_by_name: string | null
+  completed_at: string | null
+  created_at: string
+  adjustments: CalibrationAdjustment[]
+}
+
+export interface CalibrationCandidate {
+  id: number
+  employee_name: string
+  employee_number: string
+  department_name: string | null
+  final_score: string
+  hr_attention: boolean
+}
+
+export type Feedback360RequestStatus = 'open' | 'closed'
+export type Feedback360Relationship = 'self' | 'manager' | 'peer' | 'direct_report'
+export type Feedback360RaterStatus = 'pending_approval' | 'approved' | 'declined_nomination' | 'withdrawn'
+
+export const FEEDBACK_360_RELATIONSHIP_LABELS: Record<Feedback360Relationship, string> = {
+  self: 'Self', manager: 'Manager / Head', peer: 'Peer', direct_report: 'Direct report',
+}
+
+export interface Feedback360Response {
+  id: number
+  rater_slot: number
+  collaboration_rating: number
+  communication_rating: number
+  reliability_rating: number
+  strengths: string
+  development_areas: string
+  submitted_at: string
+}
+
+export interface Feedback360Rater {
+  id: number
+  request: number
+  rater: number
+  rater_name: string
+  relationship: Feedback360Relationship
+  relationship_display: string
+  status: Feedback360RaterStatus
+  status_display: string
+  nominated_by: number | null
+  approved_by: number | null
+  approved_at: string | null
+  has_submitted: boolean
+  // Masked server-side per the visibility decision (spec §2.10): null both
+  // when nothing was submitted yet AND when the viewer isn't allowed to see
+  // this particular row's content -- the two cases are indistinguishable on
+  // purpose, so the UI must not infer "not submitted" from a null response.
+  response: Feedback360Response | null
+  subject_name: string
+  period_name: string
+  created_at: string
+}
+
+export interface Feedback360Aggregate {
+  response_count: number
+  collaboration_rating: number
+  communication_rating: number
+  reliability_rating: number
+}
+
+export interface Feedback360Request {
+  id: number
+  agreement: number
+  status: Feedback360RequestStatus
+  status_display: string
+  opened_by: number | null
+  opened_by_name: string | null
+  due_date: string | null
+  closed_at: string | null
+  created_at: string
+  raters: Feedback360Rater[]
+  peer_aggregate: Feedback360Aggregate | null
+  direct_report_aggregate: Feedback360Aggregate | null
 }

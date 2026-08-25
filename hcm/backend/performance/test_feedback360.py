@@ -286,6 +286,22 @@ class VisibilityTests(Feedback360TestCase):
         response = self.client.get(f"/api/v1/feedback-360-requests/{self.request.id}/")
         self.assertEqual(response.status_code, 404)  # _HideForbiddenAsNotFound
 
+    def test_mine_forces_own_slots_only_even_for_hr_admin(self):
+        # hr_admin is also, incidentally, the auto-approved manager rater on
+        # nothing here, but they can_read_all -- ?mine=true must still narrow
+        # to "my own slots", the same distinction InterviewSession's
+        # ?mine=true draws for recruiter/hr_admin panelists.
+        self._login(self.hr_admin)
+        everything = self.client.get(f"/api/v1/feedback-360-raters/?request={self.request.id}")
+        self.assertEqual(len(everything.data["results"]), 3)  # self, manager, peer
+
+        mine = self.client.get(f"/api/v1/feedback-360-raters/?request={self.request.id}&mine=true")
+        self.assertEqual(mine.data["results"], [])  # hr_admin isn't a rater on this round
+
+        self._login(self.other)
+        mine_peer = self.client.get(f"/api/v1/feedback-360-raters/?request={self.request.id}&mine=true")
+        self.assertEqual([r["id"] for r in mine_peer.data["results"]], [self.peer_slot.id])
+
     def test_a_peer_rater_can_still_reach_their_own_slot_via_the_rater_list(self):
         # `other` cannot view the whole request (asserted implicitly above via
         # masking) but their own slot is reachable through the rater endpoint

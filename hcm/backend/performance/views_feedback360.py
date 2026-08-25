@@ -112,7 +112,8 @@ class Feedback360RaterViewSet(_HideForbiddenAsNotFound, viewsets.ModelViewSet):
     `Feedback360RaterPermission` for the two-layer authority split."""
 
     queryset = Feedback360Rater.objects.select_related(
-        "request__agreement__employee", "request__agreement__head", "rater", "nominated_by", "approved_by", "response"
+        "request__agreement__employee", "request__agreement__head", "request__agreement__period",
+        "rater", "nominated_by", "approved_by", "response",
     )
     serializer_class = Feedback360RaterSerializer
     permission_classes = [Feedback360RaterPermission]
@@ -125,6 +126,13 @@ class Feedback360RaterViewSet(_HideForbiddenAsNotFound, viewsets.ModelViewSet):
         request_id = int_query_param(self.request, "request")
         if request_id is not None:
             qs = qs.filter(request_id=request_id)
+        # ?mine=true forces "slots I'm personally the rater for", even for
+        # hr_admin/auditor -- same shape recruitment's InterviewSession
+        # `?mine=true` uses, for the identical reason: "give me the admin
+        # view of every round" and "give me only what I've been asked to
+        # rate" are different requests role alone can't distinguish.
+        if self.request.query_params.get("mine") == "true":
+            return qs.filter(rater=employee)
         if can_read_all(employee):
             return qs
         if self.action != "list":

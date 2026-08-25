@@ -86,6 +86,7 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       { to: '/course-catalogue', label: 'Course Catalogue', roles: HR },
       { to: '/dashboards/training-compliance', label: 'Training Compliance', roles: HR },
       { to: '/talent-pools', label: 'Talent Pools', roles: HR },
+      { to: '/calibration', label: 'Calibration', roles: HR },
       { to: '/assessments', label: 'Assessments', roles: ASSESS },
     ],
   },
@@ -120,6 +121,9 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       // assignment, not tied to any role -- roles: [] like every other
       // My Space item, not RECRUIT.
       { to: '/my-interviews', label: 'My Interviews', roles: [] },
+      // Same shape as My Interviews: being asked to rate someone is a
+      // row-level assignment, not a role.
+      { to: '/my-feedback-requests', label: 'My 360° Feedback', roles: [] },
       { to: '/my-benefits', label: 'My Benefits', roles: [] },
       { to: '/my-learning', label: 'My Learning', roles: [] },
       { to: '/my-policies', label: 'My Policies', roles: [] },

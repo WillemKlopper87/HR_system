@@ -9,6 +9,7 @@ import { ApplicantDetailPage } from './pages/ApplicantDetailPage'
 import { ApplicantsPage } from './pages/ApplicantsPage'
 import { AssessmentsPage } from './pages/AssessmentsPage'
 import { BenefitsPage } from './pages/BenefitsPage'
+import { CalibrationPage } from './pages/CalibrationPage'
 import { CareersListPage } from './pages/CareersListPage'
 import { CareersPostingPage } from './pages/CareersPostingPage'
 import { ChecklistsPage } from './pages/ChecklistsPage'
@@ -26,6 +27,7 @@ import { EquityDashboardPage } from './pages/EquityDashboardPage'
 import { HeadcountDashboardPage } from './pages/HeadcountDashboardPage'
 import { MyBenefitsPage } from './pages/MyBenefitsPage'
 import { MyDocumentsPage } from './pages/MyDocumentsPage'
+import { MyFeedbackRequestsPage } from './pages/MyFeedbackRequestsPage'
 import { MyInterviewsPage } from './pages/MyInterviewsPage'
 import { MyLearningPage } from './pages/MyLearningPage'
 import { MyProfilePage } from './pages/MyProfilePage'
@@ -96,6 +98,7 @@ export default function App() {
               <Route path="/course-catalogue" element={<CourseCataloguePage />} />
               <Route path="/dashboards/training-compliance" element={<TrainingCompliancePage />} />
               <Route path="/talent-pools" element={<TalentPoolsPage />} />
+              <Route path="/calibration" element={<CalibrationPage />} />
             </Route>
             <Route path="/dashboards/headcount" element={<HeadcountDashboardPage />} />
             <Route element={<RequireRole roles={['recruiter', 'hr_admin']} />}>
@@ -150,6 +153,7 @@ export default function App() {
             />
             <Route path="/my-profile" element={<MyProfilePage />} />
             <Route path="/my-interviews" element={<MyInterviewsPage />} />
+            <Route path="/my-feedback-requests" element={<MyFeedbackRequestsPage />} />
             <Route path="/my-benefits" element={<MyBenefitsPage />} />
             <Route path="/my-learning" element={<MyLearningPage />} />
             <Route path="/my-documents" element={<MyDocumentsPage />} />

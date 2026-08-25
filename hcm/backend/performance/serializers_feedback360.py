@@ -34,18 +34,29 @@ class Feedback360RaterSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     has_submitted = serializers.SerializerMethodField()
     response = serializers.SerializerMethodField()
+    # Convenience context for "/my-feedback-requests" (design spec §7),
+    # where a bare `request` id isn't enough to show the rater who they're
+    # being asked to rate -- mirrors the *_name convenience fields used
+    # throughout this module rather than making the frontend fetch the
+    # parent Feedback360Request/agreement separately.
+    subject_name = serializers.SerializerMethodField()
+    period_name = serializers.CharField(source="request.agreement.period.name", read_only=True)
 
     class Meta:
         model = Feedback360Rater
         fields = [
             "id", "request", "rater", "rater_name", "relationship", "relationship_display", "status",
             "status_display", "nominated_by", "approved_by", "approved_at", "has_submitted", "response",
-            "created_at",
+            "subject_name", "period_name", "created_at",
         ]
         read_only_fields = ["relationship", "status", "nominated_by", "approved_by", "approved_at", "created_at"]
 
     def get_rater_name(self, obj) -> str:
         return f"{obj.rater.first_name} {obj.rater.last_name}"
+
+    def get_subject_name(self, obj) -> str:
+        employee = obj.request.agreement.employee
+        return f"{employee.first_name} {employee.last_name}"
 
     def get_has_submitted(self, obj) -> bool:
         return obj.has_submitted
