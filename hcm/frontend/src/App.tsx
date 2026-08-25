@@ -43,8 +43,10 @@ import { RequisitionsPage } from './pages/RequisitionsPage'
 import { ReviewCyclesPage } from './pages/ReviewCyclesPage'
 import { ReviewDetailPage } from './pages/ReviewDetailPage'
 import { ReviewsPage } from './pages/ReviewsPage'
+import { CourseCataloguePage } from './pages/CourseCataloguePage'
 import { SkillsInventoryPage } from './pages/SkillsInventoryPage'
 import { TeamDevelopmentPage } from './pages/TeamDevelopmentPage'
+import { TrainingCompliancePage } from './pages/TrainingCompliancePage'
 import { WorkforceIntegrityPage } from './pages/WorkforceIntegrityPage'
 
 // Code-split: face-api.js pulls in TensorFlow.js (~1MB) for client-side
@@ -78,6 +80,8 @@ export default function App() {
               <Route path="/data-quality" element={<DataQualityPage />} />
               <Route path="/review-cycles" element={<ReviewCyclesPage />} />
               <Route path="/skills-inventory" element={<SkillsInventoryPage />} />
+              <Route path="/course-catalogue" element={<CourseCataloguePage />} />
+              <Route path="/dashboards/training-compliance" element={<TrainingCompliancePage />} />
             </Route>
             <Route path="/dashboards/headcount" element={<HeadcountDashboardPage />} />
             <Route element={<RequireRole roles={['recruiter', 'hr_admin']} />}>

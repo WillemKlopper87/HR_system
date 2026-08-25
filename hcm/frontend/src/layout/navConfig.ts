@@ -83,6 +83,8 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       { to: '/performance-records', label: 'Performance Records', roles: AUDIT_ROLES },
       { to: '/team-development', label: 'Team Development', roles: [] },
       { to: '/skills-inventory', label: 'Skills Inventory', roles: HR },
+      { to: '/course-catalogue', label: 'Course Catalogue', roles: HR },
+      { to: '/dashboards/training-compliance', label: 'Training Compliance', roles: HR },
       { to: '/assessments', label: 'Assessments', roles: ASSESS },
     ],
   },

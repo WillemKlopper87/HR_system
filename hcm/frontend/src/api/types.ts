@@ -532,6 +532,7 @@ export interface TrainingRecord {
   employee: number
   title?: string
   provider?: string
+  course?: number | null
   status?: TrainingStatus
   start_date?: string | null
   completion_date?: string | null
@@ -545,6 +546,61 @@ export const TRAINING_STATUS_LABELS: Record<TrainingStatus, string> = {
   in_progress: 'In progress',
   completed: 'Completed',
   cancelled: 'Cancelled',
+}
+
+// C6: mandatory-training compliance (design spec
+// docs/superpowers/specs/2026-08-25-mandatory-training-compliance-design.md)
+export interface Course {
+  id: number
+  name: string
+  provider?: string
+  description?: string
+  hours?: string | null
+  mandatory: boolean
+  validity_days?: number | null
+  active: boolean
+}
+
+export interface CourseRequirement {
+  id: number
+  course: number
+  department: number | null
+  occupational_level: number | null
+  effective_from: string
+  due_within_days: number
+  active: boolean
+}
+
+export type ComplianceStatusLabel = 'compliant' | 'due' | 'overdue'
+
+export interface TrainingComplianceBreakdownRow {
+  key: string
+  total_subject: number
+  compliant: number
+  due: number
+  overdue: number
+}
+
+export interface TrainingComplianceCourseRow {
+  course: number
+  name: string
+  total_subject: number
+  compliant: number
+  due: number
+  overdue: number
+  completion_rate_pct: number | null
+  by_department: TrainingComplianceBreakdownRow[]
+  by_occupational_level: TrainingComplianceBreakdownRow[]
+}
+
+export interface OverdueTrainingRow {
+  employee: number
+  employee_number: string
+  name: string
+  course: number
+  course_name: string
+  due_date: string
+  days_overdue: number
 }
 
 export interface PayBand {

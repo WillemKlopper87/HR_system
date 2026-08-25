@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
-import { TRAINING_STATUS_LABELS, type TrainingRecord } from '../api/types'
+import { useAllPages } from '../api/hooks'
+import { TRAINING_STATUS_LABELS, type Course, type TrainingRecord } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 
 export function MyLearningPage() {
@@ -87,11 +88,25 @@ export function MyLearningPage() {
 }
 
 function RequestEnrollmentForm({ employeeId, onCreated }: { employeeId: number; onCreated: () => void }) {
+  const { data: courses } = useAllPages<Course>('/courses/', [], 'Failed to load the course catalogue.')
+  const [courseId, setCourseId] = useState<number | ''>('')
   const [title, setTitle] = useState('')
   const [provider, setProvider] = useState('')
   const [startDate, setStartDate] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  function handleCourseChange(value: string) {
+    const id = value ? Number(value) : ''
+    setCourseId(id)
+    // Pre-fill title/provider from the catalogue entry as a convenience —
+    // still editable, since `title` is what's actually stored and shown.
+    const chosen = courses?.find((c) => c.id === id)
+    if (chosen) {
+      setTitle(chosen.name)
+      setProvider(chosen.provider ?? '')
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -99,7 +114,7 @@ function RequestEnrollmentForm({ employeeId, onCreated }: { employeeId: number; 
     setSubmitting(true)
     try {
       await api.post('/training-records/', {
-        employee: employeeId, title, provider, start_date: startDate || null,
+        employee: employeeId, title, provider, course: courseId || null, start_date: startDate || null,
       })
       onCreated()
     } catch (err) {
@@ -111,6 +126,17 @@ function RequestEnrollmentForm({ employeeId, onCreated }: { employeeId: number; 
 
   return (
     <form className="inline-form" onSubmit={handleSubmit}>
+      <label>
+        From the catalogue (optional)
+        <select value={courseId} onChange={(e) => handleCourseChange(e.target.value)}>
+          <option value="">— Not in the catalogue —</option>
+          {(courses ?? []).filter((c) => c.active).map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}{c.mandatory ? ' (mandatory)' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
       <label>
         Course/training title
         <input value={title} onChange={(e) => setTitle(e.target.value)} required />
