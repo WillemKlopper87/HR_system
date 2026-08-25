@@ -59,7 +59,22 @@ hcm/
                 flattened, not a new model)
     learning/  skills, certifications, training records, WSP/ATR export (Sprint 8);
                 + Sprint 15 ESS (TrainingRecord.Status.REQUESTED — self-submitted
-                enrollment requests, forced status/field restrictions)
+                enrollment requests, forced status/field restrictions);
+                + C6 mandatory-training compliance (spec docs/superpowers/specs/
+                2026-08-25-mandatory-training-compliance-design.md): Course
+                catalogue + CourseRequirement (scoped by Department/
+                OccupationalLevel, both optional — job_title/Position/job_grade
+                considered and rejected, see spec §2.3), TrainingRecord.course
+                (nullable FK, no backfill onto historical rows). Compliance is
+                derived on read (compliance.py), never stored — same philosophy
+                as establishment.Position.current_occupant. Aggregate
+                completion-rate dashboard is hr_admin-only; the named
+                overdue-individuals list is row-scoped via the existing
+                row_scoped_queryset primitive (own reporting chain, or org-wide
+                for an all-scope role) — no new access-control mechanism.
+                MANDATORY_TRAINING_OVERDUE registered into core_hr's
+                data-quality sweep; a daily Celery task reuses notifications.
+                services.notify/notify_many for due/overdue reminders.
     compensation/ pay bands, comp proposal workflow, benefits catalog + elections (Sprint 10);
                 + Sprint 15 ESS (benefits catalog read-open, elections self-service
                 row-scoped)

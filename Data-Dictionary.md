@@ -364,13 +364,56 @@ ESS-editable set). It never touches `employment_event`, `employment_change`, `au
 history, regardless of any `retention_rule` state — the non-destructive philosophy the employment-exit-states
 spec §6.3 established for the access cascade extends here by construction, not by rule lookup.
 
-## 6. Later-sprint entities (summary — detail in the owning sprint)
+## 6. learning — mandatory-training compliance (C6)
+
+Spec: `docs/superpowers/specs/2026-08-25-mandatory-training-compliance-design.md`. Extends the existing
+`learning` app (Sprint 8) — `course`/`course_requirement` are new tables; `training_record` gains a nullable
+`course` FK.
+
+### course
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| name | varchar(200), unique | ✔ | P | Catalogue identity, mirrors `skill.name` |
+| provider | varchar(200), blank | | P | |
+| description | text, blank | | P | |
+| hours | decimal(6,1), null | | P | |
+| mandatory | bool | ✔ (default false) | P | Catalogue metadata — the *kind* of course, not the scoped rule; see `course_requirement` below |
+| validity_days | int, null | | P | Renewal cycle in days (e.g. 365 = annual refresher); null = never expires once completed |
+| active | bool | ✔ (default true) | P | |
+
+### course_requirement
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| course | FK course | ✔ | P | `PROTECT` — mirrors `employee_skill.skill` |
+| department | FK department, null | | P | `PROTECT`. Null = not scoped by department |
+| occupational_level | FK occupational_level, null | | P | `PROTECT`. Null = not scoped by level |
+| effective_from | date | ✔ | P | Rules can be added after people are already employed — the clock for anyone already in scope starts here, not at their hire date |
+| due_within_days | int | ✔ | P | Grace period from "became subject to this rule" to due |
+| active | bool | ✔ (default true) | P | Retire a rule without deleting it |
+
+Both null (`department` and `occupational_level`) means an organisation-wide mandate. **No DB-level uniqueness**
+on `(course, department, occupational_level)` — `NULL` isn't equal to itself under SQL uniqueness semantics, so
+a `UniqueConstraint` would not catch two org-wide rules for the same course, the likeliest accidental duplicate.
+`CourseRequirementSerializer.validate()` checks for an existing active duplicate instead (treating `None` as
+equal to `None`), and separately rejects a requirement targeting a non-`mandatory` course (spec §2.2/§4.2).
+
+Scoping FK choice (`department`/`occupational_level`, not `job_title`/`position`/`job_grade`) — full
+investigation in spec §2.3, summarised in `RBAC-Roles.md`'s C6 section.
+
+**Compliance is derived, never stored** — no `compliance_record` table. `learning/compliance.py` computes, on
+read, which requirements apply to an employee (matched against their current `employee_version`'s `department`/
+`occupational_level`) and whether a `training_record(course=X, status=completed)` satisfies each one within its
+validity window. Same "derive, don't store" philosophy as `establishment.position.current_occupant` (§3 above).
+
+## 7. Later-sprint entities (summary — detail in the owning sprint)
 
 | Module | Entities (tier of most sensitive field) | Detailed in |
 |---|---|---|
 | recruitment | requisition (I), applicant (S — demographics, consent-gated), application_stage (I), offer (R — pay) | Sprint 4 |
 | performance | goal (I), review_cycle (I), review (S — ratings), feedback (S) | Sprint 6 |
-| learning | skill (P), employee_skill (I), certification (I), training_record (I — feeds WSP/ATR, and since C2, so does certification) | Sprint 8 |
+| learning | skill (P), employee_skill (I), certification (I), training_record (I — feeds WSP/ATR, and since C2, so does certification; since C6, `course` FK is also I) | Sprint 8 |
 | compensation | pay_band (R, effective-dated), comp_proposal (R), benefits_election (S) | Sprint 10 |
 | assessments | assessment_assignment (S), assessment_result (S), provider_config (I) | Sprint 12 |
 | ee_reporting | ee_snapshot (S, immutable), ee_report (S, versioned + sign-off chain ending at CEO/Accounting Officer), ee_plan (I — 5-yr sector targets + annual targets per level×group×gender + disability targets), ee_questionnaire (I — justifiable reasons, consultation, 24-category barriers/AA grid, monitoring), employer_config (I — Section A identity: DTI/PAYE/UIF/EE ref, SETA classification, EAP choice), **remuneration_record (R — per-employee annualised fixed + variable remuneration imported from SAP payroll; required to generate EEA4)** | Sprint 13 (spec: `EEA-Form-Spec-Notes.md`) |

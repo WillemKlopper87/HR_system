@@ -107,6 +107,26 @@ are not equally sensitive), which the generic per-field tiering shape doesn't ex
 row via `can_access_tier_for_target`, the same helper `TieredModelSerializer` uses per field, just applied at row
 granularity here instead.
 
+## Module access: mandatory-training compliance (C6)
+
+Spec: `docs/superpowers/specs/2026-08-25-mandatory-training-compliance-design.md`. Extends `learning`
+(no new app): `Course`/`CourseRequirement` (catalogue + scoped rule), `TrainingRecord.course` (nullable FK).
+Compliance is derived on read (`learning/compliance.py`), never stored.
+
+| Action | Roles allowed |
+|---|---|
+| Read `Course`/`CourseRequirement` (catalogue browsing, dropdowns) | Any authenticated employee — Public tier, same reasoning as `Skill` |
+| Create/update/delete `Course`/`CourseRequirement` | **hr_admin only** |
+| `GET /dashboards/learning/training-compliance/` (aggregate completion rate by course, org-wide + by department/occupational level) | **hr_admin only** — no per-employee names in the response, same gate/reasoning as `skills_inventory` (spec §5.3) |
+| `GET /dashboards/learning/training-compliance/overdue/` (named overdue-individuals list) | **Row-scoped**, not org-wide-by-default — reuses `row_scoped_queryset` exactly as `team_development` already does: `line_manager` sees only their own reporting chain, `hr_admin`/`auditor`/other all-scope roles see everyone, a base `employee` sees only themselves (spec §5.4) |
+
+Scoping FK choice for `CourseRequirement`: `Department` and `OccupationalLevel`, both optional (both null =
+organisation-wide mandate). `job_title` was rejected as too unreliable (free text — the exact defect this
+feature exists to fix, applied to a different field); `establishment.Position` was rejected as too granular
+(an individually-numbered post, not a role type); `job_grade` was considered and set aside as a pay-banding
+concept layered under `occupational_level`, not an independent axis any worked example needed. See spec §2.3
+for the full investigation.
+
 ## Entra ID group mapping (draft — confirm names with IT, ADR-004)
 
 | Entra group | Role |

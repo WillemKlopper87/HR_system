@@ -19,7 +19,14 @@ Spec: `docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md`.
 - [ ] Disciplinary & grievance cases (warnings, hearings, outcomes, CCMA), linked to `ImprovementPlan`, feeding EEA2 movements
 
 ### C6 — Talent depth (per demand)
-- [ ] Succession/talent pools; interview scheduling + external careers portal; calibration/360; mandatory-training compliance + catalogue; salary-review/bonus cycles + total-rewards; EE plan + consultation records; real assessment-provider adapter
+- [x] Mandatory-training compliance + course catalogue — Shipped 2026-08-25. Spec:
+      `docs/superpowers/specs/2026-08-25-mandatory-training-compliance-design.md`.
+- [ ] Succession/talent pools
+- [ ] Interview scheduling + external careers portal
+- [ ] Calibration/360
+- [ ] Salary-review/bonus cycles + total-rewards statement
+- [ ] EE plan + consultation-forum records
+- [ ] Real assessment-provider adapter
 
 ### C7 — UX / NFR
 - [ ] Responsive + accessibility pass (ESS, liveness first); server-side pagination/search; broader bulk import/export; report builder + scheduled emails
