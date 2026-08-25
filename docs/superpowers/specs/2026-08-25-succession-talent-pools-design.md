@@ -322,7 +322,14 @@ Write (create/update): **hr_admin only**. Enforced by `CriticalPostPermission`
 
 Read and write: **hr_admin only manages it; hr_admin and auditor may read it. No other role, including the
 employee themself and their line_manager, may read it at all** (§2.6) — enforced by
-`SuccessionCandidatePermission`. Deliberately **not** a `FIELD_TIERS`/`TieredModelSerializer` entry — matches
+`SuccessionCandidatePermission`. On top of the role gate, `SuccessionCandidateViewSet.get_queryset` **excludes
+any row whose `employee` is the acting requester themself, regardless of role** — the "no self-scope
+carve-out anywhere" line in §2.6 is a real backend guarantee, not just the frontend declining to render its own
+UI: an hr_admin or auditor acting on their own login cannot read a row about themself through this endpoint
+even by calling the API directly. Such a row simply isn't in the list, and retrieving it by id 404s (not
+403s) — the same "filtered out of the queryset" shape row-scoping already uses elsewhere (e.g.
+`ChecklistInstance`'s reporting-chain filter). Deliberately **not** a `FIELD_TIERS`/`TieredModelSerializer`
+entry — matches
 `performance.Review`/`Feedback`'s own documented exception in `rbac_audit/tiers.py` ("gated by whole-endpoint
 role/row checks instead," since the model itself, not a subset of its fields, is what's sensitive here, and
 the coarse permission class already excludes everyone outside hr_admin/auditor from reaching a read at all).
@@ -341,10 +348,11 @@ the coarse permission class already excludes everyone outside hr_admin/auditor f
   section, rendered **only when the viewer holds hr_admin or auditor** (checked client-side via `hasRole`,
   same pattern every other role-gated section on this page would use if one needed it — the real gate is
   server-side, §5.2, so a stray render attempt by an unauthorised role would just get an empty/403'd response,
-  not a data leak) — listing which critical posts this employee is an active candidate for for and their
-  recorded readiness. **Never rendered when `employeeId === user?.employee_id`** (viewing your own record) even
-  for an hr_admin, so the "never self-visible" decision (§2.6) holds even for the one role that could otherwise
-  technically read the data about themself.
+  not a data leak) — listing which critical posts this employee is an active candidate for and their
+  recorded readiness. Skips the fetch entirely when `employeeId === user?.employee_id` (viewing your own
+  record) as a UX nicety — the backend's own `get_queryset` exclusion (§5.2) is what actually guarantees the
+  "never self-visible" decision (§2.6) even if this client-side check were bypassed, so this is belt-and-braces,
+  not the only enforcement.
 
 ---
 
@@ -356,7 +364,10 @@ Mirrors `learning/tests.py` + `learning/test_api.py`'s shape:
   can't-nominate-the-current-occupant rule; the can't-nominate-against-an-inactive-post rule.
 - API/role-matrix: `CriticalPost` read open to the `Position`-read role set, write hr_admin-only, every other
   role 403; `SuccessionCandidate` read/write hr_admin-only, auditor read-only, every other role — including
-  `line_manager` and the nominated employee's own login — 403 on both list and retrieve.
+  `line_manager` and the nominated employee's own login — 403 on both list and retrieve. A dedicated case for
+  the `get_queryset` self-exclusion (§5.2): an hr_admin whose own employee row is nominated somewhere gets a
+  list that omits that row and a 404 retrieving it directly by id, even though every other row remains fully
+  visible to them.
 - `learning/queries.py::skill_names_for_employee` and `performance/queries.py::latest_final_score` — direct
   unit tests (empty case, populated case) plus `rbac_audit/test_module_boundaries.py`'s existing
   `test_every_queries_seam_is_read_only` sweep picking up the new seam automatically (no test change needed

@@ -89,6 +89,7 @@ urlpatterns = [
     path("api/v1/", include("establishment.urls")),
     path("api/v1/", include("onboarding.urls")),
     path("api/v1/", include("documents.urls")),
+    path("api/v1/", include("succession.urls")),
     # OpenAPI schema + Swagger UI (H3) — hr_admin only, see IsHRAdminSchema.
     path("api/schema/", HRAdminSchemaView.as_view(), name="schema"),
     path("api/docs/", HRAdminSwaggerView.as_view(url_name="schema"), name="swagger-ui"),

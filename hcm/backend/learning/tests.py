@@ -6,7 +6,8 @@ from core_hr.models import Department, Employee, JobGrade, Location, Occupationa
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import Certification
+from .models import Certification, EmployeeSkill, Skill
+from .queries import skill_names_for_employee
 
 
 def _seed_reference_data():
@@ -41,3 +42,27 @@ class CertificationExpiryTests(TestCase):
             employee=self.employee, name="Past", expiry_date=timezone.localdate() - timedelta(days=1)
         )
         self.assertTrue(cert.is_expired)
+
+
+class SkillNamesForEmployeeQueryTests(TestCase):
+    """learning/queries.py -- the read-only seam succession's candidate
+    cards use for skill context (C6, docs/superpowers/specs/2026-08-25-
+    succession-talent-pools-design.md §2.7)."""
+
+    def setUp(self):
+        dept, level, grade, location = _seed_reference_data()
+        self.employee = Employee.objects.hire(
+            employee_number="E101", first_name="A", last_name="B", date_of_birth=date(1990, 1, 1),
+            work_email="e101@example.com", hire_date=date(2021, 1, 1), department=dept, occupational_level=level,
+            job_grade=grade, location=location,
+        )
+
+    def test_no_skills_returns_empty_list(self):
+        self.assertEqual(skill_names_for_employee(self.employee.id), [])
+
+    def test_returns_skill_names_ordered_alphabetically(self):
+        zebra = Skill.objects.create(name="Zebra Wrangling")
+        alpha = Skill.objects.create(name="Accounting")
+        EmployeeSkill.objects.create(employee=self.employee, skill=zebra)
+        EmployeeSkill.objects.create(employee=self.employee, skill=alpha)
+        self.assertEqual(skill_names_for_employee(self.employee.id), ["Accounting", "Zebra Wrangling"])
