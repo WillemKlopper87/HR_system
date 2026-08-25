@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
 from django.contrib.auth import get_user_model
@@ -8,7 +8,7 @@ from django.test import TestCase
 from rbac_audit.models import Role, RoleAssignment
 from rest_framework.test import APIClient
 
-from .models import Certification, EmployeeSkill, Skill, TrainingRecord
+from .models import Certification, Course, CourseRequirement, EmployeeSkill, Skill, TrainingRecord
 
 User = get_user_model()
 
@@ -304,3 +304,146 @@ class WspAtrExportTests(LearningApiTestCase):
         content = response.content.decode()
         self.assertIn("New Diploma", content)
         self.assertNotIn("Old Diploma", content)
+
+
+class CourseCatalogTests(LearningApiTestCase):
+    def test_any_authenticated_employee_can_read_courses(self):
+        Course.objects.create(name="POPIA Awareness", mandatory=True)
+        self.client.force_authenticate(user=self.outsider.user)
+        response = self.client.get("/api/v1/courses/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_non_hr_admin_cannot_create_course(self):
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post("/api/v1/courses/", {"name": "New Course"}, format="json")
+        self.assertEqual(response.status_code, 403)
+
+    def test_hr_admin_can_create_course(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            "/api/v1/courses/", {"name": "New Course", "mandatory": True}, format="json"
+        )
+        self.assertEqual(response.status_code, 201)
+
+
+class CourseRequirementTests(LearningApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.mandatory_course = Course.objects.create(name="Safety Induction", mandatory=True)
+        self.elective_course = Course.objects.create(name="AWS Bootcamp", mandatory=False)
+
+    def test_requirement_on_non_mandatory_course_rejected(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            "/api/v1/course-requirements/",
+            {"course": self.elective_course.id, "effective_from": "2026-01-01", "due_within_days": 90},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_requirement_on_mandatory_course_accepted(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            "/api/v1/course-requirements/",
+            {
+                "course": self.mandatory_course.id, "department": self.dept.id,
+                "effective_from": "2026-01-01", "due_within_days": 90,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_duplicate_active_scope_rejected(self):
+        CourseRequirement.objects.create(
+            course=self.mandatory_course, department=self.dept, effective_from=date(2026, 1, 1), due_within_days=90,
+        )
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            "/api/v1/course-requirements/",
+            {
+                "course": self.mandatory_course.id, "department": self.dept.id,
+                "effective_from": "2026-02-01", "due_within_days": 60,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_non_hr_admin_cannot_create_requirement(self):
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post(
+            "/api/v1/course-requirements/",
+            {"course": self.mandatory_course.id, "effective_from": "2026-01-01", "due_within_days": 90},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+
+class TrainingRecordCourseFieldTests(LearningApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.course = Course.objects.create(name="AWS Bootcamp", mandatory=False)
+
+    def test_self_submission_can_reference_a_catalog_course(self):
+        """C6 design spec §2.5: `course` is one more field on
+        TrainingRecord -- the Sprint-15 self-submission status-forcing
+        behaviour is entirely unaffected by it."""
+        self.client.force_authenticate(user=self.report.user)
+        response = self.client.post(
+            "/api/v1/training-records/",
+            {"employee": self.report.id, "title": "AWS Bootcamp", "course": self.course.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["course"], self.course.id)
+        self.assertEqual(response.data["status"], "requested")
+
+
+class TrainingComplianceDashboardTests(LearningApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.course = Course.objects.create(name="Safety Induction", mandatory=True)
+        CourseRequirement.objects.create(
+            course=self.course, department=self.dept, effective_from=date(2020, 1, 1), due_within_days=30,
+        )
+
+    def test_non_hr_admin_cannot_view_dashboard(self):
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.get("/api/v1/dashboards/learning/training-compliance/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_hr_admin_sees_aggregate_counts(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/dashboards/learning/training-compliance/")
+        self.assertEqual(response.status_code, 200)
+        row = next(c for c in response.data["courses"] if c["name"] == "Safety Induction")
+        self.assertGreaterEqual(row["total_subject"], 1)
+        self.assertIn("by_department", row)
+        self.assertIn("by_occupational_level", row)
+
+
+class TrainingComplianceOverdueTests(LearningApiTestCase):
+    """C6 design spec §5.4: row-scoped exactly like team_development --
+    no unscoped org-wide list of names."""
+
+    def setUp(self):
+        super().setUp()
+        self.course = Course.objects.create(name="Safety Induction", mandatory=True)
+        CourseRequirement.objects.create(
+            course=self.course, department=self.dept, effective_from=date(2020, 1, 1), due_within_days=30,
+        )
+
+    def test_manager_sees_only_own_team_overdue(self):
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.get("/api/v1/dashboards/learning/training-compliance/overdue/")
+        self.assertEqual(response.status_code, 200)
+        employee_numbers = {row["employee_number"] for row in response.data["overdue"]}
+        self.assertIn("E100", employee_numbers)  # self.report, in manager's reporting chain
+        self.assertNotIn("OUT", employee_numbers)  # outsider, not in manager's reporting chain
+
+    def test_hr_admin_sees_org_wide_overdue(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/dashboards/learning/training-compliance/overdue/")
+        self.assertEqual(response.status_code, 200)
+        employee_numbers = {row["employee_number"] for row in response.data["overdue"]}
+        self.assertIn("E100", employee_numbers)
+        self.assertIn("OUT", employee_numbers)

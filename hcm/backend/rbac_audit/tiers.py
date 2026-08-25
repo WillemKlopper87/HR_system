@@ -134,6 +134,7 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
     "learning.TrainingRecord": {
         "title": FieldTier.INTERNAL,
         "provider": FieldTier.INTERNAL,
+        "course": FieldTier.INTERNAL,
         "status": FieldTier.INTERNAL,
         "start_date": FieldTier.INTERNAL,
         "completion_date": FieldTier.INTERNAL,

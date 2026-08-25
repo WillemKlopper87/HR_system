@@ -4,13 +4,50 @@ from rbac_audit.drf import TieredModelSerializer, get_request_employee
 from rbac_audit.permissions import has_row_access
 from rest_framework import serializers
 
-from .models import Certification, EmployeeSkill, Skill, TrainingRecord
+from .models import Certification, Course, CourseRequirement, EmployeeSkill, Skill, TrainingRecord
 
 
 class SkillSerializer(serializers.ModelSerializer):
     class Meta:
         model = Skill
         fields = ["id", "name", "category", "description", "active"]
+
+
+class CourseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = ["id", "name", "provider", "description", "hours", "mandatory", "validity_days", "active"]
+
+
+class CourseRequirementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseRequirement
+        fields = [
+            "id", "course", "department", "occupational_level", "effective_from", "due_within_days", "active",
+        ]
+
+    def validate(self, attrs):
+        course = attrs.get("course") or getattr(self.instance, "course", None)
+        if course is not None and not course.mandatory:
+            raise serializers.ValidationError(
+                "Course must be marked mandatory in the catalogue before a requirement rule can target it."
+            )
+
+        department = attrs.get("department", getattr(self.instance, "department", None))
+        occupational_level = attrs.get("occupational_level", getattr(self.instance, "occupational_level", None))
+        active = attrs.get("active", getattr(self.instance, "active", True))
+        if course is not None and active:
+            duplicate = CourseRequirement.objects.filter(
+                course=course, department=department, occupational_level=occupational_level, active=True,
+            )
+            if self.instance is not None:
+                duplicate = duplicate.exclude(pk=self.instance.pk)
+            if duplicate.exists():
+                raise serializers.ValidationError(
+                    "An active requirement already exists for this course and this exact department/"
+                    "occupational-level scope."
+                )
+        return attrs
 
 
 class RowScopedLearningSerializer(TieredModelSerializer):
@@ -47,7 +84,10 @@ class CertificationSerializer(RowScopedLearningSerializer):
 class TrainingRecordSerializer(RowScopedLearningSerializer):
     class Meta:
         model = TrainingRecord
-        fields = ["id", "employee", "title", "provider", "status", "start_date", "completion_date", "hours", "cost"]
+        fields = [
+            "id", "employee", "title", "provider", "course", "status", "start_date", "completion_date",
+            "hours", "cost",
+        ]
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

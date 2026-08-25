@@ -23,6 +23,7 @@ class Notification(TimestampedModel):
         LIVENESS_FLAG = "liveness_flag", "Liveness review flagged"
         EE_SIGNOFF = "ee_signoff", "Performance agreement signed"
         CONTRACT_REMINDER = "contract_reminder", "Contract expiry reminder"
+        MANDATORY_TRAINING_REMINDER = "mandatory_training_reminder", "Mandatory training reminder"
 
     recipient = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="notifications")
     kind = models.CharField(max_length=30, choices=Kind.choices)

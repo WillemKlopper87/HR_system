@@ -274,6 +274,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "core_hr.tasks.run_contract_reminders_task",
         "schedule": 24 * 60 * 60,  # daily; crontab(hour=7) once beat runs against a real broker
     },
+    # Mandatory-training compliance reminders (C6) -- notifies an employee
+    # ahead of their own due date, and their manager the day it lapses
+    # into overdue.
+    "run-mandatory-training-reminders-daily": {
+        "task": "learning.tasks.run_mandatory_training_reminders_task",
+        "schedule": 24 * 60 * 60,  # daily; crontab(hour=7) once beat runs against a real broker
+    },
 }
 
 # HMAC signing secret for the inbound assessment-provider webhook
@@ -363,3 +370,9 @@ CONTRACT_REMINDER_OFFSETS_DAYS = [
     int(d) for d in os.environ.get("CONTRACT_REMINDER_OFFSETS_DAYS", "60,30,14,7").split(",")
 ]
 CONTRACT_ESCALATION_DAYS = int(os.environ.get("CONTRACT_ESCALATION_DAYS", "14"))
+
+# Mandatory-training compliance reminders (C6) -- how many days before an
+# employee's own due date they get nudged. See learning/reminders.py.
+MANDATORY_TRAINING_REMINDER_OFFSET_DAYS = int(
+    os.environ.get("MANDATORY_TRAINING_REMINDER_OFFSET_DAYS", "14")
+)
