@@ -161,6 +161,74 @@ export interface Department {
   active: boolean
 }
 
+// --- Onboarding / offboarding checklists (C1 part 3 slice 3) -------------
+
+export type ChecklistDirection = 'onboarding' | 'offboarding'
+export type ChecklistTemplateStatus = 'draft' | 'published' | 'retired'
+export type ChecklistInstanceStatus = 'active' | 'completed' | 'cancelled'
+export type ChecklistOwnerRole = 'hr' | 'it' | 'line_manager' | 'employee' | 'other'
+
+export const CHECKLIST_DIRECTION_LABELS: Record<ChecklistDirection, string> = {
+  onboarding: 'Onboarding',
+  offboarding: 'Offboarding',
+}
+
+export const CHECKLIST_OWNER_ROLE_LABELS: Record<ChecklistOwnerRole, string> = {
+  hr: 'HR',
+  it: 'IT',
+  line_manager: 'Line manager',
+  employee: 'Employee',
+  other: 'Other',
+}
+
+export interface ChecklistTemplateItem {
+  id: number
+  template: number
+  label: string
+  description: string
+  owner_role: ChecklistOwnerRole
+  order: number
+}
+
+export interface ChecklistTemplate {
+  id: number
+  name: string
+  direction: ChecklistDirection
+  version: number
+  status: ChecklistTemplateStatus
+  created_by: number | null
+  published_at: string | null
+  created_at: string
+  items: ChecklistTemplateItem[]
+}
+
+export interface ChecklistInstanceItem {
+  id: number
+  instance: number
+  label: string
+  description: string
+  owner_role: ChecklistOwnerRole
+  order: number
+  completed_by: number | null
+  completed_at: string | null
+  notes: string
+  is_complete: boolean
+}
+
+export interface ChecklistInstance {
+  id: number
+  employee: number
+  template: number
+  template_version: number
+  direction: ChecklistDirection
+  status: ChecklistInstanceStatus
+  triggering_change: number | null
+  created_by: number | null
+  created_at: string
+  completed_at: string | null
+  items: ChecklistInstanceItem[]
+}
+
 export interface OccupationalLevel {
   id: number
   name: string

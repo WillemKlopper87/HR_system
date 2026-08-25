@@ -50,6 +50,11 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       // Recruitment does.
       { to: '/contract-renewals', label: 'Contract Renewals', roles: CONTRACTS },
       { to: '/employment-changes', label: 'Employment Changes', roles: EXITS },
+      // Visibility is scoped server-side per employee/reporting-chain
+      // (design spec §7) -- every authenticated employee can open this and
+      // sees at least their own checklist, so roles: [] like /employees.
+      { to: '/checklists', label: 'Checklists', roles: [] },
+      { to: '/checklist-templates', label: 'Checklist Templates', roles: AUDIT_ROLES },
       { to: '/dashboards/headcount', label: 'Headcount', roles: [] },
     ],
   },

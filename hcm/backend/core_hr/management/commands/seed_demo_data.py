@@ -11,7 +11,16 @@ from django.db import transaction
 from django.utils import timezone
 
 from core_hr.data_quality import run_data_quality_checks
-from core_hr.models import Department, Employee, EmployeeVersion, JobGrade, Location, OccupationalLevel
+from core_hr.exits import confirm_employment_change, propose_employment_change
+from core_hr.models import (
+    Department,
+    Employee,
+    EmployeeVersion,
+    EmploymentChange,
+    JobGrade,
+    Location,
+    OccupationalLevel,
+)
 from rbac_audit.consent import record_consent
 from rbac_audit.models import ConsentRecord, Role, RoleAssignment
 
@@ -51,6 +60,13 @@ from performance.services import (
     sign_agreement,
     submit_agreement,
 )
+# Aliased: performance.services already owns `publish_template` for
+# AgreementTemplate above -- this is onboarding.ChecklistTemplate's own
+# publish action (C1 part 3 slice 3), an unrelated model.
+from onboarding.models import ChecklistTemplate
+from onboarding.services import complete_item as complete_checklist_item
+from onboarding.services import create_template as create_checklist_template
+from onboarding.services import publish_template as publish_checklist_template
 from identity_verification.models import LivenessCheck
 from identity_verification.services import enroll_employee, run_liveness_check
 from learning.models import Certification, EmployeeSkill, Skill, TrainingRecord
@@ -166,6 +182,42 @@ class Command(BaseCommand):
             # record at all, so this seed data grants it explicitly, same
             # as every RBAC test's setUp does.
             base_role = Role.objects.get(name="employee")
+
+            # --- Onboarding/offboarding checklist templates (C1 part 3
+            # slice 3) -- seeded and published BEFORE any employee below is
+            # hired, so hire()'s automatic hook (core_hr/lifecycle_hooks.py)
+            # actually creates an onboarding checklist for every one of
+            # them, the same way a real HR team would have the process live
+            # before day one rather than retrofitting it. created_by is
+            # None here (no hr_admin employee exists yet at this point in
+            # the script) -- perfectly valid, that field is nullable.
+            onboarding_template = create_checklist_template(
+                name="Standard onboarding", direction=ChecklistTemplate.Direction.ONBOARDING,
+                items=[
+                    {"label": "Issue laptop and access card", "owner_role": "it",
+                     "description": "Provision a laptop, building access card and VPN account."},
+                    {"label": "Set up payroll and banking details", "owner_role": "hr",
+                     "description": "Confirm banking details and enrol on the payroll run."},
+                    {"label": "Introduce to line manager and team", "owner_role": "line_manager",
+                     "description": "First-week introductions and a walkthrough of team norms."},
+                    {"label": "Book induction / orientation session", "owner_role": "hr"},
+                    {"label": "Confirm workstation and required software", "owner_role": "it"},
+                ],
+            )
+            publish_checklist_template(onboarding_template, actor=None)
+
+            offboarding_template = create_checklist_template(
+                name="Standard offboarding", direction=ChecklistTemplate.Direction.OFFBOARDING,
+                items=[
+                    {"label": "Collect laptop, access card and other assets", "owner_role": "it",
+                     "description": "Confirm all issued equipment is returned and in working order."},
+                    {"label": "Revoke building and system access", "owner_role": "it"},
+                    {"label": "Conduct exit interview", "owner_role": "hr"},
+                    {"label": "Confirm final pay and outstanding leave", "owner_role": "hr"},
+                    {"label": "Handover notes to line manager", "owner_role": "line_manager"},
+                ],
+            )
+            publish_checklist_template(offboarding_template, actor=None)
 
             def hire(*, department, level, location, manager, hire_date, employment_status=None, contract_end_date=None):
                 nonlocal employee_counter
@@ -343,6 +395,11 @@ class Command(BaseCommand):
             # environment has zero Positions and both seeded requisitions
             # sit unlinked -- the exact pre-C1 state this feature replaces.
             self._seed_establishment_demo_data(requisitions=demo_requisitions, hr_admin=hr_head)
+            self._seed_onboarding_demo_data(
+                hr_admin=hr_head, manager=eng_head, staff=staff,
+                department=eng_dept, level=mid_level, grade=grades_by_level[mid_level.code][0],
+                location=locations[0],
+            )
 
         run_data_quality_checks()
 
@@ -447,6 +504,43 @@ class Command(BaseCommand):
         self.stdout.write(
             f"Seeded establishment control: {backfilled} positions backfilled from current employees, "
             f"{linked} linked across {len(requisitions)} demo requisitions."
+        )
+
+    def _seed_onboarding_demo_data(self, *, hr_admin, manager, staff, department, level, grade, location):
+        """C1 part 3 slice 3: the onboarding template published earlier
+        (before any employee was hired) already gave every seeded employee,
+        `staff` included, an active onboarding checklist via hire()'s
+        automatic hook -- nothing to create there. This method:
+
+        1. Ticks off a couple of `staff`'s onboarding tasks, so
+           /checklists shows a mix of done/not-done rather than either
+           extreme.
+        2. Hires one throwaway employee and immediately resigns them
+           (propose -> confirm, which executes at once since resignation
+           is a routine, proposer-confirms type effective today) so the
+           offboarding hook actually fires and /checklists has a real
+           offboarding example to show, not just onboarding ones."""
+        if staff is not None:
+            onboarding = staff.checklists.filter(direction=ChecklistTemplate.Direction.ONBOARDING).first()
+            if onboarding is not None:
+                for item in onboarding.items.all()[:2]:
+                    complete_checklist_item(item, actor=manager, notes="Done in first week.")
+
+        leaver = Employee.objects.hire(
+            employee_number="E90001", first_name="Departing", last_name="Demo",
+            date_of_birth=date(1988, 3, 12), work_email="departing.demo@sentech-demo.example",
+            hire_date=date(2021, 1, 1), department=department, occupational_level=level,
+            job_grade=grade, location=location, manager=manager,
+        )
+        change = propose_employment_change(
+            leaver, actor=hr_admin, change_type=EmploymentChange.ChangeType.RESIGNATION,
+            effective_date=timezone.localdate(), reason="Accepted a role elsewhere; resignation on notice.",
+        )
+        confirm_employment_change(change, actor=hr_admin)
+
+        self.stdout.write(
+            "Seeded onboarding/offboarding checklists: 'Standard onboarding' and 'Standard offboarding' "
+            "published; a demo resignation shows the offboarding checklist created automatically."
         )
 
     def _positions_for_requisition(self, requisition, *, hr_admin):

@@ -9,6 +9,8 @@ import { ApplicantDetailPage } from './pages/ApplicantDetailPage'
 import { ApplicantsPage } from './pages/ApplicantsPage'
 import { AssessmentsPage } from './pages/AssessmentsPage'
 import { BenefitsPage } from './pages/BenefitsPage'
+import { ChecklistsPage } from './pages/ChecklistsPage'
+import { ChecklistTemplatesPage } from './pages/ChecklistTemplatesPage'
 import { CompProposalsPage } from './pages/CompProposalsPage'
 import { ContractRenewalsPage } from './pages/ContractRenewalsPage'
 import { EmploymentChangesPage } from './pages/EmploymentChangesPage'
@@ -93,6 +95,13 @@ export default function App() {
                 dismissals originate from a disciplinary process (C5). */}
             <Route element={<RequireRole roles={['hr_admin', 'auditor']} />}>
               <Route path="/employment-changes" element={<EmploymentChangesPage />} />
+            </Route>
+            {/* Visibility is scoped server-side per employee/reporting-chain
+                (design spec §7) -- any authenticated employee may open this
+                page and will see at least their own checklist. */}
+            <Route path="/checklists" element={<ChecklistsPage />} />
+            <Route element={<RequireRole roles={['hr_admin', 'auditor']} />}>
+              <Route path="/checklist-templates" element={<ChecklistTemplatesPage />} />
             </Route>
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/reviews/:id" element={<ReviewDetailPage />} />
