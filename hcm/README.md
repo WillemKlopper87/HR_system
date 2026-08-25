@@ -71,7 +71,33 @@ hcm/
                 it, never the employee it's about) — see `hcm/frontend/src/pages/
                 PerformanceRecordsPage.tsx` (new, hr_admin+auditor, org-wide,
                 the evidence manifest is the already-nested agreement data
-                flattened, not a new model)
+                flattened, not a new model);
+                + C6 calibration/moderation + 360 feedback (spec docs/superpowers/
+                specs/2026-08-25-performance-calibration-360-design.md): two new
+                sibling model modules, calibration.py (CalibrationSession scoped
+                by period x department, blank department = org-wide, reusing the
+                rating-distribution dashboard's own grouping; CalibrationAdjustment
+                create-only, reason required even for "no change", never triggers
+                amend_agreement's re-sign — a consistency check layered on top of
+                an already-signed agreement, not a renegotiation; three
+                independent audit trails — the adjustment row, PerformanceAgreement.
+                history via the existing simple_history middleware, and log_access)
+                and feedback360.py (Feedback360Request/Rater/Response, attached to
+                PerformanceAgreement not the legacy free-text Feedback model;
+                self/manager raters automatic, peer/direct_report nominated +
+                Head/hr_admin-approved; relationship derived server-side from the
+                org chart, same pattern classify_feedback_type already uses). The
+                load-bearing decision is visibility (spec §2.10): Head/hr_admin/
+                auditor and a rater's own row see full attribution always; the
+                subject sees self/manager in full but peer/direct-report only as a
+                pooled ratings-only average once >=3 responses exist per
+                relationship bucket (FEEDBACK_360_MIN_RESPONSES_FOR_AGGREGATE = 3,
+                deliberately not views_agreements.SMALL_CELL_THRESHOLD's 5 — a
+                different risk shape/scale), never with free text. Never an input
+                to final_score. New routes: `/calibration` (hr_admin), embedded
+                Feedback360Section on the existing agreement card, and
+                `/my-feedback-requests` (roles: [], ?mine=true — same shape
+                InterviewSession's ?mine=true already uses for panelists)
     learning/  skills, certifications, training records, WSP/ATR export (Sprint 8);
                 + Sprint 15 ESS (TrainingRecord.Status.REQUESTED — self-submitted
                 enrollment requests, forced status/field restrictions);
@@ -220,7 +246,22 @@ hcm/
                (/careers/:id), the SPA's only routes genuinely outside
                RequireAuth/AppShell (no session, no session-driven nav);
                RequisitionsPage gains a description field + a "post to the
-               public careers site" toggle per requisition
+               public careers site" toggle per requisition; C6 calibration +
+               360 feedback — new CalibrationPage (/calibration, hr_admin-only:
+               pick a period, open a session, record an outcome per agreement
+               in the cohort, close it); a Feedback360Section embedded on the
+               existing agreement card (MyPerformancePage/TeamPerformancePage)
+               for open/nominate/approve/decline/view, with server-enforced
+               masking rendered client-side purely from what the API omits
+               (never reimplemented in the component); new
+               MyFeedbackRequestsPage (/my-feedback-requests, every employee,
+               ?mine=true — the one place any rater, including the subject's
+               own self-assessment and the Head's own manager response,
+               actually answers). MyPerformancePage also gained a real fix
+               along the way: every past year now gets an Open/Viewing toggle
+               into the full agreement card (previously only the most recent
+               year did) — calibration outcomes and 360 rounds can exist on an
+               older, already-archived agreement, not just the current one
     liveness/  face-api.js wrapper + shared camera-capture component (Sprint 12c);
                lazy-loaded (React.lazy) since TensorFlow.js is ~1MB and only this
                one page needs it

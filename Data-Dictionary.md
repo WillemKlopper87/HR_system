@@ -536,12 +536,104 @@ fields (`race`/`gender`/`disability_status`) follow the same not_disclosed-defau
 the internal flow — **consent gates storage of the answer, not submission of the application**: an unconsented
 value is silently dropped rather than blocking the applicant's whole submission.
 
-## 9. Later-sprint entities (summary — detail in the owning sprint)
+## 9. performance — calibration/moderation + 360 feedback (C6)
+
+Spec: `docs/superpowers/specs/2026-08-25-performance-calibration-360-design.md`. Extends the existing
+`performance` app (PC-1..PC-3 `PerformanceAgreement` family) — everything here is fundamentally about one
+agreement, so a new app was rejected (spec §2.1).
+
+### calibration_session
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| period | FK performance_period | ✔ | — (whole-model, see below) | `PROTECT` |
+| department | FK department, null | | — | Blank = org-wide cohort, same "empty targeting = everyone" shape `agreement_template` already uses |
+| status | varchar, choices | ✔ (default open) | — | open / completed |
+| meeting_date | date, null | | — | |
+| participants_note | varchar(500), blank | | — | Free text — who attended |
+| summary | text, blank | | — | Overall committee notes |
+| convened_by | FK employee, null | | — | `SET_NULL` |
+| completed_at | datetime, null | | — | |
+
+**Deliberately not a `FIELD_TIERS` entry** — a cohort-wide committee record is a comparative judgement about a
+group of named individuals, the same risk shape `succession_candidate` already documents; gated whole-endpoint,
+hr_admin writes, hr_admin/auditor read, no self/team browsing (spec §2.6, `RBAC-Roles.md`).
+
+### calibration_adjustment
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| session | FK calibration_session | ✔ | — (row-level, rides the parent agreement's audience) | `CASCADE` |
+| agreement | FK performance_agreement | ✔ | — | `PROTECT` — never orphan an audit row |
+| previous_score | decimal(4,2), null | | — | Captured at write time |
+| new_score | decimal(4,2), null | | — | `null` = "reviewed, no change" |
+| reason | text | ✔ | — | Required even for "no change" — never a silent record |
+| adjusted_by | FK employee, null | | — | `SET_NULL` |
+
+`UniqueConstraint(session, agreement)` — one outcome per agreement per session. **Create-only, no update/delete
+route** — same shape `agreement_signature` already uses; a correction is a new, separately-reasoned row.
+Read rides `performance_agreement`'s own audience via the nested `calibration_adjustments` field, not a second
+gate. Writing a `new_score` updates `performance_agreement.final_score`/`hr_attention` directly and is captured
+automatically by `performance_agreement`'s existing `simple_history` table — **no re-signature**: the original
+`agreement_signature`/`agreement_document` rows for the FINAL stage are untouched (spec §2.4).
+
+### feedback_360_request
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| agreement | FK performance_agreement | ✔ | — (row-level, agreement's own audience) | `CASCADE` |
+| status | varchar, choices | ✔ (default open) | — | open / closed |
+| opened_by | FK employee, null | | — | `SET_NULL` |
+| due_date | date, null | | — | |
+| closed_at | datetime, null | | — | |
+
+Creation gated to `agreement.status in PerformanceAgreement.CONTRACTED_STATUSES` — KPIs must already be agreed.
+
+### feedback_360_rater
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| request | FK feedback_360_request | ✔ | — | `CASCADE` |
+| rater | FK employee | ✔ | — | `CASCADE` |
+| relationship | varchar, choices | ✔ | — | self / manager / peer / direct_report — **derived server-side** from the org chart at nomination time, never client-trusted (same pattern `feedback.feedback_type` already uses) |
+| status | varchar, choices | ✔ (default pending_approval) | — | pending_approval / approved / declined_nomination / withdrawn — "submitted" is derived from whether a `feedback_360_response` exists, not stored |
+| nominated_by | FK employee, null | | — | `SET_NULL` |
+| approved_by | FK employee, null | | — | `SET_NULL` |
+| approved_at | datetime, null | | — | |
+
+`UniqueConstraint(request, rater)`. `self`/`manager` slots are auto-created and pre-approved when the request
+opens; `peer`/`direct_report` slots need Head/hr_admin approval — not open to any authenticated employee the way
+legacy `feedback` is (spec §2.7/§2.9).
+
+### feedback_360_response
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| rater_slot | OneToOne feedback_360_rater | ✔ | — (masked, see below) | `CASCADE` |
+| collaboration_rating | smallint, choices 1-5 | ✔ | — (masked) | Matches `interview_scorecard`'s fixed-vocabulary precedent |
+| communication_rating | smallint, choices 1-5 | ✔ | — (masked) | |
+| reliability_rating | smallint, choices 1-5 | ✔ | — (masked) | |
+| strengths | text, blank | | — (masked) | |
+| development_areas | text, blank | | — (masked) | |
+| submitted_at | datetime | ✔ (auto) | — | |
+
+**The load-bearing visibility rule (spec §2.10), not a `FIELD_TIERS` entry** (same reasoning as
+`interview_scorecard`'s blind review — a viewer-state-keyed rule, not a static role/tier grant):
+Head/delegate/hr_admin/auditor and the rater's own row see the content in full, always. The subject sees a
+**self**/**manager** response in full (no new exposure vs. `agreement_element.final_head_comment`, already
+visible elsewhere), but a **peer**/**direct_report** response is never shown to them individually, permanently —
+only a pooled, ratings-only average per relationship type once ≥3 responses exist in that bucket
+(`FEEDBACK_360_MIN_RESPONSES_FOR_AGGREGATE`, deliberately not `views_agreements.SMALL_CELL_THRESHOLD`'s 5 — a
+360 round's realistic rater pool is 2-6 people, a different scale from an org-wide demographic aggregate), and
+**never with free text at all**, even once aggregated. Never an input to `performance_agreement.final_score` —
+qualitative context only.
+
+## 10. Later-sprint entities (summary — detail in the owning sprint)
 
 | Module | Entities (tier of most sensitive field) | Detailed in |
 |---|---|---|
 | recruitment | requisition (I), applicant (S — demographics, consent-gated), application_stage (I), offer (R — pay); since C6, also interview_session/interview_scorecard (row-level, blind-review) and background_check (whole-model S) — see §8 | Sprint 4, C6 |
-| performance | goal (I), review_cycle (I), review (S — ratings), feedback (S) | Sprint 6 |
+| performance | goal (I), review_cycle (I), review (S — ratings), feedback (S); performance_agreement family (PC-1..PC-3, not yet detailed above); since C6, also calibration_session/calibration_adjustment (whole-model, hr_admin/auditor) and feedback_360_request/rater/response (viewer-state-masked, see §9) | Sprint 6, PC-1..PC-3, C6 |
 | learning | skill (P), employee_skill (I), certification (I), training_record (I — feeds WSP/ATR, and since C2, so does certification; since C6, `course` FK is also I) | Sprint 8 |
 | compensation | pay_band (R, effective-dated), comp_proposal (R), benefits_election (S) | Sprint 10 |
 | assessments | assessment_assignment (S), assessment_result (S), provider_config (I) | Sprint 12 |

@@ -25,6 +25,7 @@ Thumbs.db
 
 # Playwright e2e (hcm/frontend/e2e)
 hcm/backend/e2e.sqlite3
+hcm/backend/e2e.sqlite3-journal
 hcm/frontend/test-results/
 hcm/frontend/playwright-report/
 hcm/frontend/blob-report/

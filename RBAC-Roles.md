@@ -168,6 +168,35 @@ Applicant` row (`source=portal`) through the same `Applicant` model, stage machi
 path every internally-sourced applicant uses — consent gates *storage* of the optional race/gender/
 disability_status answers, not *submission* of the application itself.
 
+## Module access: performance calibration/moderation + 360 feedback (C6)
+
+Spec: `docs/superpowers/specs/2026-08-25-performance-calibration-360-design.md`. Both slices extend
+`performance` (not a new app — everything is fundamentally about one `PerformanceAgreement`): `CalibrationSession`/
+`CalibrationAdjustment` (`models/calibration.py`) and `Feedback360Request`/`Feedback360Rater`/`Feedback360Response`
+(`models/feedback360.py`).
+
+| Action | Roles allowed |
+|---|---|
+| Read a `CalibrationSession` (list/detail — the cohort-wide committee record) | **hr_admin · auditor only** — the same "no self/team browsing of a comparative judgement about others" precedent `SuccessionCandidate` already sets (spec §2.6). One agreement's own `CalibrationAdjustment` still reaches its subject/Head via the nested `calibration_adjustments` field on `PerformanceAgreementSerializer` — the agreement's own audience, not a second permission surface |
+| Open/close a `CalibrationSession`, record an outcome (`record-outcome` action) | **hr_admin only** — recording an offline committee's outcome, not a live multi-party tool (spec §2.3) |
+| `CalibrationAdjustment` update/delete | **Nobody — no route exists.** Create-only, through `record-outcome`; a correction is a new, separately-reasoned row, the same "no update/delete path" shape `AgreementSignature` already uses |
+| Read a `Feedback360Request`/its raters (the whole 360 round) | Same audience as the parent agreement (`can_view_agreement`): the subject, their Head/delegate, hr_admin, auditor. A plain peer/direct-report rater with no other tie to the agreement does **not** reach the whole round — only their own `Feedback360Rater` slot (below) |
+| Open/close a `Feedback360Request` | Subject, Head/delegate, or hr_admin |
+| Nominate a peer/direct-report rater | Subject, Head/delegate, or hr_admin — **not** open to any authenticated employee the way legacy `Feedback` is (spec §2.7/§2.9): this input can shape a real assessment, not just be a private note |
+| Approve/decline a nomination | **Head/delegate or hr_admin only** |
+| Read/respond to one's own `Feedback360Rater` slot (`/my-feedback-requests`, `?mine=true`) | **The named rater only** — reachable even with no other access to the agreement, same shape `InterviewSession`'s `?mine=true` uses for panelists. No proxy-entry: only the named rater may submit their own response |
+| Read a `Feedback360Response` (the content, not the row) | **Full, attributed: Head/delegate, hr_admin, auditor, always; the rater, their own.** The subject sees **self**/**manager** responses in full (no new exposure — already visible elsewhere as `final_head_comment`), but a **peer/direct-report** response is never shown to the subject individually, ever — only a pooled, ratings-only average per relationship type, once ≥3 responses exist in that bucket, and never with free text at all (spec §2.10 — the load-bearing decision) |
+
+`FEEDBACK_360_MIN_RESPONSES_FOR_AGGREGATE = 3` (`models/feedback360.py`) is deliberately **not**
+`views_agreements.SMALL_CELL_THRESHOLD` (5) — that threshold protects a demographic cell inside an org-wide
+aggregate, a different risk shape/scale from a 360 round's realistic 2–6-person rater pool per relationship type;
+reusing 5 would make peer/direct-report feedback almost never clear the bar. Neither `final_score` nor `hr_admin`
+calibration write is ever silent: a `CalibrationAdjustment` is required to carry a reason even when it changes
+nothing, and `PerformanceAgreement.history` (existing `simple_history`) captures the `final_score`/`hr_attention`
+change automatically — three independent audit trails, no re-signature (spec §2.4: a consistency check layered on
+top of an already-signed agreement is a different kind of event from `amend_agreement`'s employee-Head
+renegotiation, which stays untouched by calibration).
+
 ## Entra ID group mapping (draft — confirm names with IT, ADR-004)
 
 | Entra group | Role |
