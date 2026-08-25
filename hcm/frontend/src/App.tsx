@@ -45,6 +45,7 @@ import { ReviewDetailPage } from './pages/ReviewDetailPage'
 import { ReviewsPage } from './pages/ReviewsPage'
 import { CourseCataloguePage } from './pages/CourseCataloguePage'
 import { SkillsInventoryPage } from './pages/SkillsInventoryPage'
+import { TalentPoolsPage } from './pages/TalentPoolsPage'
 import { TeamDevelopmentPage } from './pages/TeamDevelopmentPage'
 import { TrainingCompliancePage } from './pages/TrainingCompliancePage'
 import { WorkforceIntegrityPage } from './pages/WorkforceIntegrityPage'
@@ -82,6 +83,7 @@ export default function App() {
               <Route path="/skills-inventory" element={<SkillsInventoryPage />} />
               <Route path="/course-catalogue" element={<CourseCataloguePage />} />
               <Route path="/dashboards/training-compliance" element={<TrainingCompliancePage />} />
+              <Route path="/talent-pools" element={<TalentPoolsPage />} />
             </Route>
             <Route path="/dashboards/headcount" element={<HeadcountDashboardPage />} />
             <Route element={<RequireRole roles={['recruiter', 'hr_admin']} />}>

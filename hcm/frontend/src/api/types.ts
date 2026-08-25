@@ -1363,3 +1363,48 @@ export interface DataSubjectRequest {
   resolution_notes: string
   download_url: string | null
 }
+
+// ---- Succession planning / talent pools (C6) ----
+// docs/superpowers/specs/2026-08-25-succession-talent-pools-design.md
+
+export interface CriticalPost {
+  id: number
+  position: number
+  reason: string
+  active: boolean
+  flagged_by: number | null
+  created_at: string
+  updated_at: string
+}
+
+export type SuccessionReadiness = 'ready_now' | 'ready_1_2_years' | 'ready_3_plus_years' | 'development_needed'
+
+export const SUCCESSION_READINESS_LABELS: Record<SuccessionReadiness, string> = {
+  ready_now: 'Ready now',
+  ready_1_2_years: 'Ready in 1–2 years',
+  ready_3_plus_years: 'Ready in 3+ years',
+  development_needed: 'Development needed',
+}
+
+/** Read-only cross-app context (spec §2.7) — informational only, never an
+ * input to `readiness`, which is always the human judgement call HR
+ * records directly. */
+export interface SuccessionPerformanceContext {
+  final_score: string
+  period_name: string
+  hr_attention: boolean
+}
+
+export interface SuccessionCandidate {
+  id: number
+  critical_post: number
+  employee: number
+  readiness: SuccessionReadiness
+  notes: string
+  nominated_by: number | null
+  active: boolean
+  skill_names: string[]
+  latest_performance: SuccessionPerformanceContext | null
+  created_at: string
+  updated_at: string
+}

@@ -1,13 +1,22 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api/client'
 import { useAllPages } from '../api/hooks'
 import { useReferenceData } from '../api/ReferenceDataContext'
-import { POSITION_STATUS_LABELS, type Position } from '../api/types'
+import { POSITION_STATUS_LABELS, type CriticalPost, type Position } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 
 export function PositionsPage() {
   const { hasRole } = useAuth()
   const { data: positions, error: loadError, reload: load } = useAllPages<Position>('/positions/', [], 'Failed to load positions.')
+  // Critical-post flags are the same read audience Position itself is
+  // readable to (spec §5.1) -- if this 403s for a role that can still see
+  // /positions/ (there is none today), the column just shows no flags
+  // rather than erroring the whole page.
+  const { data: criticalPosts } = useAllPages<CriticalPost>('/critical-posts/')
+  const criticalPositionIds = useMemo(
+    () => new Set((criticalPosts ?? []).filter((c) => c.active).map((c) => c.position)),
+    [criticalPosts],
+  )
   const [showForm, setShowForm] = useState(false)
 
   const canPropose = hasRole('hr_admin')
@@ -50,12 +59,16 @@ export function PositionsPage() {
                 <th>Title</th>
                 <th>Status</th>
                 <th>Incumbent</th>
+                <th>Critical</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {positions.map((position) => (
-                <PositionRow key={position.id} position={position} onChanged={load} />
+                <PositionRow
+                  key={position.id} position={position} isCritical={criticalPositionIds.has(position.id)}
+                  onChanged={load}
+                />
               ))}
             </tbody>
           </table>
@@ -65,7 +78,9 @@ export function PositionsPage() {
   )
 }
 
-function PositionRow({ position, onChanged }: { position: Position; onChanged: () => void }) {
+function PositionRow({
+  position, isCritical, onChanged,
+}: { position: Position; isCritical: boolean; onChanged: () => void }) {
   const { hasRole } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -93,6 +108,7 @@ function PositionRow({ position, onChanged }: { position: Position; onChanged: (
         <span className="status-badge">{POSITION_STATUS_LABELS[position.status]}</span>
       </td>
       <td>{position.current_incumbent_number ?? (position.status === 'approved' ? 'Vacant' : '—')}</td>
+      <td>{isCritical && <span className="restricted-badge">Critical</span>}</td>
       <td>
         {error && <p className="form-error">{error}</p>}
         <div className="form-actions">

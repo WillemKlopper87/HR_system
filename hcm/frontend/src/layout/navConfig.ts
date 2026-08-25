@@ -85,6 +85,7 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       { to: '/skills-inventory', label: 'Skills Inventory', roles: HR },
       { to: '/course-catalogue', label: 'Course Catalogue', roles: HR },
       { to: '/dashboards/training-compliance', label: 'Training Compliance', roles: HR },
+      { to: '/talent-pools', label: 'Talent Pools', roles: HR },
       { to: '/assessments', label: 'Assessments', roles: ASSESS },
     ],
   },
