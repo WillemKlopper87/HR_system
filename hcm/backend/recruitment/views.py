@@ -192,9 +192,13 @@ class InterviewSessionViewSet(viewsets.ModelViewSet):
         employee = get_request_employee(self.request)
         if employee is None:
             return qs.none()
-        if has_role(employee, "recruiter") or has_role(employee, "hr_admin"):
-            pass
-        else:
+        # ?mine=true forces "sessions I'm personally on the panel for"
+        # regardless of role -- without it, a recruiter/hr_admin sees every
+        # session (the admin view, e.g. ApplicantDetailPage); MyInterviewsPage
+        # needs the row-scoped view even for a recruiter/hr_admin who is
+        # ALSO occasionally a panelist, so role alone can't decide this.
+        mine_only = self.request.query_params.get("mine") == "true"
+        if mine_only or not (has_role(employee, "recruiter") or has_role(employee, "hr_admin")):
             qs = qs.filter(interviewers=employee)
         applicant_id = int_query_param(self.request, "applicant")
         if applicant_id is not None:

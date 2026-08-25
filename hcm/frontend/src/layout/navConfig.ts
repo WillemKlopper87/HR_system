@@ -116,6 +116,10 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
     items: [
       { to: '/my-verification', label: 'My Verification', roles: [] },
       { to: '/my-profile', label: 'My Profile', roles: [] },
+      // Being tapped as an interview panelist is an ad-hoc, row-level
+      // assignment, not tied to any role -- roles: [] like every other
+      // My Space item, not RECRUIT.
+      { to: '/my-interviews', label: 'My Interviews', roles: [] },
       { to: '/my-benefits', label: 'My Benefits', roles: [] },
       { to: '/my-learning', label: 'My Learning', roles: [] },
       { to: '/my-policies', label: 'My Policies', roles: [] },

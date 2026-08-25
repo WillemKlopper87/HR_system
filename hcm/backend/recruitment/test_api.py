@@ -364,6 +364,31 @@ class InterviewSessionApiTests(InterviewSchedulingApiTestCase):
         response = self.client.get(f"/api/v1/interview-sessions/{session.id}/")
         self.assertEqual(response.status_code, 404)
 
+    def test_mine_only_scopes_even_a_recruiter_to_their_own_panel_assignments(self):
+        """A recruiter who is ALSO occasionally a panelist needs "my
+        interviews" to mean their own assignments, not the admin view of
+        every session in the system -- role alone can't decide this, hence
+        the explicit ?mine=true query param."""
+        own_session = InterviewSession.objects.create(applicant=self.applicant, scheduled_at="2026-09-01T10:00:00Z")
+        own_session.interviewers.set([self.recruiter, self.interviewer1])
+        other_applicant = Applicant.objects.create(
+            requisition=self.requisition, first_name="Other", last_name="Applicant",
+            email="other@example.com", date_of_birth=date(1992, 1, 1),
+        )
+        transition_applicant(other_applicant, to_stage=Applicant.Stage.SCREENED, actor=self.recruiter)
+        transition_applicant(other_applicant, to_stage=Applicant.Stage.INTERVIEW, actor=self.recruiter)
+        InterviewSession.objects.create(
+            applicant=other_applicant, scheduled_at="2026-09-02T10:00:00Z"
+        ).interviewers.set([self.interviewer1])
+
+        self.client.force_authenticate(user=self.recruiter.user)
+        everything = self.client.get("/api/v1/interview-sessions/")
+        self.assertEqual(len(everything.data["results"]), 2)
+
+        mine = self.client.get("/api/v1/interview-sessions/?mine=true")
+        self.assertEqual(len(mine.data["results"]), 1)
+        self.assertEqual(mine.data["results"][0]["id"], own_session.id)
+
     def test_assigned_interviewer_can_read_but_not_write_own_session(self):
         session = InterviewSession.objects.create(applicant=self.applicant, scheduled_at="2026-09-01T10:00:00Z")
         session.interviewers.set([self.interviewer1])

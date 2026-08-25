@@ -228,6 +228,13 @@ they're an interviewer (never an empty-vs-403 ambiguity — a non-interviewer, n
 genuinely empty list, matching the shape `ChecklistInstance`'s reporting-chain filter already uses elsewhere in
 this codebase, not a 403 on the list endpoint itself).
 
+A `?mine=true` query param forces the row-scoped filter even for recruiter/hr_admin: role alone can't tell
+"give me the admin view of every session" (`ApplicantDetailPage.tsx`'s use) apart from "give me only the
+sessions I'm personally on the panel for" (`MyInterviewsPage.tsx`'s use) when the same person holds both
+recruiter/hr_admin **and** an occasional panel assignment — a real, not hypothetical, overlap (a recruiter can
+sit on their own panel). Without it, a recruiter visiting "My Interviews" would see the entire company's
+interview schedule, not their own assignments.
+
 **What an interviewer sees of the applicant.** Not the full `ApplicantSerializer` (which exposes Sensitive-tier
 demographics to anyone who can reach it, gated only by `IsRecruiterOrHRAdmin` at the whole-endpoint level — an
 assigned interviewer is explicitly *not* that audience). `InterviewSessionSerializer` instead nests a

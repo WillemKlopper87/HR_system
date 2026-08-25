@@ -24,6 +24,7 @@ import { EquityDashboardPage } from './pages/EquityDashboardPage'
 import { HeadcountDashboardPage } from './pages/HeadcountDashboardPage'
 import { MyBenefitsPage } from './pages/MyBenefitsPage'
 import { MyDocumentsPage } from './pages/MyDocumentsPage'
+import { MyInterviewsPage } from './pages/MyInterviewsPage'
 import { MyLearningPage } from './pages/MyLearningPage'
 import { MyProfilePage } from './pages/MyProfilePage'
 import { MyPerformancePage } from './pages/MyPerformancePage'
@@ -137,6 +138,7 @@ export default function App() {
               }
             />
             <Route path="/my-profile" element={<MyProfilePage />} />
+            <Route path="/my-interviews" element={<MyInterviewsPage />} />
             <Route path="/my-benefits" element={<MyBenefitsPage />} />
             <Route path="/my-learning" element={<MyLearningPage />} />
             <Route path="/my-documents" element={<MyDocumentsPage />} />
