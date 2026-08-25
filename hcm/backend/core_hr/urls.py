@@ -3,7 +3,9 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     DataQualityExceptionViewSet,
+    DependantViewSet,
     DepartmentViewSet,
+    EmergencyContactViewSet,
     EmployeeVersionViewSet,
     EmployeeViewSet,
     EmploymentChangeViewSet,
@@ -22,6 +24,8 @@ router.register("occupational-levels", OccupationalLevelViewSet, basename="occup
 router.register("job-grades", JobGradeViewSet, basename="job-grade")
 router.register("locations", LocationViewSet, basename="location")
 router.register("data-quality-exceptions", DataQualityExceptionViewSet, basename="data-quality-exception")
+router.register("dependants", DependantViewSet, basename="dependant")
+router.register("emergency-contacts", EmergencyContactViewSet, basename="emergency-contact")
 
 urlpatterns = router.urls + [
     path("dashboards/headcount/", headcount_dashboard, name="headcount-dashboard"),

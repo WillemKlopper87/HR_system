@@ -23,20 +23,24 @@ from .data_quality import run_data_quality_checks
 from .exits import EmploymentChangeError, cancel_employment_change, confirm_employment_change, propose_employment_change
 from .models import (
     DataQualityException,
+    Dependant,
     Department,
     Employee,
+    EmergencyContact,
     EmployeeVersion,
     EmploymentChange,
     JobGrade,
     Location,
     OccupationalLevel,
 )
-from .permissions import EmploymentChangePermission, IsHRAdmin, IsHRAdminOrReadOnly
+from .permissions import EmploymentChangePermission, IsHRAdmin, IsHRAdminOrReadOnly, IsSelfOrHRAdmin
 from .serializers import (
     ContractActionInputSerializer,
     ContractRenewalDecisionSerializer,
     DataQualityExceptionSerializer,
+    DependantSerializer,
     DepartmentSerializer,
+    EmergencyContactSerializer,
     EmployeeSerializer,
     EmployeeVersionSerializer,
     EmploymentChangeSerializer,
@@ -388,6 +392,43 @@ class LocationViewSet(ProtectedDeleteMixin, viewsets.ModelViewSet):
     queryset = Location.objects.all()
     serializer_class = LocationSerializer
     permission_classes = [IsHRAdminOrReadOnly]
+
+
+class _SelfOrHRAdminEmployeeScopedViewSet(viewsets.ModelViewSet):
+    """Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+    spec §2.8, §5.2): self-or-hr_admin only, narrower than
+    RowScopePermission's row-scope (a line_manager never manages a
+    report's dependants/emergency contacts). List is filtered to the
+    caller's own rows unless they hold hr_admin; detail lookups are left
+    unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+    queryset-driven 404 -- same shape as
+    policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+    to hide existence here, unlike Policy's draft-hiding)."""
+
+    model = None  # set by subclasses
+    permission_classes = [IsSelfOrHRAdmin]
+
+    def get_queryset(self):
+        queryset = self.model.objects.select_related("employee")
+        if self.action != "list":
+            return queryset
+        employee = get_request_employee(self.request)
+        if employee is not None and has_role(employee, "hr_admin"):
+            return queryset
+        return queryset.filter(employee=employee)
+
+    def get_target_employee(self, obj):
+        return obj.employee
+
+
+class DependantViewSet(_SelfOrHRAdminEmployeeScopedViewSet):
+    model = Dependant
+    serializer_class = DependantSerializer
+
+
+class EmergencyContactViewSet(_SelfOrHRAdminEmployeeScopedViewSet):
+    model = EmergencyContact
+    serializer_class = EmergencyContactSerializer
 
 
 class DataQualityExceptionViewSet(viewsets.ReadOnlyModelViewSet):

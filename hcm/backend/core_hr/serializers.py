@@ -7,14 +7,17 @@ from rest_framework import serializers
 from .models import (
     ContractRenewalDecision,
     DataQualityException,
+    Dependant,
     Department,
     Employee,
+    EmergencyContact,
     EmployeeVersion,
     EmploymentChange,
     JobGrade,
     Location,
     OccupationalLevel,
 )
+from .permissions import is_self_or_hr_admin
 
 # Sprint 15 (ESS): the only fields a PATCH through EmployeeViewSet may
 # touch, for self or hr_admin alike — RBAC-Roles.md's employee row: "*W on
@@ -143,6 +146,36 @@ class EmployeeSerializer(TieredModelSerializer):
                     f"Only these fields can be updated here: {', '.join(sorted(ESS_EDITABLE_FIELDS))}."
                 )
         return attrs
+
+
+class _SelfOrHRAdminSerializer(TieredModelSerializer):
+    """Shared validate() for Dependant/EmergencyContact (C2 design spec
+    §2.8): narrower than learning.RowScopedLearningSerializer's
+    has_row_access -- self or hr_admin only, never a line_manager's
+    own_team scope, since managing a report's dependants/emergency
+    contacts is HR administration, not team management."""
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        requester = get_request_employee(request) if request is not None else None
+        target = attrs.get("employee") or getattr(self.instance, "employee", None)
+        if target is not None and not is_self_or_hr_admin(requester, target):
+            raise serializers.ValidationError("You don't have access to manage this employee's records.")
+        return attrs
+
+
+class DependantSerializer(_SelfOrHRAdminSerializer):
+    class Meta:
+        model = Dependant
+        fields = ["id", "employee", "first_name", "last_name", "relationship", "date_of_birth", "id_number", "notes"]
+
+
+class EmergencyContactSerializer(_SelfOrHRAdminSerializer):
+    class Meta:
+        model = EmergencyContact
+        fields = [
+            "id", "employee", "name", "relationship", "phone", "alternative_phone", "email", "is_primary",
+        ]
 
 
 class DepartmentSerializer(serializers.ModelSerializer):

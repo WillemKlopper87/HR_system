@@ -30,6 +30,42 @@ class IsHRAdminOrReadOnly(permissions.BasePermission):
         return has_role(get_request_employee(request), "hr_admin")
 
 
+class IsSelfOrHRAdmin(permissions.BasePermission):
+    """Self-or-hr_admin object access for a per-employee record whose write
+    access is deliberately narrower than generic row-scope (C2 design spec
+    §2.8): a line_manager has no legitimate reason to manage a report's
+    dependants, emergency contacts, or documents -- that's HR
+    administration, not team management. Kept in core_hr (rather than
+    duplicated module-locally like policies.IsSelfOrHRAdmin/
+    identity_verification.IsSelfOrHRAdmin) because core_hr is the one app
+    every domain app already imports directly -- learning/views.py already
+    imports IsHRAdmin/IsHRAdminOrReadOnly from here the same way.
+
+    `obj` must expose `.employee`/`.employee_id` (Dependant,
+    EmergencyContact, and documents.EmployeeDocument/DataSubjectRequest all
+    do)."""
+
+    def has_permission(self, request, view):
+        return get_request_employee(request) is not None
+
+    def has_object_permission(self, request, view, obj):
+        employee = get_request_employee(request)
+        if employee is None:
+            return False
+        if has_role(employee, "hr_admin"):
+            return True
+        return obj.employee_id == employee.id
+
+
+def is_self_or_hr_admin(requester, target_employee) -> bool:
+    """Boolean form of IsSelfOrHRAdmin, for use in a serializer's
+    validate() on CREATE (no object yet to run has_object_permission
+    against) -- same shape as rbac_audit.permissions.has_row_access."""
+    if requester is None or target_employee is None:
+        return False
+    return requester.id == target_employee.id or has_role(requester, "hr_admin")
+
+
 class EmploymentChangePermission(permissions.BasePermission):
     """Coarse gate for EmploymentChangeViewSet (C1 part 3, design spec
     docs/superpowers/specs/2026-08-20-employment-exit-states-design.md

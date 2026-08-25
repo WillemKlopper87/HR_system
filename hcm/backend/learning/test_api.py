@@ -262,8 +262,9 @@ class WspAtrExportTests(LearningApiTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "text/csv")
         content = response.content.decode()
-        self.assertIn("employee_number,occupational_level,race,gender,disability_status", content)
+        self.assertIn("record_type,employee_number,occupational_level,race,gender,disability_status", content)
         self.assertIn("E100", content)
+        self.assertIn("training,E100", content)
         self.assertIn("AWS Bootcamp", content)
         self.assertIn("5000.00", content)
 
@@ -277,3 +278,29 @@ class WspAtrExportTests(LearningApiTestCase):
         content = response.content.decode()
         self.assertIn("AWS Bootcamp", content)
         self.assertNotIn("Old Course", content)
+
+    def test_certifications_are_unioned_in_as_qualification_rows(self):
+        """C2 design spec §2.4: Certification wasn't in this export at all
+        before — now it's unioned in with a record_type discriminator."""
+        Certification.objects.create(
+            employee=self.report, name="BCom Accounting", issuing_body="UNISA", issue_date=date(2026, 2, 1),
+        )
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/dashboards/learning/wsp-atr-export/")
+        content = response.content.decode()
+        self.assertIn("qualification,E100", content)
+        self.assertIn("BCom Accounting", content)
+        self.assertIn("UNISA", content)
+
+    def test_certification_year_filter_uses_issue_date(self):
+        Certification.objects.create(
+            employee=self.report, name="Old Diploma", issuing_body="TUT", issue_date=date(2020, 1, 1),
+        )
+        Certification.objects.create(
+            employee=self.report, name="New Diploma", issuing_body="TUT", issue_date=date(2026, 1, 1),
+        )
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/dashboards/learning/wsp-atr-export/?year=2026")
+        content = response.content.decode()
+        self.assertIn("New Diploma", content)
+        self.assertNotIn("Old Diploma", content)

@@ -148,6 +148,12 @@ class ConsentRecord(models.Model):
         DEMOGRAPHIC_SELF_ID = "demographic_self_id", "Demographic self-identification"
         ASSESSMENT = "assessment", "Psychometric assessment"
         BIOMETRIC = "biometric", "Biometric identity + attendance-location verification"
+        # C2 (docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md
+        # §2.7) — gates uploading an id_copy/disability_verification
+        # documents.EmployeeDocument, kept distinct from DEMOGRAPHIC_SELF_ID
+        # so a POPIA erasure request can withdraw exactly this consent
+        # without touching the separate self-ID answer on EmployeeVersion.
+        EMPLOYEE_DOCUMENTS = "employee_documents", "Employee document storage (ID copy, disability verification)"
         OTHER = "other", "Other"
 
     class LawfulBasis(models.TextChoices):

@@ -71,6 +71,26 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
         "recommended_comment": FieldTier.INTERNAL,
         "decided_comment": FieldTier.INTERNAL,
     },
+    # C2 (docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md
+    # §2.9): personal data about a third party who holds no seat at this
+    # system's RBAC table -- Sensitive by default (stricter than the
+    # employee's own analogous fields), Restricted for a third-party ID
+    # number, matching Employee.national_id_number's own tier.
+    "core_hr.Dependant": {
+        "first_name": FieldTier.SENSITIVE,
+        "last_name": FieldTier.SENSITIVE,
+        "relationship": FieldTier.SENSITIVE,
+        "date_of_birth": FieldTier.SENSITIVE,
+        "id_number": FieldTier.RESTRICTED,
+        "notes": FieldTier.SENSITIVE,
+    },
+    "core_hr.EmergencyContact": {
+        "name": FieldTier.SENSITIVE,
+        "relationship": FieldTier.SENSITIVE,
+        "phone": FieldTier.SENSITIVE,
+        "alternative_phone": FieldTier.SENSITIVE,
+        "email": FieldTier.SENSITIVE,
+    },
     "recruitment.Applicant": {
         "first_name": FieldTier.PUBLIC,
         "last_name": FieldTier.PUBLIC,

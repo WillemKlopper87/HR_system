@@ -137,23 +137,35 @@ def wsp_atr_export(request):
     absent from L&D sprints... add WSP/ATR export to Sprints 8-9 or it
     will be rebuilt in spreadsheets." A CSV in the shape a WSP/ATR
     submission needs — training data joined to the EEA demographic/level
-    fields SETA reporting requires alongside it."""
+    fields SETA reporting requires alongside it.
+
+    C2 (docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md
+    §2.4): also unions in Certification rows via a `record_type` column —
+    qualifications feed WSP/ATR too, and Certification wasn't in this
+    export at all before this. Purely additive within this app (it already
+    owns both models); no new peer-app coupling. Qualification rows carry
+    name/issuing_body in the training_title/provider columns (same shape,
+    different semantic label) with hours/cost/status/completion_date left
+    blank — concepts that don't apply to a qualification."""
     year = int_query_param(request, "year")
-    records = TrainingRecord.objects.select_related("employee").order_by("employee__employee_number")
+    training_records = TrainingRecord.objects.select_related("employee").order_by("employee__employee_number")
+    certifications = Certification.objects.select_related("employee").order_by("employee__employee_number")
     if year is not None:
-        records = records.filter(Q(completion_date__year=year) | Q(start_date__year=year))
+        training_records = training_records.filter(Q(completion_date__year=year) | Q(start_date__year=year))
+        certifications = certifications.filter(issue_date__year=year)
 
     filename = f"wsp-atr-export{f'-{year}' if year else ''}.csv"
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     writer = csv.writer(response)
     writer.writerow([
-        "employee_number", "occupational_level", "race", "gender", "disability_status",
+        "record_type", "employee_number", "occupational_level", "race", "gender", "disability_status",
         "training_title", "provider", "status", "start_date", "completion_date", "hours", "cost",
     ])
-    for record in records:
+    for record in training_records:
         version = record.employee.current_version
         writer.writerow([
+            "training",
             record.employee.employee_number,
             version.occupational_level.name if version else "",
             version.race if version else "",
@@ -166,5 +178,22 @@ def wsp_atr_export(request):
             record.completion_date or "",
             record.hours if record.hours is not None else "",
             record.cost if record.cost is not None else "",
+        ])
+    for cert in certifications:
+        version = cert.employee.current_version
+        writer.writerow([
+            "qualification",
+            cert.employee.employee_number,
+            version.occupational_level.name if version else "",
+            version.race if version else "",
+            version.gender if version else "",
+            version.disability_status if version else "",
+            cert.name,
+            cert.issuing_body,
+            "",
+            cert.issue_date or "",
+            "",
+            "",
+            "",
         ])
     return response

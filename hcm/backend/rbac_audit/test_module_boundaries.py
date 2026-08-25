@@ -20,7 +20,7 @@ BACKEND = Path(settings.BASE_DIR)
 DOMAIN_APPS = [
     "core_hr", "rbac_audit", "recruitment", "performance", "learning", "compensation",
     "assessments", "identity_verification", "ee_reporting", "policies", "integrations",
-    "notifications", "establishment",
+    "notifications", "establishment", "onboarding", "documents",
 ]
 # Shared infrastructure every module may import. `integrations` joined in PC-0:
 # it is an outbound *adapter* layer (ADR-011), deliberately domain-agnostic —

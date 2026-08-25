@@ -88,6 +88,7 @@ urlpatterns = [
     path("api/v1/", include("notifications.urls")),
     path("api/v1/", include("establishment.urls")),
     path("api/v1/", include("onboarding.urls")),
+    path("api/v1/", include("documents.urls")),
     # OpenAPI schema + Swagger UI (H3) — hr_admin only, see IsHRAdminSchema.
     path("api/schema/", HRAdminSchemaView.as_view(), name="schema"),
     path("api/docs/", HRAdminSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
@@ -100,7 +101,10 @@ urlpatterns = [
 # No MEDIA_URL static() mount: django.views.static.serve has no RBAC/
 # authentication layer at all, and the zero-config dev/CI path defaults
 # DEBUG=True (config/settings.py), so mounting it would make every
-# uploaded policy document fetchable by anyone who has the URL, logged in
-# or not. policies.Policy.source_file is served exclusively through
+# uploaded policy document (or employee document, or POPIA export bundle)
+# fetchable by anyone who has the URL, logged in or not.
+# policies.Policy.source_file is served exclusively through
 # PolicyViewSet.download (authenticated, same permission + status-filtered
 # queryset as the rest of the API) instead — see policies/views.py.
+# documents.EmployeeDocument.file / DataSubjectRequest.export_file reuse
+# the identical pattern — see documents/views.py.
