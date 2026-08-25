@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { api, ApiError } from '../api/client'
+import { api, ApiError, fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import {
   CHECKLIST_DIRECTION_LABELS,
@@ -27,7 +27,7 @@ export function ChecklistTemplatesPage() {
   const canWrite = hasRole('hr_admin')
   const [direction, setDirection] = useState<ChecklistDirection>('onboarding')
   const { data: templates, error, reload: load } = useApiQuery(
-    () => api.get<ChecklistTemplate[]>(`/checklist-templates/?direction=${direction}`),
+    () => fetchAllPages<ChecklistTemplate>(`/checklist-templates/?direction=${direction}`),
     [direction],
     { errorMessage: 'Failed to load checklist templates.' },
   )
@@ -140,6 +140,9 @@ function TemplateCard({ template, onChanged }: { template: ChecklistTemplate; on
   const [error, setError] = useState<string | null>(null)
   const draft = template.status === 'draft'
   const showItemActions = draft && canWrite
+  // Mirrors the server's own rule (services.publish_template): a template
+  // needs at least one task before it can be published.
+  const canPublish = draft && canWrite && template.items.length > 0
 
   async function publish() {
     setBusy(true)
@@ -175,7 +178,7 @@ function TemplateCard({ template, onChanged }: { template: ChecklistTemplate; on
         </h3>
         <div>
           <span className="status-badge">{template.status}</span>{' '}
-          {draft && canWrite && (
+          {canPublish && (
             <button type="button" onClick={() => void publish()} disabled={busy}>
               Publish
             </button>
