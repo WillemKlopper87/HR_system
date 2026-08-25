@@ -134,6 +134,31 @@ hcm/
                 so it can never reach employment history/audit logs). New
                 core_hr models Dependant/EmergencyContact ride alongside
                 (self-or-hr_admin only, third-party data).
+    succession/ succession planning / talent pools (C6, second sub-item, spec
+                docs/superpowers/specs/2026-08-25-succession-talent-pools-design.md):
+                CriticalPost (OneToOneField flag on establishment.Position,
+                active toggles it without deleting) and SuccessionCandidate
+                (nominee + readiness: ready_now/ready_1_2_years/
+                ready_3_plus_years/development_needed). Not SHARED_KERNEL —
+                reads establishment.Position/core_hr.Employee directly (both
+                kernel) but nothing needs a reverse FK into it. No
+                services.py — every write is single-row, validated in the
+                serializer, matching Skill/Course/CourseRequirement's shape
+                rather than Position's/ChecklistTemplate's workflow shape.
+                Read access to the successor-candidate list is hr_admin/
+                auditor only, with NO self-scope carve-out anywhere — the
+                viewset's own get_queryset excludes the acting requester's
+                own employee_id regardless of role, so not even an hr_admin
+                can see their own row. The critical-post flag itself is
+                visible to the same audience Position already is. Adds
+                learning/queries.py::skill_names_for_employee and a new
+                performance/queries.py::latest_final_score (performance's
+                first read seam) as read-only informational context on a
+                candidate's card — never an input to the stored readiness
+                value. CRITICAL_POST_NO_SUCCESSOR registered into core_hr's
+                data-quality sweep (an active critical post with no active
+                ready-now/ready-soon candidate, attached to its current
+                occupant; a vacant critical post is silently skipped).
   frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards; RequirePayrollStepUp.tsx —
                TOTP enrollment + step-up challenge UI, a children-wrapper (not a
@@ -161,7 +186,13 @@ hcm/
                Contacts sections on EmployeeDetailPage (hr_admin manages
                anyone's, same page self reaches for their own); hr_admin +
                auditor data-subject-requests review queue (auditor read-only
-               — action buttons hidden client-side, 403'd server-side)
+               — action buttons hidden client-side, 403'd server-side);
+               talent-pools (C6, hr_admin-only — flag a critical post,
+               nominate/rate/withdraw successor candidates); Positions page
+               gains a Critical column; EmployeeDetailPage gains a read-only
+               Succession section, hr_admin/auditor-only and never fetched
+               for your own record (the backend's own self-exclusion is the
+               real guarantee, not this client-side skip)
     liveness/  face-api.js wrapper + shared camera-capture component (Sprint 12c);
                lazy-loaded (React.lazy) since TensorFlow.js is ~1MB and only this
                one page needs it
@@ -306,6 +337,14 @@ shows what they would do.
   through `learning/queries.py`, a small read-only query-interface module that
   exists purely to be imported by other apps, per Architecture-Design.md §4's
   own named example of how the "no peer imports" rule is meant to be satisfied.
+  `succession` (C6) is the first consumer to need this pattern twice at once —
+  it reads `learning/queries.py::skill_names_for_employee` and a new
+  `performance/queries.py::latest_final_score` (performance's first read seam)
+  as informational context on a successor candidate's card, never as an input
+  to the stored readiness value. `succession` itself imports `establishment`
+  and `core_hr` directly rather than through a seam — both are `SHARED_KERNEL`
+  (below), which any domain app may import freely; `succession` does not join
+  the kernel itself, since nothing needs a reverse FK into it.
 - All API access goes through the shared RBAC permission classes + field-tier
   serializer mixin from `rbac_audit` (Sprint 2). No per-module access control.
 - Background/scheduled work runs in Celery (`config/celery.py`; worker + beat

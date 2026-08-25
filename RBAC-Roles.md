@@ -127,6 +127,25 @@ feature exists to fix, applied to a different field); `establishment.Position` w
 concept layered under `occupational_level`, not an independent axis any worked example needed. See spec §2.3
 for the full investigation.
 
+## Module access: succession planning / talent pools (C6)
+
+Spec: `docs/superpowers/specs/2026-08-25-succession-talent-pools-design.md`. New app `succession` (not
+`SHARED_KERNEL` — nothing needs a reverse FK into it): `CriticalPost` (flag on `establishment.Position`) and
+`SuccessionCandidate` (nominee + readiness, scoped to one `CriticalPost`).
+
+| Action | Roles allowed |
+|---|---|
+| Read `CriticalPost` (the flag itself — which posts matter, and why) | Same audience `establishment.Position` is already readable to: **hr_admin · comp_manager · accounting_officer · auditor · recruiter** |
+| Create/update `CriticalPost` | **hr_admin only** |
+| Read `SuccessionCandidate` (the successor list — who, how ready) | **hr_admin · auditor only.** No other role — including the nominated employee's own login and their line_manager — reaches this at all. On top of the role gate, `SuccessionCandidateViewSet.get_queryset` excludes any row whose `employee` is the acting requester themself, **regardless of role** — an hr_admin or auditor cannot read a row about themself through this endpoint either. This is deliberately stricter than a normal Internal-tier field (which the base `employee` role reads for itself by default): a successor list is a comparative, exclusionary judgement about *other* people, and absence from it is itself sensitive (spec §2.6) |
+| Create/update `SuccessionCandidate` (nominate, change readiness/notes, withdraw) | **hr_admin only** — no manager-nominates/hr_admin-confirms two-step chain; hr_admin authors directly, the same single-actor pattern `Course`/`CourseRequirement`/`ChecklistTemplate` already use |
+
+Scoping decision: tied to `establishment.Position` via a `OneToOneField`, not a broader Department/
+OccupationalLevel "role track" the way `CourseRequirement` is — a critical post is one specific seat (continuity
+for *that* seat), not a population a rule can apply to uniformly. See spec §2.2 for the full investigation
+(including why the Department/OccupationalLevel shape that fits mandatory-training compliance doesn't fit
+this feature).
+
 ## Entra ID group mapping (draft — confirm names with IT, ADR-004)
 
 | Entra group | Role |

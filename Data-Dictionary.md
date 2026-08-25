@@ -407,7 +407,47 @@ read, which requirements apply to an employee (matched against their current `em
 `occupational_level`) and whether a `training_record(course=X, status=completed)` satisfies each one within its
 validity window. Same "derive, don't store" philosophy as `establishment.position.current_occupant` (§3 above).
 
-## 7. Later-sprint entities (summary — detail in the owning sprint)
+## 7. succession — succession planning / talent pools (C6)
+
+Spec: `docs/superpowers/specs/2026-08-25-succession-talent-pools-design.md`. New app, not `SHARED_KERNEL`.
+
+### critical_post
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| position | FK establishment.position, unique | ✔ | — (row-level, see below) | `PROTECT`. One row per post ever flagged; `active` toggles the flag rather than a second row |
+| reason | text, blank | | — | Why this post is succession-critical |
+| active | bool | ✔ (default true) | — | Flag/unflag without deleting, mirrors `course.active` |
+| flagged_by | FK employee, null | | — | `SET_NULL` |
+
+Read audience matches `establishment.position` itself (hr_admin, comp_manager, accounting_officer, auditor,
+recruiter) — the flag is Position-adjacent metadata, not the sensitive nominee list below. Not a `FIELD_TIERS`
+entry — gated whole-endpoint by `CriticalPostPermission`, same shape as `ChecklistTemplatePermission`.
+
+### succession_candidate
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| critical_post | FK critical_post | ✔ | — (row-level) | `CASCADE` |
+| employee | FK employee | ✔ | — (row-level) | `CASCADE` — the nominated successor |
+| readiness | varchar, choices | ✔ | — (row-level) | `ready_now` / `ready_1_2_years` / `ready_3_plus_years` / `development_needed` |
+| notes | text, blank | | — (row-level) | |
+| nominated_by | FK employee, null | | — (row-level) | `SET_NULL` |
+| active | bool | ✔ (default true) | — (row-level) | Withdraw without deleting; multiple historical rows per (critical_post, employee) pair are allowed |
+
+`UniqueConstraint(critical_post, employee) WHERE active` — at most one active nomination per pair, same
+conditional shape as `checklist_instance`'s one-active-per-employee-per-direction rule. **Deliberately not a
+`FIELD_TIERS` entry** — this whole model is sensitive, not a subset of its fields, so it's gated whole-endpoint
+(`SuccessionCandidatePermission`: hr_admin manages it, hr_admin/auditor read it) exactly like
+`performance.review`/`feedback`'s own documented exception. Read access is **narrower than a normal
+Internal-tier field**: no role gets self-scope here at all, including hr_admin viewing their own row — the
+viewset's own `get_queryset` excludes the acting requester's `employee_id` regardless of role (spec §2.6/§5.2).
+
+Both `skill_names`/`latest_performance` on the API response are **read-only cross-app context, not stored
+columns** — `learning/queries.py::skill_names_for_employee` and the new `performance/queries.py::
+latest_final_score` read seams, informational only, never an input to `readiness` (spec §2.7).
+
+## 8. Later-sprint entities (summary — detail in the owning sprint)
 
 | Module | Entities (tier of most sensitive field) | Detailed in |
 |---|---|---|
