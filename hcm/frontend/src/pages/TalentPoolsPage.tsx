@@ -29,29 +29,42 @@ const READINESS_OPTIONS: SuccessionReadiness[] = [
  * does or doesn't render. */
 export function TalentPoolsPage() {
   const ref = useReferenceData()
-  const { data, error, reload: load } = useApiQuery(
+  // Split from the critical-post/candidate data below on purpose: positions
+  // and employees are org-wide, cursor-paginated lists (150+ rows each) that
+  // rarely change mid-session, while criticalPosts/candidates change on
+  // every flag/nominate/withdraw action on this page. Refetching all four
+  // lists after every single action (the one-`useApiQuery` shape this page
+  // started with) made every mutation pay for two heavy full-list re-fetches
+  // it didn't need — this reference data loads once and only `liveData`
+  // reloads after a mutation.
+  const { data: refData, error: refError } = useApiQuery(
     () =>
-      Promise.all([
-        fetchAllPages<Position>('/positions/'),
-        fetchAllPages<CriticalPost>('/critical-posts/'),
-        fetchAllPages<SuccessionCandidate>('/succession-candidates/'),
-        fetchAllPages<Employee>('/employees/'),
-      ]).then(([positions, criticalPosts, candidates, employees]) => ({ positions, criticalPosts, candidates, employees })),
+      Promise.all([fetchAllPages<Position>('/positions/'), fetchAllPages<Employee>('/employees/')]).then(
+        ([positions, employees]) => ({ positions, employees }),
+      ),
+    [],
+    { errorMessage: 'Failed to load positions/employees.' },
+  )
+  const { data: liveData, error: liveError, reload: load } = useApiQuery(
+    () =>
+      Promise.all([fetchAllPages<CriticalPost>('/critical-posts/'), fetchAllPages<SuccessionCandidate>('/succession-candidates/')]).then(
+        ([criticalPosts, candidates]) => ({ criticalPosts, candidates }),
+      ),
     [],
     { errorMessage: 'Failed to load talent pools.' },
   )
   const [showFlagForm, setShowFlagForm] = useState(false)
 
-  const positions = data?.positions ?? []
-  const criticalPosts = data?.criticalPosts ?? []
-  const candidates = data?.candidates ?? []
-  const employees = data?.employees ?? []
+  const positions = refData?.positions ?? []
+  const employees = refData?.employees ?? []
+  const criticalPosts = liveData?.criticalPosts ?? []
+  const candidates = liveData?.candidates ?? []
 
-  // Keyed off `data` itself (stable between renders, only changes on
-  // reload), not the `?? []`-derived locals above -- those are a fresh
-  // array literal every render, which would defeat the memoization.
-  const positionById = useMemo(() => new Map((data?.positions ?? []).map((p) => [p.id, p])), [data])
-  const employeeById = useMemo(() => new Map((data?.employees ?? []).map((e) => [e.id, e])), [data])
+  // Keyed off the query results themselves (stable between renders, only
+  // change on reload), not the `?? []`-derived locals above -- those are a
+  // fresh array literal every render, which would defeat the memoization.
+  const positionById = useMemo(() => new Map((refData?.positions ?? []).map((p) => [p.id, p])), [refData])
+  const employeeById = useMemo(() => new Map((refData?.employees ?? []).map((e) => [e.id, e])), [refData])
   const employeeName = (id: number | null) => {
     if (id === null) return '—'
     const e = employeeById.get(id)
@@ -76,7 +89,7 @@ export function TalentPoolsPage() {
         hr_admin/auditor — see the design spec for why.
       </p>
 
-      {error && <p className="form-error">{error}</p>}
+      {(refError || liveError) && <p className="form-error">{refError ?? liveError}</p>}
 
       {showFlagForm && (
         <FlagPositionForm
@@ -86,7 +99,7 @@ export function TalentPoolsPage() {
         />
       )}
 
-      {data === null ? (
+      {refData === null || liveData === null ? (
         <p className="empty-state">Loading…</p>
       ) : activeFlags.length === 0 ? (
         <p className="empty-state">No critical posts flagged yet.</p>

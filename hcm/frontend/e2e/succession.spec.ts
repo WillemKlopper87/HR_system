@@ -73,14 +73,25 @@ test.describe('Succession planning / talent pools (C6)', () => {
     await expect(criticalCard).toContainText('Vacant')
 
     // Nominate a successor -- the vacant post's "not the current occupant"
-    // filter excludes nobody, and nothing else has been nominated yet
-    // (empty exclusion set too), so the first real option is always safe.
+    // filter excludes nobody, and nothing else has been nominated yet, so
+    // any real option would normally be safe... except index 1 could land
+    // on hradmin's OWN employee record, and the backend's get_queryset
+    // self-exclusion (spec §5.2) means hradmin can never see a row about
+    // themself again through this same endpoint -- exactly the "no self-
+    // scope carve-out anywhere" rule working as designed, but it silently
+    // breaks a test that assumes whichever row it just created is visible
+    // to the actor that created it. Exclude hradmin's own id explicitly.
+    const me = await (await page.request.get('/api/v1/auth/me/')).json()
+    const ownId = String(me.employee_id)
     await criticalCard.getByRole('button', { name: '+ Nominate' }).click()
     const employeeSelect = criticalCard.getByLabel('Employee')
-    await employeeSelect.selectOption({ index: 1 })
-    const candidateId = await employeeSelect.locator('option:checked').getAttribute('value')
-    const candidateLabel = (await employeeSelect.locator('option:checked').textContent())?.trim() ?? ''
+    const optionValues = await employeeSelect.locator('option').evaluateAll(
+      (opts) => opts.map((o) => (o as HTMLOptionElement).value),
+    )
+    const candidateId = optionValues.find((v) => v && v !== ownId)
     expect(candidateId).toBeTruthy()
+    await employeeSelect.selectOption(candidateId!)
+    const candidateLabel = (await employeeSelect.locator(`option[value="${candidateId}"]`).textContent())?.trim() ?? ''
     await criticalCard.getByLabel('Readiness').selectOption('ready_now')
     await criticalCard.getByLabel('Notes').fill('E2E: strong technical depth, ready today.')
     await criticalCard.getByRole('button', { name: 'Nominate' }).click()
