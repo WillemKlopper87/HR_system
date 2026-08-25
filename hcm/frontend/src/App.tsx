@@ -13,6 +13,7 @@ import { ChecklistsPage } from './pages/ChecklistsPage'
 import { ChecklistTemplatesPage } from './pages/ChecklistTemplatesPage'
 import { CompProposalsPage } from './pages/CompProposalsPage'
 import { ContractRenewalsPage } from './pages/ContractRenewalsPage'
+import { DataSubjectRequestsPage } from './pages/DataSubjectRequestsPage'
 import { EmploymentChangesPage } from './pages/EmploymentChangesPage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { EEConfigurationPage } from './pages/EEConfigurationPage'
@@ -22,6 +23,7 @@ import { EmployeeListPage } from './pages/EmployeeListPage'
 import { EquityDashboardPage } from './pages/EquityDashboardPage'
 import { HeadcountDashboardPage } from './pages/HeadcountDashboardPage'
 import { MyBenefitsPage } from './pages/MyBenefitsPage'
+import { MyDocumentsPage } from './pages/MyDocumentsPage'
 import { MyLearningPage } from './pages/MyLearningPage'
 import { MyProfilePage } from './pages/MyProfilePage'
 import { MyPerformancePage } from './pages/MyPerformancePage'
@@ -131,6 +133,7 @@ export default function App() {
             <Route path="/my-profile" element={<MyProfilePage />} />
             <Route path="/my-benefits" element={<MyBenefitsPage />} />
             <Route path="/my-learning" element={<MyLearningPage />} />
+            <Route path="/my-documents" element={<MyDocumentsPage />} />
             <Route element={<RequireRole roles={['hr_admin']} />}>
               <Route path="/workforce-integrity" element={<WorkforceIntegrityPage />} />
             </Route>
@@ -150,6 +153,7 @@ export default function App() {
             <Route element={<RequireRole roles={['hr_admin', 'auditor']} />}>
               <Route path="/performance-records" element={<PerformanceRecordsPage />} />
               <Route path="/audit-log" element={<AuditLogPage />} />
+              <Route path="/data-subject-requests" element={<DataSubjectRequestsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/employees" replace />} />
           </Route>

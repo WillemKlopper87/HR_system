@@ -93,6 +93,11 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       { to: '/policies', label: 'Policy Library', roles: HR },
       { to: '/dashboards/policy-acknowledgment', label: 'Policy Compliance', roles: HR },
       { to: '/workforce-integrity', label: 'Workforce Integrity', roles: HR },
+      // Read is hr_admin + auditor (auditor's "read-only everywhere"
+      // mandate); complete/decline are hr_admin-only, enforced server-side
+      // and hidden client-side for auditor (design spec §5.3) — same read/
+      // write split as Checklist Templates above.
+      { to: '/data-subject-requests', label: 'Data-Subject Requests', roles: AUDIT_ROLES },
     ],
   },
   {
@@ -112,6 +117,7 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       { to: '/my-learning', label: 'My Learning', roles: [] },
       { to: '/my-policies', label: 'My Policies', roles: [] },
       { to: '/my-performance', label: 'My Performance', roles: [] },
+      { to: '/my-documents', label: 'My Documents', roles: [] },
     ],
   },
 ]

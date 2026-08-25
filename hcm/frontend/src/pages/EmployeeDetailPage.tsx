@@ -4,7 +4,24 @@ import { Link, useParams } from 'react-router-dom'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useReferenceData } from '../api/ReferenceDataContext'
 import { useAuth } from '../auth/AuthContext'
-import type { Certification, Employee, EmployeeSkill, EmployeeVersion, Feedback, Goal, Skill, TrainingRecord } from '../api/types'
+import {
+  DEPENDANT_RELATIONSHIP_LABELS,
+  EMPLOYEE_DOCUMENT_CONSENT_REQUIRED_TYPES,
+  EMPLOYEE_DOCUMENT_TYPE_LABELS,
+  type Certification,
+  type Dependant,
+  type DependantRelationship,
+  type EmergencyContact,
+  type Employee,
+  type EmployeeDocument,
+  type EmployeeDocumentType,
+  type EmployeeSkill,
+  type EmployeeVersion,
+  type Feedback,
+  type Goal,
+  type Skill,
+  type TrainingRecord,
+} from '../api/types'
 
 /** Renders "Restricted" when the key is absent from the API response (the
  * tiered serializer stripped it — the viewer's role lacks read access to
@@ -136,7 +153,451 @@ export function EmployeeDetailPage() {
       {employee && <TrainingSection employeeId={employee.id} />}
       {employee && <GoalsSection employeeId={employee.id} />}
       {employee && <FeedbackSection employeeId={employee.id} />}
+      {employee && <DocumentsSection employeeId={employee.id} />}
+      {employee && <DependantsSection employeeId={employee.id} />}
+      {employee && <EmergencyContactsSection employeeId={employee.id} />}
     </div>
+  )
+}
+
+// C2 (docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md):
+// documents/dependants/emergency-contacts management for whoever this page
+// is already open to — hr_admin managing anyone, or an employee viewing
+// their own record (self-or-hr_admin is enforced server-side either way;
+// a stranger simply gets an empty/403'd section, same as every other
+// section on this page relies on row-scope to hide, not client logic).
+
+function DocumentsSection({ employeeId }: { employeeId: number }) {
+  const [documents, setDocuments] = useState<EmployeeDocument[] | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function load() {
+    setError(null)
+    fetchAllPages<EmployeeDocument>(`/employee-documents/?employee=${employeeId}`)
+      .then(setDocuments)
+      .catch(() => setError('Failed to load documents.'))
+  }
+
+  useEffect(load, [employeeId])
+
+  async function handleDelete(document: EmployeeDocument) {
+    if (!window.confirm(`Delete "${document.title}"? This cannot be undone.`)) return
+    try {
+      await api.delete(`/employee-documents/${document.id}/`)
+      load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Delete failed.')
+    }
+  }
+
+  return (
+    <section className="detail-card">
+      <div className="page-header">
+        <h2>Documents</h2>
+        <button type="button" className="btn-secondary" onClick={() => setShowForm((v) => !v)}>
+          {showForm ? 'Cancel' : '+ Upload document'}
+        </button>
+      </div>
+      {error && <p className="form-error">{error}</p>}
+      {showForm && (
+        <NewDocumentForm
+          employeeId={employeeId}
+          onCreated={() => {
+            setShowForm(false)
+            load()
+          }}
+        />
+      )}
+      {documents === null ? (
+        <p className="empty-state">Loading…</p>
+      ) : documents.length === 0 ? (
+        <p className="empty-state">No documents on file.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Title</th>
+                <th>Tier</th>
+                <th>Uploaded</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {documents.map((d) => (
+                <tr key={d.id}>
+                  <td>{EMPLOYEE_DOCUMENT_TYPE_LABELS[d.document_type]}</td>
+                  <td>{d.title}</td>
+                  <td>{d.tier}</td>
+                  <td>{new Date(d.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <div className="form-actions">
+                      <a className="btn-link" href={d.download_url} target="_blank" rel="noreferrer">
+                        Download
+                      </a>
+                      <button type="button" className="btn-link" onClick={() => void handleDelete(d)}>
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function NewDocumentForm({ employeeId, onCreated }: { employeeId: number; onCreated: () => void }) {
+  const [documentType, setDocumentType] = useState<EmployeeDocumentType>('qualification')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [capturingConsent, setCapturingConsent] = useState(false)
+
+  const consentRequired = EMPLOYEE_DOCUMENT_CONSENT_REQUIRED_TYPES.includes(documentType)
+
+  async function handleCaptureConsent() {
+    setError(null)
+    setCapturingConsent(true)
+    try {
+      await api.post('/employee-documents/consent/', { employee: employeeId })
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not record consent.')
+    } finally {
+      setCapturingConsent(false)
+    }
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!file) return
+    setError(null)
+    setSubmitting(true)
+    try {
+      const form = new FormData()
+      form.append('employee', String(employeeId))
+      form.append('document_type', documentType)
+      form.append('title', title)
+      form.append('description', description)
+      form.append('file', file)
+      await api.postForm('/employee-documents/', form)
+      onCreated()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Upload failed.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="inline-form" onSubmit={handleSubmit} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+      <label>
+        Document type
+        <select value={documentType} onChange={(e) => setDocumentType(e.target.value as EmployeeDocumentType)}>
+          {Object.entries(EMPLOYEE_DOCUMENT_TYPE_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Title
+        <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+      </label>
+      <label>
+        Description
+        <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+      </label>
+      <label>
+        File (PDF, JPEG, PNG, or Word)
+        <input
+          type="file" accept=".pdf,.jpg,.jpeg,.png,.docx"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)} required
+        />
+      </label>
+      {consentRequired && (
+        <p className="hint-text">
+          This document type requires consent to be captured before it can be uploaded.{' '}
+          <button type="button" className="btn-link" disabled={capturingConsent} onClick={() => void handleCaptureConsent()}>
+            {capturingConsent ? 'Recording…' : 'Capture consent now'}
+          </button>
+        </p>
+      )}
+      {error && <p className="form-error">{error}</p>}
+      <div className="form-actions">
+        <button type="submit" className="btn-primary" disabled={submitting || !file}>
+          {submitting ? 'Uploading…' : 'Upload'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function DependantsSection({ employeeId }: { employeeId: number }) {
+  const [dependants, setDependants] = useState<Dependant[] | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function load() {
+    setError(null)
+    fetchAllPages<Dependant>(`/dependants/?employee=${employeeId}`)
+      .then(setDependants)
+      .catch(() => setError('Failed to load dependants.'))
+  }
+
+  useEffect(load, [employeeId])
+
+  async function handleDelete(dependant: Dependant) {
+    if (!window.confirm(`Remove ${dependant.first_name} ${dependant.last_name}?`)) return
+    try {
+      await api.delete(`/dependants/${dependant.id}/`)
+      load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Delete failed.')
+    }
+  }
+
+  return (
+    <section className="detail-card">
+      <div className="page-header">
+        <h2>Dependants</h2>
+        <button type="button" className="btn-secondary" onClick={() => setShowForm((v) => !v)}>
+          {showForm ? 'Cancel' : '+ Add dependant'}
+        </button>
+      </div>
+      {error && <p className="form-error">{error}</p>}
+      {showForm && (
+        <NewDependantForm
+          employeeId={employeeId}
+          onCreated={() => {
+            setShowForm(false)
+            load()
+          }}
+        />
+      )}
+      {dependants === null ? (
+        <p className="empty-state">Loading…</p>
+      ) : dependants.length === 0 ? (
+        <p className="empty-state">No dependants recorded.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Relationship</th>
+                <th>Date of birth</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dependants.map((d) => (
+                <tr key={d.id}>
+                  <td>{d.first_name} {d.last_name}</td>
+                  <td>{DEPENDANT_RELATIONSHIP_LABELS[d.relationship]}</td>
+                  <td>{d.date_of_birth ?? '—'}</td>
+                  <td>
+                    <button type="button" className="btn-link" onClick={() => void handleDelete(d)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function NewDependantForm({ employeeId, onCreated }: { employeeId: number; onCreated: () => void }) {
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [relationship, setRelationship] = useState<DependantRelationship>('child')
+  const [dateOfBirth, setDateOfBirth] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSubmitting(true)
+    try {
+      await api.post('/dependants/', {
+        employee: employeeId, first_name: firstName, last_name: lastName,
+        relationship, date_of_birth: dateOfBirth || null,
+      })
+      onCreated()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Add failed.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="inline-form" onSubmit={handleSubmit}>
+      <label>
+        First name
+        <input value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+      </label>
+      <label>
+        Last name
+        <input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+      </label>
+      <label>
+        Relationship
+        <select value={relationship} onChange={(e) => setRelationship(e.target.value as DependantRelationship)}>
+          {Object.entries(DEPENDANT_RELATIONSHIP_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Date of birth
+        <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
+      </label>
+      {error && <p className="form-error">{error}</p>}
+      <div className="form-actions">
+        <button type="submit" className="btn-primary" disabled={submitting}>
+          {submitting ? 'Adding…' : 'Add dependant'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function EmergencyContactsSection({ employeeId }: { employeeId: number }) {
+  const [contacts, setContacts] = useState<EmergencyContact[] | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function load() {
+    setError(null)
+    fetchAllPages<EmergencyContact>(`/emergency-contacts/?employee=${employeeId}`)
+      .then(setContacts)
+      .catch(() => setError('Failed to load emergency contacts.'))
+  }
+
+  useEffect(load, [employeeId])
+
+  async function handleDelete(contact: EmergencyContact) {
+    if (!window.confirm(`Remove ${contact.name}?`)) return
+    try {
+      await api.delete(`/emergency-contacts/${contact.id}/`)
+      load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Delete failed.')
+    }
+  }
+
+  return (
+    <section className="detail-card">
+      <div className="page-header">
+        <h2>Emergency contacts</h2>
+        <button type="button" className="btn-secondary" onClick={() => setShowForm((v) => !v)}>
+          {showForm ? 'Cancel' : '+ Add contact'}
+        </button>
+      </div>
+      {error && <p className="form-error">{error}</p>}
+      {showForm && (
+        <NewEmergencyContactForm
+          employeeId={employeeId}
+          onCreated={() => {
+            setShowForm(false)
+            load()
+          }}
+        />
+      )}
+      {contacts === null ? (
+        <p className="empty-state">Loading…</p>
+      ) : contacts.length === 0 ? (
+        <p className="empty-state">No emergency contacts recorded.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Relationship</th>
+                <th>Phone</th>
+                <th>Primary</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contacts.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.name}</td>
+                  <td>{c.relationship || '—'}</td>
+                  <td>{c.phone}</td>
+                  <td>{c.is_primary ? 'Yes' : ''}</td>
+                  <td>
+                    <button type="button" className="btn-link" onClick={() => void handleDelete(c)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function NewEmergencyContactForm({ employeeId, onCreated }: { employeeId: number; onCreated: () => void }) {
+  const [name, setName] = useState('')
+  const [relationship, setRelationship] = useState('')
+  const [phone, setPhone] = useState('')
+  const [isPrimary, setIsPrimary] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSubmitting(true)
+    try {
+      await api.post('/emergency-contacts/', {
+        employee: employeeId, name, relationship, phone, is_primary: isPrimary,
+      })
+      onCreated()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Add failed.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="inline-form" onSubmit={handleSubmit}>
+      <label>
+        Name
+        <input value={name} onChange={(e) => setName(e.target.value)} required />
+      </label>
+      <label>
+        Relationship
+        <input value={relationship} onChange={(e) => setRelationship(e.target.value)} placeholder="e.g. Spouse" />
+      </label>
+      <label>
+        Phone
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} required />
+      </label>
+      <label>
+        <input type="checkbox" checked={isPrimary} onChange={(e) => setIsPrimary(e.target.checked)} /> Primary contact
+      </label>
+      {error && <p className="form-error">{error}</p>}
+      <div className="form-actions">
+        <button type="submit" className="btn-primary" disabled={submitting}>
+          {submitting ? 'Adding…' : 'Add contact'}
+        </button>
+      </div>
+    </form>
   )
 }
 

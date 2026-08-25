@@ -1216,3 +1216,94 @@ export interface AuditLogEntry {
   request_id: string
   ip_address: string | null
 }
+
+// C2 — employee documents & POPIA rights
+// (docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md)
+
+export type EmployeeDocumentType =
+  | 'id_copy' | 'qualification' | 'employment_contract' | 'disability_verification' | 'other'
+
+export const EMPLOYEE_DOCUMENT_TYPE_LABELS: Record<EmployeeDocumentType, string> = {
+  id_copy: 'ID copy',
+  qualification: 'Qualification / certificate',
+  employment_contract: 'Employment contract',
+  disability_verification: 'Disability verification',
+  other: 'Other',
+}
+
+// documents/models.py::EmployeeDocument.CONSENT_REQUIRED_TYPES — mirrored
+// here so the upload form can prompt for consent before submitting rather
+// than only finding out from a 400.
+export const EMPLOYEE_DOCUMENT_CONSENT_REQUIRED_TYPES: EmployeeDocumentType[] = ['id_copy', 'disability_verification']
+
+export interface EmployeeDocument {
+  id: number
+  employee: number
+  employee_number: string
+  document_type: EmployeeDocumentType
+  title: string
+  description: string
+  download_url: string
+  content_type: string
+  size_bytes: number
+  tier: FieldTierCode
+  uploaded_by: number | null
+  uploaded_by_number: string | null
+  created_at: string
+}
+
+export type DependantRelationship = 'spouse' | 'child' | 'parent' | 'other'
+
+export const DEPENDANT_RELATIONSHIP_LABELS: Record<DependantRelationship, string> = {
+  spouse: 'Spouse', child: 'Child', parent: 'Parent', other: 'Other',
+}
+
+export interface Dependant {
+  id: number
+  employee: number
+  first_name: string
+  last_name: string
+  relationship: DependantRelationship
+  date_of_birth: string | null
+  id_number: string
+  notes: string
+}
+
+export interface EmergencyContact {
+  id: number
+  employee: number
+  name: string
+  relationship: string
+  phone: string
+  alternative_phone: string
+  email: string
+  is_primary: boolean
+}
+
+export type DataSubjectRequestType = 'export' | 'erasure'
+export type DataSubjectRequestStatus = 'submitted' | 'completed' | 'declined'
+
+export const DATA_SUBJECT_REQUEST_TYPE_LABELS: Record<DataSubjectRequestType, string> = {
+  export: 'Export my data', erasure: 'Erasure request',
+}
+
+export const DATA_SUBJECT_REQUEST_STATUS_LABELS: Record<DataSubjectRequestStatus, string> = {
+  submitted: 'Submitted', completed: 'Completed', declined: 'Declined',
+}
+
+export interface DataSubjectRequest {
+  id: number
+  employee: number
+  employee_number: string
+  request_type: DataSubjectRequestType
+  status: DataSubjectRequestStatus
+  requested_by: number | null
+  requested_by_number: string | null
+  requested_at: string
+  request_notes: string
+  reviewed_by: number | null
+  reviewed_by_number: string | null
+  reviewed_at: string | null
+  resolution_notes: string
+  download_url: string | null
+}
