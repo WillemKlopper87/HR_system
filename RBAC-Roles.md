@@ -66,6 +66,26 @@ Wrong role is a 403 from the view; wrong *state* (already recommended, already d
 current version, a renewal end date that isn't after the current one) is a 400 from
 `core_hr/contracts.py` — the same split `establishment` uses.
 
+## Module access: onboarding / offboarding checklists (C1 part 3 slice 3)
+
+Spec: `docs/superpowers/specs/2026-08-24-onboarding-offboarding-checklists-design.md` §7. Two model pairs:
+`ChecklistTemplate`/`ChecklistTemplateItem` (the process definition) and `ChecklistInstance`/
+`ChecklistInstanceItem` (one employee's live checklist).
+
+| Action | Roles allowed |
+|---|---|
+| Read a template / its items (`GET /checklist-templates/`, `/checklist-template-items/`) | **hr_admin · auditor** |
+| Create/publish/retire a template, add/edit/remove its items | **hr_admin only** |
+| List/read checklist instances (`GET /checklist-instances/`, `/checklist-items/`) | **hr_admin · auditor** — all; **line_manager** — instances for employees in their reporting chain (`is_in_reporting_chain`, the same check contract-renewal's recommend action uses); **any employee** — their own instance only |
+| Manually create an instance (`POST /checklist-instances/`) | **hr_admin only** — the automatic path (hire / exit execution) covers the normal case; this is the backfill fallback |
+| Complete/reopen a task (`POST /checklist-items/{id}/complete/`, `/reopen/`) | **hr_admin** — any task; **line_manager** — only a task whose `owner_role` is `line_manager`, only for their own reporting chain; **nobody else**, including the checklist's own subject — an employee can see their own checklist but never ticks a row themselves (design spec §3, decision 1: several tasks are attestations *about* the employee, not *by* them) |
+
+Row visibility for instances/items is decided in each viewset's `get_queryset` (not a blanket permission class),
+the same split `EmployeeVersion`'s nested `contract_renewal_decision` read gate uses. Task completion's
+`owner_role` + reporting-chain gate is checked directly in the `complete`/`reopen` actions rather than a
+permission class, for the same reason the tiered-confirmation rule in the exit state machine lives in
+`exits.py`'s service layer: it needs the specific row's data, not just the actor's role.
+
 ## Entra ID group mapping (draft — confirm names with IT, ADR-004)
 
 | Entra group | Role |

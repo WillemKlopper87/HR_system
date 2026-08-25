@@ -104,17 +104,17 @@ works. Take one employee from arrival to departure and the breaks are obvious:
 | Lifecycle step | State | Blocker |
 |---|---|---|
 | Recruit → offer → hire | ✅ Works | — |
-| **Onboard** (tasks, IT, first week) | ❌ Missing | C1 ③ — planned, not started |
+| **Onboard** (tasks, IT, first week) | ✅ Works | C1 ③ slice 3 — shipped 2026-08-25 |
 | Profile, org placement | ✅ Works | — |
-| **See the org visually** | ❌ Missing | A1 #3 — unplanned |
-| **Personal documents** (ID, contract, quals) | ❌ Missing | C2 — planned, not started |
+| **See the org visually** | ✅ Works | A1 #3 — `/org-chart` shipped 2026-08-20 |
+| **Personal documents** (ID, contract, quals) | ❌ Missing | C2 — up next |
 | **Request leave** | ❌ Missing | A5 #15 — needs a decision |
 | Performance cycle | ✅ Works (deep) | — |
-| Contract renewal | ✅ Works | C1 ② — shipping now |
-| **Offboard** (exit cascade) | ❌ Missing | C1 ③ — planned, not started |
+| Contract renewal | ✅ Works | C1 ② — shipped |
+| **Offboard** (exit cascade + task checklist) | ✅ Works | C1 ③ — shipped (access cascade: slices 1-2; task checklist: slice 3, 2026-08-25) |
 
-Five breaks. Three are already on the backlog (C1 ③ ×2, C2). One is unplanned but cheap (org chart). One
-needs a decision (leave).
+Three of the original five breaks are now closed (onboarding, org chart, offboarding). Two remain: personal
+documents (C2, next up) and leave (blocked on a decision, not effort — see Part A5 #15 below).
 
 ### The reframing
 
@@ -128,12 +128,15 @@ per the original brief's own reasoning (build a standard process, demo it, let H
 
 ### Proposed sequence
 
-1. **C1 ③ — onboarding + offboarding checklists.** Closes two of the five breaks at once, and offboarding
-   carries the integrity payload the Gap Survey flagged: a terminated employee should automatically drop out of
-   liveness checks and role assignments.
-2. **C2 — employee documents.** Closes the third break; the consent/tiering plumbing already exists, so this is
-   mostly a new model plus the policies module's existing download pattern.
-3. **Org chart view.** Small, unplanned, disproportionate demo value — the data is already there.
+1. ~~**C1 ③ — onboarding + offboarding checklists.**~~ **Shipped 2026-08-25.** The integrity payload (a
+   terminated employee automatically dropping out of liveness checks and role assignments) shipped earlier as
+   the exit access cascade (C1 ③ slices 1-2); this slice added the task layer on top — versioned
+   onboarding/offboarding templates, an instance per employee created automatically on hire / on an exit
+   executing, task completion gated by owner role + reporting chain. Spec:
+   `docs/superpowers/specs/2026-08-24-onboarding-offboarding-checklists-design.md`.
+2. **C2 — employee documents.** Next up. Closes the third break; the consent/tiering plumbing already exists,
+   so this is mostly a new model plus the policies module's existing download pattern.
+3. ~~**Org chart view.**~~ **Shipped 2026-08-20.**
 4. **Leave — decide, then build or mirror.** Highest demo value of anything on this list; blocked on a decision
    rather than on effort.
 

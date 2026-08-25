@@ -243,7 +243,59 @@ many steps, with no code or schema change — see `RBAC-Roles.md` for who may ac
 per employee already in service when C1 shipped) carry **no** approval-step rows: that is already-real employment,
 not a proposal that went through review.
 
-## 4. Later-sprint entities (summary — detail in the owning sprint)
+## 4. onboarding (C1 part 3 slice 3 — onboarding / offboarding checklists)
+
+Spec: `docs/superpowers/specs/2026-08-24-onboarding-offboarding-checklists-design.md`. One app covering both
+directions via a `direction` field (spec §2.1), structurally mirroring `performance.AgreementTemplate`'s
+versioned-template shape but deliberately without its signing/scoring machinery (spec §2.3) — a checklist item
+is ticked off, not rated or signed.
+
+### checklist_template / checklist_template_item
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| name | varchar(200) | ✔ | I | |
+| direction | enum | ✔ | I | onboarding / offboarding |
+| version | smallint | ✔ | I | Auto-assigned server-side: `(max version for this name+direction) + 1` — never client-writable |
+| status | enum | ✔ | I | draft → published → retired |
+| created_by | FK employee, null | | I | `SET_NULL` |
+| published_at | datetime, null | | I | |
+
+`UniqueConstraint(name, direction, version)` — extends `AgreementTemplate`'s equivalent constraint with
+`direction`, since two directions legitimately share a name+version and version is assigned per name+direction,
+not per name alone. `checklist_template_item`: `template` (FK, `CASCADE`), `label` (varchar 300), `description`
+(text, blank), `owner_role` (enum: hr / it / line_manager / employee / other — who normally does this, and for
+`line_manager` specifically also the completion gate itself, spec §3), `order` (smallint). Editable only while
+the template's `status` is `draft` (service-layer rule, not a DB constraint) — publishing freezes the task list
+so a later edit never rewrites a checklist instance that already snapshotted it (spec §2.4).
+
+### checklist_instance / checklist_instance_item
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| employee | FK employee | ✔ | — | `CASCADE` |
+| template | FK checklist_template | ✔ | I | `PROTECT` — the exact template version this instance was drawn from |
+| template_version / direction | smallint / enum | ✔ | I | Snapshot of the template's own fields at creation |
+| status | enum | ✔ | I | active → completed, or cancelled |
+| triggering_change | FK employment_change, null | | I | `SET_NULL`. Set only for an offboarding instance created by the automatic exit hook; null for onboarding instances and any manually-created instance |
+| created_by | FK employee, null | | I | `SET_NULL`. Null = created by the automatic hire/exit hook; set = the hr_admin who manually triggered it |
+| completed_at | datetime, null | | I | Set when every item on the instance is complete |
+
+DB-enforced: at most one **active** instance per employee per direction (`one_active_checklist_per_employee_per_direction`,
+a Django 5.2 conditional `UniqueConstraint`), the same shape as `employment_change`'s
+`one_open_employment_change_per_employee`. `checklist_instance_item`: `instance` (FK, `CASCADE`),
+`label`/`description`/`owner_role`/`order` copied from the template item at creation and never re-synced
+(this row's identity *is* the snapshot), `completed_by` (FK employee, null, `SET_NULL`), `completed_at`
+(datetime, null — null = not done), `notes` (text, blank).
+
+**Triggers (spec §6):** `core_hr/lifecycle_hooks.py` — a new registry, same shape as `access_cascade.py`/
+`data_quality.py` — lets `EmployeeManager.hire()` spawn an onboarding instance and `exits.py`'s ending-type
+execution branch spawn an offboarding instance, without `core_hr` (SHARED_KERNEL) importing the `onboarding`
+app. A suspension executing does **not** trigger an offboarding instance — a suspended employee hasn't left. No
+published template for the direction = the hook is a no-op, never an error; a hire or an exit must never fail
+because a checklist template doesn't exist.
+
+## 5. Later-sprint entities (summary — detail in the owning sprint)
 
 | Module | Entities (tier of most sensitive field) | Detailed in |
 |---|---|---|

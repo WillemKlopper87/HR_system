@@ -95,6 +95,17 @@ hcm/
                 EMAIL_* settings, console backend when SMTP_HOST is unset).
                 Shared kernel (like integrations): imports core_hr only, knows
                 recipients and message text, nothing about any domain
+    onboarding/ onboarding/offboarding checklists (C1 part 3 slice 3, spec
+                docs/superpowers/specs/2026-08-24-onboarding-offboarding-checklists-design.md):
+                versioned ChecklistTemplate/ChecklistTemplateItem (flat ordered
+                task list, no signing/scoring — deliberately simpler than
+                performance.AgreementTemplate) and ChecklistInstance/
+                ChecklistInstanceItem, which snapshot a template's items at
+                creation. Triggered automatically off core_hr.Employee.hire()
+                and off an ending-type EmploymentChange executing, via a new
+                core_hr/lifecycle_hooks.py registry (same shape as
+                access_cascade.py/data_quality.py) — core_hr is SHARED_KERNEL
+                and never imports this app.
   frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards; RequirePayrollStepUp.tsx —
                TOTP enrollment + step-up challenge UI, a children-wrapper (not a
@@ -169,7 +180,10 @@ python -m venv .venv            # NOTE: prefer a venv OUTSIDE OneDrive (see belo
 ```
 
 Demo logins from `seed_demo_data` (password = username + "123"): `hradmin` (HR Admin),
-`manager` (Line Manager), `recruiter` (Recruiter), `compmanager` (Compensation Manager),
+`hradmin2` (a second HR Admin — needed for the exit state machine's tiered
+"a different hr_admin must confirm" control, C1 part 3; with only one hr_admin seeded
+every tiered change would be proposable but never confirmable), `manager` (Line Manager),
+`recruiter` (Recruiter), `compmanager` (Compensation Manager),
 `eemanager` (EE Manager), `accountingofficer` (Accounting Officer/CEO, EEA2/EEA4
 sign-off only — Sprint 13-14), `auditor` (Auditor, read-only everywhere — added PC-3;
 reports to nobody in the org chart, same as the CEO, since an auditor's read access
@@ -186,6 +200,14 @@ No demo login starts with a TOTP device enrolled (ADR-009) — `pay-bands`,
 live step-up-authentication challenge (enroll → confirm → verify + justify) on
 first visit for `compmanager`/`hradmin`, deliberately, so there's always something
 real to demo for that capability rather than a pre-satisfied gate.
+
+`onboarding`'s "Standard onboarding"/"Standard offboarding" checklist templates are
+seeded and published before any employee is hired, so every seeded employee already
+has an onboarding checklist at `/checklists` (`hradmin` sees them all; `manager` sees
+`employee`'s; `employee` sees only their own — see RBAC-Roles.md). A couple of
+`employee`'s onboarding tasks are pre-completed so the page shows a mix of done/not-done,
+and one throwaway employee is hired and immediately resigned so a real offboarding
+checklist exists too, created automatically the moment the exit executes.
 
 `identity_verification`'s face-descriptor model weights are checked into
 `frontend/public/models/` (copied from `node_modules/@vladmandic/face-api/model/` —
