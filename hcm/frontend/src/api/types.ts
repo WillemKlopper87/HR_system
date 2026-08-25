@@ -351,9 +351,14 @@ export interface Requisition {
   opened_at: string | null
   target_fill_date: string | null
   closed_at: string | null
+  // C6 careers portal — description is generally useful (not portal-only);
+  // external_posting is the deliberate opt-in flag (default false).
+  description?: string
+  external_posting: boolean
 }
 
 export type ApplicantStage = 'applied' | 'screened' | 'interview' | 'offer' | 'hired' | 'rejected'
+export type ApplicantSource = 'internal' | 'portal'
 
 export interface Applicant {
   id: number
@@ -372,6 +377,10 @@ export interface Applicant {
   gender?: string
   disability_status?: string
   resulting_employee: number | null
+  source: ApplicantSource
+  resume: string | null
+  resume_content_type?: string
+  resume_size_bytes?: number
 }
 
 export interface ApplicantStageEvent {
@@ -426,6 +435,113 @@ export const REQUISITION_STATUS_LABELS: Record<RequisitionStatus, string> = {
   on_hold: 'On hold',
   closed: 'Closed',
   filled: 'Filled',
+}
+
+// --- C6: interview scheduling, panel scorecards, background checks -------
+
+export type InterviewSessionStatus = 'scheduled' | 'completed' | 'cancelled'
+
+export interface InterviewApplicantSummary {
+  id: number
+  first_name: string
+  last_name: string
+  requisition: number
+  requisition_title: string
+  current_stage: ApplicantStage
+  resume: string | null
+}
+
+export interface InterviewSession {
+  id: number
+  applicant: number
+  applicant_summary: InterviewApplicantSummary
+  round_number: number
+  scheduled_at: string
+  duration_minutes: number
+  location: string
+  status: InterviewSessionStatus
+  notes: string
+  interviewers: number[]
+  created_by: number | null
+  created_at: string
+}
+
+export const INTERVIEW_SESSION_STATUS_LABELS: Record<InterviewSessionStatus, string> = {
+  scheduled: 'Scheduled',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+
+export type InterviewRecommendation = 'strong_hire' | 'hire' | 'no_hire' | 'strong_no_hire'
+
+export interface InterviewScorecard {
+  id: number
+  session: number
+  interviewer: number
+  // Blind-review masked (design spec §2.2): a scorecard whose content isn't
+  // yet visible to the viewer omits these five fields entirely rather than
+  // sending null — treat their absence as "not visible yet", not "unrated".
+  skill_rating?: number
+  communication_rating?: number
+  culture_fit_rating?: number
+  comments?: string
+  recommendation?: InterviewRecommendation
+  created_at: string
+}
+
+export const INTERVIEW_RECOMMENDATION_LABELS: Record<InterviewRecommendation, string> = {
+  strong_hire: 'Strong hire',
+  hire: 'Hire',
+  no_hire: 'No hire',
+  strong_no_hire: 'Strong no hire',
+}
+
+export type BackgroundCheckType =
+  | 'reference'
+  | 'criminal_record'
+  | 'qualification_verification'
+  | 'credit_check'
+  | 'other'
+export type BackgroundCheckStatus = 'not_started' | 'requested' | 'in_progress' | 'cleared' | 'flagged'
+
+export interface BackgroundCheck {
+  id: number
+  applicant: number
+  check_type: BackgroundCheckType
+  status: BackgroundCheckStatus
+  requested_by: number | null
+  requested_at: string | null
+  completed_at: string | null
+  notes: string
+  created_at: string
+}
+
+export const BACKGROUND_CHECK_TYPE_LABELS: Record<BackgroundCheckType, string> = {
+  reference: 'Reference check',
+  criminal_record: 'Criminal record check',
+  qualification_verification: 'Qualification verification',
+  credit_check: 'Credit check',
+  other: 'Other',
+}
+
+export const BACKGROUND_CHECK_STATUS_LABELS: Record<BackgroundCheckStatus, string> = {
+  not_started: 'Not started',
+  requested: 'Requested',
+  in_progress: 'In progress',
+  cleared: 'Cleared',
+  flagged: 'Flagged',
+}
+
+// --- C6: public careers portal (no auth) ----------------------------------
+
+export interface PublicPosting {
+  id: number
+  title: string
+  department: string
+  occupational_level: string
+  location: string
+  description: string
+  target_fill_date: string | null
 }
 
 export type ReviewCycleType = 'annual' | 'biannual'

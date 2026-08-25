@@ -5,7 +5,7 @@ from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rbac_audit.consent import record_consent
-from rbac_audit.drf import get_request_employee
+from rbac_audit.drf import get_request_employee, int_query_param
 from rbac_audit.models import ConsentRecord
 from rbac_audit.permissions import can_see_unsuppressed_aggregates, has_role
 from rbac_audit.tiers import FieldTier
@@ -193,8 +193,13 @@ class InterviewSessionViewSet(viewsets.ModelViewSet):
         if employee is None:
             return qs.none()
         if has_role(employee, "recruiter") or has_role(employee, "hr_admin"):
-            return qs
-        return qs.filter(interviewers=employee)
+            pass
+        else:
+            qs = qs.filter(interviewers=employee)
+        applicant_id = int_query_param(self.request, "applicant")
+        if applicant_id is not None:
+            qs = qs.filter(applicant_id=applicant_id)
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(created_by=get_request_employee(self.request))
@@ -212,11 +217,17 @@ class InterviewScorecardViewSet(viewsets.ModelViewSet):
         if employee is None:
             return qs.none()
         if has_role(employee, "recruiter") or has_role(employee, "hr_admin"):
-            return qs
-        # Own scorecards plus peers' on any session this employee is on the
-        # panel for — to_representation (InterviewScorecardSerializer) masks
-        # peer content until the viewer has submitted their own (spec §2.2).
-        return qs.filter(session__interviewers=employee).distinct()
+            pass
+        else:
+            # Own scorecards plus peers' on any session this employee is on
+            # the panel for — to_representation (InterviewScorecardSerializer)
+            # masks peer content until the viewer has submitted their own
+            # (spec §2.2).
+            qs = qs.filter(session__interviewers=employee).distinct()
+        session_id = int_query_param(self.request, "session")
+        if session_id is not None:
+            qs = qs.filter(session_id=session_id)
+        return qs
 
 
 class BackgroundCheckViewSet(viewsets.ModelViewSet):
@@ -230,6 +241,13 @@ class BackgroundCheckViewSet(viewsets.ModelViewSet):
     serializer_class = BackgroundCheckSerializer
     permission_classes = [IsRecruiterOrHRAdmin]
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        applicant_id = int_query_param(self.request, "applicant")
+        if applicant_id is not None:
+            qs = qs.filter(applicant_id=applicant_id)
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(requested_by=get_request_employee(self.request))
