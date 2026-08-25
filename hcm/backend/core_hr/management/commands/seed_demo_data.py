@@ -53,12 +53,18 @@ from performance.models import (
 )
 from performance.services import (
     approve_agreement,
+    approve_feedback_360_rater,
     create_agreement,
     generate_agreements_for_period,
+    nominate_feedback_360_rater,
+    open_calibration_session,
+    open_feedback_360_request,
     open_phase,
     publish_template,
+    record_calibration_outcome,
     sign_agreement,
     submit_agreement,
+    submit_feedback_360_response,
 )
 # Aliased: performance.services already owns `publish_template` for
 # AgreementTemplate above -- this is onboarding.ChecklistTemplate's own
@@ -391,6 +397,9 @@ class Command(BaseCommand):
             self._seed_ess_demo_data(direct_report=staff)
             self._seed_policies_demo_data(hr_admin=hr_head, direct_report=staff, rng=rng)
             self._seed_performance_agreements_demo_data(hr_admin=hr_head, head=eng_head, staff=staff, rng=rng)
+            self._seed_calibration_and_feedback360_demo_data(
+                hr_admin=hr_head, employee=fin_head, head=ceo, peer=ops_head,
+            )
             # LAST, once every employee exists: establishment.migrations.
             # 0002 ran its backfill against an empty database (correctly
             # creating nothing), so without this every fresh demo/e2e
@@ -1340,6 +1349,110 @@ class Command(BaseCommand):
             f"Seeded performance period {period.name}: {result['created']} agreements "
             f"({PerformanceAgreement.objects.filter(period=period, status='agreed').count()} signed, "
             f"{PerformanceAgreement.objects.filter(period=period, status='draft').count()} still to do)."
+        )
+
+    def _seed_calibration_and_feedback360_demo_data(self, *, hr_admin, employee, head, peer):
+        """C6: calibration/moderation + 360 feedback (design spec 2026-08-25-
+        performance-calibration-360-design.md). A SECOND, already-elapsed FY
+        (2025/26) exists purely so /calibration and /my-feedback-requests have
+        something real to show, without touching the main 2026/27 period's
+        carefully-curated draft/submitted/approved/agreed spread above --
+        opening mid-year/final on that period would sweep every AGREED
+        agreement there into the new stage as a side effect, which would
+        contradict its own "a few fully agreed" narrative. `employee`/`head`
+        are demo logins (fin_head/compmanager under ceo/accountingofficer),
+        real accounts so the whole flow -- including the two password
+        signatures -- is genuinely reproducible, not faked.
+
+        Deliberately left mid-flow, not fully wrapped up: the 360 round has
+        self + manager responses in (both automatic slots) but the one
+        nominated peer hasn't responded yet -- exactly the state a demo login
+        as that peer (`eemanager`) can walk forward, and it demonstrates the
+        aggregate's >=3-response floor (design spec §2.10) genuinely not
+        being met yet, the realistic starting point, not a finished example.
+        """
+        period = PerformancePeriod.objects.create(
+            name="2025/26", start_date=date(2025, 4, 1), end_date=date(2026, 3, 31), created_by=hr_admin,
+        )
+        for stage, opens_on, due_on in [
+            (PeriodPhase.Stage.CONTRACTING, date(2025, 4, 1), date(2025, 4, 30)),
+            (PeriodPhase.Stage.MIDYEAR, date(2025, 9, 1), date(2025, 9, 30)),
+            (PeriodPhase.Stage.FINAL, date(2026, 4, 1), date(2026, 4, 30)),
+        ]:
+            PeriodPhase.objects.create(period=period, stage=stage, opens_on=opens_on, due_on=due_on)
+
+        template = AgreementTemplate.objects.create(
+            name="Calibration Demo Scorecard", version=1, period=period, created_by=hr_admin,
+        )
+        section = TemplateSection.objects.create(template=template, title="ORGANISATIONAL PERFORMANCE", order=0)
+        descriptors_a = {"1": "Over budget by >10%", "2": "Over budget", "3": "On budget", "4": "Under budget", "5": "Well under budget"}
+        descriptors_b = {"1": "Missed", "2": "Partially met", "3": "Met", "4": "Exceeded", "5": "Significantly exceeded"}
+        TemplateElement.objects.create(
+            template=template, section=section, kpa_description="Financial management", kpi_title="Budget variance",
+            metric="%", default_weight=Decimal("0.6"), order=0, level_descriptors=descriptors_a,
+        )
+        TemplateElement.objects.create(
+            template=template, section=section, kpa_description="Delivery", kpi_title="Departmental plan delivery",
+            metric="Milestones", default_weight=Decimal("0.4"), order=1, level_descriptors=descriptors_b,
+        )
+        publish_template(template, actor=hr_admin)
+
+        open_phase(period, PeriodPhase.Stage.CONTRACTING, actor=hr_admin)
+        agreement = create_agreement(period=period, employee=employee, template=template, actor=hr_admin)
+        submit_agreement(agreement, actor=employee)
+        approve_agreement(agreement, actor=head)
+        sign_agreement(agreement, actor=employee, role="employee", password=self._password_for(employee))
+        sign_agreement(agreement, actor=head, role="head", password=self._password_for(head))
+
+        open_phase(period, PeriodPhase.Stage.MIDYEAR, actor=hr_admin)
+        agreement.refresh_from_db()
+        sign_agreement(agreement, actor=employee, role="employee", password=self._password_for(employee))
+        sign_agreement(agreement, actor=head, role="head", password=self._password_for(head))
+
+        open_phase(period, PeriodPhase.Stage.FINAL, actor=hr_admin)
+        agreement.refresh_from_db()
+        for element in agreement.elements.all():
+            element.final_rating = 4
+            element.save(update_fields=["final_rating"])
+        sign_agreement(agreement, actor=employee, role="employee", password=self._password_for(employee))
+        sign_agreement(agreement, actor=head, role="head", password=self._password_for(head))
+        agreement.refresh_from_db()
+
+        # Calibration: hr_admin reviews the (org-wide, single-agreement)
+        # cohort and records the realistic common case -- "reviewed, no
+        # change needed" -- not an adjustment. The audit trail (session +
+        # reason) exists either way.
+        session = open_calibration_session(
+            period=period, department=None, actor=hr_admin, meeting_date=date(2026, 5, 15),
+            participants_note="Department heads + HR Admin",
+        )
+        record_calibration_outcome(
+            session, agreement, actor=hr_admin,
+            reason="Consistent with the rest of the organisation's rating distribution this year.",
+        )
+
+        # 360: self + manager slots are automatic and both respond; one
+        # nominated peer is approved but left un-responded on purpose (see
+        # docstring).
+        feedback_request = open_feedback_360_request(agreement, actor=hr_admin)
+        self_slot = feedback_request.raters.get(relationship="self")
+        manager_slot = feedback_request.raters.get(relationship="manager")
+        submit_feedback_360_response(
+            self_slot, actor=employee, collaboration_rating=4, communication_rating=4, reliability_rating=4,
+            strengths="Delivers consistently and communicates blockers early.",
+            development_areas="Could delegate more of the budget review to the team.",
+        )
+        submit_feedback_360_response(
+            manager_slot, actor=head, collaboration_rating=4, communication_rating=5, reliability_rating=4,
+            strengths="Excellent cross-functional partner, always prepared for exec meetings.",
+        )
+        peer_slot = nominate_feedback_360_rater(feedback_request, peer, actor=employee)
+        approve_feedback_360_rater(peer_slot, actor=head)
+
+        self.stdout.write(
+            f"Seeded calibration/360 demo: {period.name} agreement final-signed for "
+            f"{employee.employee_number}, one calibration outcome recorded (no change), 360 round open with "
+            f"self+manager responded and one peer ({peer.employee_number}) approved awaiting response."
         )
 
     @staticmethod
