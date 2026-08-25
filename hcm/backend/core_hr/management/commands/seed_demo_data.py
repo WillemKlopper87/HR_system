@@ -76,6 +76,7 @@ from policies.models import Policy
 from policies.services import acknowledge_policy, create_policy, publish_policy
 from recruitment.models import Applicant, Offer, Requisition
 from recruitment.services import transition_applicant
+from succession.models import CriticalPost, SuccessionCandidate
 
 User = get_user_model()
 
@@ -400,6 +401,7 @@ class Command(BaseCommand):
                 department=eng_dept, level=mid_level, grade=grades_by_level[mid_level.code][0],
                 location=locations[0],
             )
+            self._seed_succession_demo_data(hr_admin=hr_head, eng_head=eng_head, staff=staff, fin_head=fin_head)
 
         run_data_quality_checks()
 
@@ -541,6 +543,41 @@ class Command(BaseCommand):
         self.stdout.write(
             "Seeded onboarding/offboarding checklists: 'Standard onboarding' and 'Standard offboarding' "
             "published; a demo resignation shows the offboarding checklist created automatically."
+        )
+
+    def _seed_succession_demo_data(self, *, hr_admin, eng_head, staff, fin_head):
+        """C6: two critical posts, one with a successor in the pipeline and
+        one without -- so /talent-pools has a real example of each shape,
+        and the CRITICAL_POST_NO_SUCCESSOR data-quality check (run at the
+        end of handle()) has something genuine to flag rather than an empty
+        list. Runs after _seed_establishment_demo_data, which is what gives
+        every seeded employee (eng_head, fin_head included) an approved
+        Position to flag."""
+        eng_position = eng_head.current_version.position
+        if eng_position is not None:
+            eng_critical = CriticalPost.objects.create(
+                position=eng_position, reason="Sole technical authority for platform architecture; no documented backup.",
+                flagged_by=hr_admin,
+            )
+            if staff is not None:
+                SuccessionCandidate.objects.create(
+                    critical_post=eng_critical, employee=staff,
+                    readiness=SuccessionCandidate.Readiness.READY_1_2_YEARS,
+                    notes="Strong technical growth this year; needs stakeholder-management exposure before ready.",
+                    nominated_by=hr_admin,
+                )
+
+        fin_position = fin_head.current_version.position
+        if fin_position is not None:
+            CriticalPost.objects.create(
+                position=fin_position,
+                reason="Signs off every compensation proposal; single point of failure on payroll compliance.",
+                flagged_by=hr_admin,
+            )
+
+        self.stdout.write(
+            "Seeded succession planning: 2 critical posts flagged (one with a ready-in-1-2-years successor, "
+            "one with none yet, on purpose -- demonstrates the data-quality check)."
         )
 
     def _positions_for_requisition(self, requisition, *, hr_admin):
