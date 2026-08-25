@@ -93,7 +93,12 @@ function MyInterviewSessionCard({
 
       {error && <p className="form-error">{error}</p>}
 
-      <ScorecardForm session={session} existing={mine} onSaved={load} />
+      {/* key forces a remount when `existing` first arrives (or changes
+          identity) -- useState's initial value only runs on mount, so
+          without this the form would keep showing its default 1-3-3-3
+          "new scorecard" state even after the async fetch above resolves
+          with the interviewer's real, already-submitted values. */}
+      <ScorecardForm key={mine?.id ?? 'new'} session={session} existing={mine} onSaved={load} />
 
       {peers.length > 0 && (
         <div style={{ marginTop: 12 }}>

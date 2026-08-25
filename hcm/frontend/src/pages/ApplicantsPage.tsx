@@ -68,6 +68,7 @@ export function ApplicantsPage() {
                 <th>Email</th>
                 <th>Requisition</th>
                 <th>Stage</th>
+                <th>Source</th>
               </tr>
             </thead>
             <tbody>
@@ -83,6 +84,7 @@ export function ApplicantsPage() {
                   <td>
                     <span className="status-badge">{STAGE_LABELS[a.current_stage]}</span>
                   </td>
+                  <td>{a.source === 'portal' ? 'Careers site' : 'Internal'}</td>
                 </tr>
               ))}
             </tbody>
