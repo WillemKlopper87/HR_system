@@ -146,6 +146,28 @@ for *that* seat), not a population a rule can apply to uniformly. See spec §2.2
 (including why the Department/OccupationalLevel shape that fits mandatory-training compliance doesn't fit
 this feature).
 
+## Module access: interview scheduling, panel scorecards, background checks, careers portal (C6)
+
+Spec: `docs/superpowers/specs/2026-08-25-recruitment-interviews-careers-portal-design.md`. All four sub-parts
+land in the existing `recruitment` app (direct `Applicant`/`Requisition` extensions, not a new domain) — three
+new models (`InterviewSession`, `InterviewScorecard`, `BackgroundCheck`) plus a new public surface
+(`recruitment/careers.py`).
+
+| Action | Roles allowed |
+|---|---|
+| `InterviewSession` create/update/delete, list-all | **recruiter, hr_admin** (`IsRecruiterOrHRAdminOrAssignedInterviewer`) |
+| `InterviewSession` read own assigned sessions | Any employee named in `interviewers` for that specific row — a **row-level**, not role-level, grant (being tapped as a panelist isn't tied to any role above). `?mine=true` forces this scoping even for recruiter/hr_admin, so "My Interviews" means their own panel assignments, not the admin view of every session |
+| `InterviewScorecard` create/update (own only) | **The named `interviewer` only** — force-set server-side, never client-supplied. Not even hr_admin may author or edit another interviewer's scorecard (no proxy-entry) |
+| `InterviewScorecard` read | **recruiter/hr_admin: full detail, always.** Any interviewer on the session: their own scorecard always; a peer's rating/comments/recommendation are hidden (blind review, anti-anchoring) until the viewer has submitted their own scorecard for that same session — then every scorecard on it unlocks together |
+| `BackgroundCheck` — all actions | **recruiter, hr_admin only** (`IsRecruiterOrHRAdmin`, unchanged shape). **No interviewer access at all** — a real vetting outcome (criminal/credit checks especially) is exactly the kind of thing an interviewer forming an independent impression should not see. Tracking only — no vendor integration, per `docs/MVP-Backlog.md` A3 #9 |
+| Careers portal — `GET /careers/postings/`, `POST /careers/apply/` | **`AllowAny` — no login.** The system's first genuinely public, unauthenticated, write-capable surface. Throttled per-IP (burst + sustained) and per submitted email (mirrors `LOGIN_THROTTLES`'s exact shape in `rbac_audit/throttling.py`) |
+
+`Requisition.external_posting` (default `False`) is the deliberate opt-in a recruiter/hr_admin sets per
+requisition — no open requisition is public by default. A portal submission creates a real `recruitment.
+Applicant` row (`source=portal`) through the same `Applicant` model, stage machine, and retention/anonymisation
+path every internally-sourced applicant uses — consent gates *storage* of the optional race/gender/
+disability_status answers, not *submission* of the application itself.
+
 ## Entra ID group mapping (draft — confirm names with IT, ADR-004)
 
 | Entra group | Role |

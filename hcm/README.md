@@ -29,7 +29,22 @@ hcm/
                 class, since the project-wide default assumes `created_at`)
     recruitment/ requisitions, applicant pipeline, offers, hire automation (Sprint 4);
                 + H1 retention.py (rejected-applicant anonymise/delete handler,
-                registered from apps.py)
+                registered from apps.py); + C6 interview scheduling / panel
+                scorecards / background checks / external careers portal (spec
+                docs/superpowers/specs/2026-08-25-recruitment-interviews-careers-
+                portal-design.md): InterviewSession (row-level read for an
+                assigned interviewer, ?mine=true query param), InterviewScorecard
+                (blind-review — a peer's rating/comments/recommendation stay
+                hidden in to_representation until the viewer has submitted their
+                own for that session), BackgroundCheck (tracking only, no vendor
+                integration, IsRecruiterOrHRAdmin unchanged, no interviewer
+                access at all); careers.py holds the entire public AllowAny
+                surface (GET postings, POST apply) in one file deliberately, for
+                auditability of the system's first anonymous-write endpoint —
+                three new throttle scopes in rbac_audit/throttling.py mirror
+                LOGIN_THROTTLES's shape; validation.py duplicates
+                documents/validation.py's content-sniffing (peer-app boundary —
+                recruitment may not import documents)
     performance/ goals, review cycles, self/manager reviews, feedback (Sprint 6);
                 + PC-1 KPI contracting (ADR-010): models/ and services/ are packages
                 (cycles.py = Sprint 6-7, agreements.py = periods/phases/templates/
@@ -192,7 +207,20 @@ hcm/
                gains a Critical column; EmployeeDetailPage gains a read-only
                Succession section, hr_admin/auditor-only and never fetched
                for your own record (the backend's own self-exclusion is the
-               real guarantee, not this client-side skip)
+               real guarantee, not this client-side skip); C6 interview
+               scheduling/scorecards/background checks — ApplicantDetailPage
+               gains Interviews (schedule a session, panel picker, per-session
+               scorecard aggregate) and Background checks sections; new
+               my-interviews (every employee — being tapped as a panelist is
+               row-level, not tied to any role; own assigned sessions +
+               scorecard submission, with blind-review masking rendered
+               client-side from what the API already omits); ApplicantsPage
+               gains a Source column (Careers site / Internal). C6 careers
+               portal — CareersListPage (/careers) and CareersPostingPage
+               (/careers/:id), the SPA's only routes genuinely outside
+               RequireAuth/AppShell (no session, no session-driven nav);
+               RequisitionsPage gains a description field + a "post to the
+               public careers site" toggle per requisition
     liveness/  face-api.js wrapper + shared camera-capture component (Sprint 12c);
                lazy-loaded (React.lazy) since TensorFlow.js is ~1MB and only this
                one page needs it

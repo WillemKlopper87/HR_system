@@ -23,7 +23,9 @@ Spec: `docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md`.
       `docs/superpowers/specs/2026-08-25-mandatory-training-compliance-design.md`.
 - [x] Succession/talent pools — Shipped 2026-08-25. Spec:
       `docs/superpowers/specs/2026-08-25-succession-talent-pools-design.md`.
-- [ ] Interview scheduling + external careers portal
+- [x] Interview scheduling + panel scorecards + background/reference checks + external careers portal —
+      Shipped 2026-08-25. Spec:
+      `docs/superpowers/specs/2026-08-25-recruitment-interviews-careers-portal-design.md`.
 - [ ] Calibration/360
 - [ ] Salary-review/bonus cycles + total-rewards statement
 - [ ] EE plan + consultation-forum records

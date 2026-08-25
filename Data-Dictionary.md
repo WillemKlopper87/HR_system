@@ -447,11 +447,100 @@ Both `skill_names`/`latest_performance` on the API response are **read-only cros
 columns** — `learning/queries.py::skill_names_for_employee` and the new `performance/queries.py::
 latest_final_score` read seams, informational only, never an input to `readiness` (spec §2.7).
 
-## 8. Later-sprint entities (summary — detail in the owning sprint)
+## 8. recruitment — interview scheduling, panel scorecards, background checks, careers portal (C6)
+
+Spec: `docs/superpowers/specs/2026-08-25-recruitment-interviews-careers-portal-design.md`. Extends the existing
+`recruitment` app (Sprint 4) rather than a new one — three new models, plus new fields on `requisition` and
+`applicant`.
+
+### requisition (fields added)
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| description | text, blank | | I | Free-text job description — general-purpose, not portal-exclusive |
+| external_posting | bool | ✔ (default false) | I | HR opts a requisition INTO public visibility; no open requisition is public by default |
+
+### applicant (fields added)
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| source | varchar, choices | ✔ (default internal) | P | `internal` / `portal` — provenance only, never read by the stage machine, retention handler, or hire flow |
+| resume | file, null | | I | Server-sniffed content type (`recruitment/validation.py`), never client-trusted; settable by a recruiter PATCH too, not portal-only |
+| resume_content_type | varchar, blank | | I | |
+| resume_size_bytes | int | ✔ (default 0) | I | |
+
+### interview_session
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| applicant | FK applicant | ✔ | — (row-level) | `CASCADE`. Serializer requires `applicant.current_stage == interview` at create |
+| round_number | int | ✔ (default 1) | — | Multiple rounds = multiple rows, ordered by round |
+| scheduled_at | datetime | ✔ | — | |
+| duration_minutes | int | ✔ (default 60) | — | |
+| location | varchar(300), blank | | — | Free text — a room name or a video-call URL; no calendar integration |
+| status | varchar, choices | ✔ (default scheduled) | — | scheduled / completed / cancelled |
+| notes | text, blank | | — | Recruiter's own logistics notes, distinct from a scorecard's per-interviewer notes |
+| interviewers | M2M employee | | — (row-level) | The panel — plain M2M, no through-model |
+| created_by | FK employee, null | | — | `SET_NULL` |
+
+Read/write: **recruiter, hr_admin** full access; an assigned interviewer gets **read-only access to their own
+sessions** — a row-level grant (`interviewers` membership), not a role, since any employee can be tapped as a
+panelist. Not a `FIELD_TIERS` entry — gated whole-endpoint by `IsRecruiterOrHRAdminOrAssignedInterviewer`.
+
+### interview_scorecard
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| session | FK interview_session | ✔ | — (row-level) | `CASCADE` |
+| interviewer | FK employee | ✔ | — (row-level) | `CASCADE`. Force-set server-side to the authenticated actor — never client-supplied |
+| skill_rating | smallint, choices 1-5 | ✔ | — (row-level, blind) | Matches `performance`'s own 1-5 rating vocabulary |
+| communication_rating | smallint, choices 1-5 | ✔ | — (row-level, blind) | |
+| culture_fit_rating | smallint, choices 1-5 | ✔ | — (row-level, blind) | |
+| comments | text, blank | | — (row-level, blind) | |
+| recommendation | varchar, choices | ✔ | — (row-level, blind) | strong_hire / hire / no_hire / strong_no_hire |
+
+`UniqueConstraint(session, interviewer)` — one scorecard per interviewer per session. **Blind review**: the
+five fields marked "blind" above are hidden from any viewer other than the row's own interviewer or a recruiter/
+hr_admin, until the viewer has submitted their own scorecard for that same session — enforced in
+`InterviewScorecardSerializer.to_representation`, not a `FIELD_TIERS` entry (this is an anti-anchoring
+visibility rule keyed on the VIEWER's own submission state, not a static role/tier grant, so it doesn't fit
+that machinery). Write: **the named interviewer only** — no proxy-entry, not even by hr_admin.
+
+### background_check
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| applicant | FK applicant | ✔ | — (whole-model S) | `CASCADE` |
+| check_type | varchar, choices | ✔ | — (whole-model S) | reference / criminal_record / qualification_verification / credit_check / other |
+| status | varchar, choices | ✔ (default not_started) | — (whole-model S) | not_started / requested / in_progress / cleared / flagged — no `ALLOWED_TRANSITIONS` state machine; a real vetting process can move non-monotonically (e.g. flagged → cleared after review) |
+| requested_by | FK employee, null | | — (whole-model S) | `SET_NULL` |
+| requested_at | datetime, null | | — (whole-model S) | |
+| completed_at | datetime, null | | — (whole-model S) | |
+| notes | text, blank | | — (whole-model S) | Can legitimately hold criminal-record or credit-check detail |
+
+Tracking only — no vendor integration (`docs/MVP-Backlog.md` A3 #9). **Deliberately not a `FIELD_TIERS`
+entry** — the whole model is Sensitive by nature, gated whole-endpoint by the existing `IsRecruiterOrHRAdmin`
+(same audience as `requisition`/`applicant`/`offer`). **No interviewer access at all** — unlike
+`interview_session`/`interview_scorecard`, there is no row-level carve-out here.
+
+### Careers portal (public, unauthenticated)
+
+`GET /api/v1/careers/postings/` (list/detail) and `POST /api/v1/careers/apply/` are `AllowAny` — the system's
+first genuinely public, unauthenticated, write-capable surface. A successful submission creates a real
+`applicant` row (`source=portal`) via `recruitment/services.py::submit_portal_application`, gated by:
+content-sniffed resume validation (`recruitment/validation.py`, 5MB cap — duplicates `documents/validation.py`'s
+approach rather than importing it, a peer-app boundary), three new throttle scopes in `rbac_audit/throttling.py`
+mirroring `LOGIN_THROTTLES`'s burst/sustained/identifier-keyed shape exactly (`careers_application_burst`,
+`careers_application_sustained`, `careers_application_email`), and a honeypot field. Optional demographic
+fields (`race`/`gender`/`disability_status`) follow the same not_disclosed-default, consent-gated posture as
+the internal flow — **consent gates storage of the answer, not submission of the application**: an unconsented
+value is silently dropped rather than blocking the applicant's whole submission.
+
+## 9. Later-sprint entities (summary — detail in the owning sprint)
 
 | Module | Entities (tier of most sensitive field) | Detailed in |
 |---|---|---|
-| recruitment | requisition (I), applicant (S — demographics, consent-gated), application_stage (I), offer (R — pay) | Sprint 4 |
+| recruitment | requisition (I), applicant (S — demographics, consent-gated), application_stage (I), offer (R — pay); since C6, also interview_session/interview_scorecard (row-level, blind-review) and background_check (whole-model S) — see §8 | Sprint 4, C6 |
 | performance | goal (I), review_cycle (I), review (S — ratings), feedback (S) | Sprint 6 |
 | learning | skill (P), employee_skill (I), certification (I), training_record (I — feeds WSP/ATR, and since C2, so does certification; since C6, `course` FK is also I) | Sprint 8 |
 | compensation | pay_band (R, effective-dated), comp_proposal (R), benefits_election (S) | Sprint 10 |
