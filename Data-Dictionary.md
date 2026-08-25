@@ -153,6 +153,26 @@ Standard reference tables (name, code, active). `department.parent` (FK self) fo
 
 Seeded with the six EEA occupational levels confirmed from the received forms (per EEA9): Top management · Senior management · Professionally qualified & experienced specialists and mid-management · Skilled technical, academically qualified & junior management · Semi-skilled & discretionary decision making · Unskilled & defined decision making.
 
+### dependant / emergency_contact (C2)
+
+Spec: `docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md` §2.2, §2.9. Basic ESS-level records,
+structurally identical to `employee` itself (no file, no consent gate, no workflow) — sit in `core_hr` rather than
+the new `documents` app, which exists specifically for file storage + the POPIA review queue.
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| dependant.employee | FK employee | ✔ | — | `CASCADE` |
+| dependant.first_name / last_name / relationship | varchar / varchar / enum | ✔ | S | spouse / child / parent / other |
+| dependant.date_of_birth | date, null | | S | |
+| dependant.id_number | varchar(13), blank | | R | The dependant's own ID number — same tier as `employee.national_id_number` |
+| emergency_contact.employee | FK employee | ✔ | — | `CASCADE` |
+| emergency_contact.name / relationship / phone / alternative_phone / email | varchar / varchar / varchar / varchar / email | name+phone required | S | `relationship` is free text (informational only, nothing branches on it), unlike `dependant.relationship` |
+| emergency_contact.is_primary | boolean | ✔ | I | At most one `True` per employee (conditional `UniqueConstraint`) |
+
+Sensitive-tier by default (stricter than the employee's own analogous fields): this is personal data about a
+**third party** who holds no seat at this system's RBAC table. Write access is self-or-hr_admin only, not
+generic row-scope — see `RBAC-Roles.md`.
+
 ## 2. rbac_audit
 
 ### role / role_assignment
@@ -179,14 +199,14 @@ Seeded with the six EEA occupational levels confirmed from the received forms (p
 | Field | Type | Notes |
 |---|---|---|
 | employee or applicant | FK (one of) | |
-| purpose | enum | demographic_self_id / assessment / other |
+| purpose | enum | demographic_self_id / assessment / biometric / employee_documents (C2 — gates `id_copy`/`disability_verification` uploads) / other |
 | lawful_basis | enum | consent / legal_obligation_EEA — the lawful-basis register in data |
 | granted_at / withdrawn_at | timestamptz | Withdrawal never deletes the audit trail |
 | text_version | varchar | Which consent wording was shown |
 
 ### retention_rule
 
-Per-entity retention metadata (entity, period_months, action: anonymise/delete/retain) executed by scheduled job; e.g. unsuccessful applicants → anonymise after 12 months.
+Per-entity retention metadata (entity, period_months, action: anonymise/delete/retain) executed by scheduled job; e.g. unsuccessful applicants → anonymise after 12 months. C2 (`documents/migrations/0002_seed_retention_rules.py`) seeds `documents.EmployeeDocument` (retain, 84 months documented — deliberately more conservative than `employment_event`'s 36, since contract/qualification evidence can be reached back for longer by a CCMA dispute or SETA audit) and `core_hr.Dependant`/`EmergencyContact` (delete, 1 month — no standalone evidentiary value once stale). No handler is registered yet for the latter two — same "recorded decision, executor is follow-up work" posture several pre-C2 rows already carry.
 
 ## 3. establishment (roadmap C1 part 1 — position / establishment control)
 
@@ -295,13 +315,62 @@ app. A suspension executing does **not** trigger an offboarding instance — a s
 published template for the direction = the hook is a no-op, never an error; a hire or an exit must never fail
 because a checklist template doesn't exist.
 
-## 5. Later-sprint entities (summary — detail in the owning sprint)
+## 5. documents (C2 — employee documents & POPIA rights)
+
+Spec: `docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md`. A new peer app (not folded into
+`core_hr`/SHARED_KERNEL or `policies`, whose shape is an org-wide broadcast document, the opposite of a private
+per-employee file) — see spec §2.1.
+
+### employee_document
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| employee | FK employee | ✔ | — | `CASCADE` |
+| document_type | enum | ✔ | — | id_copy / qualification / employment_contract / disability_verification / other |
+| title / description | varchar(200) / text | title required | — | |
+| file | file | ✔ | — | `employee_documents/%Y/%m/` |
+| content_type | varchar(120), blank | | — | **Server-sniffed** (`documents/validation.py`), never client-trusted — the same content-sniffing fix `policies/extraction.py` established, applied here |
+| size_bytes | int | ✔ | — | Capped at 10MB server-side |
+| uploaded_by | FK employee, null | | — | `SET_NULL` |
+
+`tier` is a **row-level property** driven by `document_type` (spec §2.6), not a `rbac_audit/tiers.py` FIELD_TIERS
+entry — the generic per-field shape doesn't fit a model whose sensitivity varies by row: `id_copy`/
+`employment_contract` → Restricted, `disability_verification`/`other` → Sensitive, `qualification` → Internal.
+Consent (`rbac_audit.ConsentRecord`, purpose `employee_documents`) is required only for `id_copy`/
+`disability_verification` (spec §2.7). Authenticated download reuses `policies.PolicyViewSet.download`'s exact
+`FileResponse` pattern — no `MEDIA_URL` static mount exists (`config/urls.py`).
+
+### data_subject_request
+
+| Field | Type | Req | Tier | Notes |
+|---|---|---|---|---|
+| employee | FK employee | ✔ | S | `CASCADE` |
+| request_type | enum | ✔ | S | export / erasure |
+| status | enum | ✔ | S | submitted → completed, or declined |
+| requested_by | FK employee, null | | S | `SET_NULL`. Usually == employee; set to the filing hr_admin when the subject can no longer log in (the exit cascade already disabled their login — spec §6.3) |
+| requested_at | datetime | ✔ | S | `auto_now_add` |
+| request_notes / resolution_notes | text, blank | | S | |
+| reviewed_by / reviewed_at | FK employee, null / datetime, null | | S | `SET_NULL`. Set when hr_admin actions the request |
+| export_file | file, null | | R | Populated only when an EXPORT request completes — a JSON snapshot, downloaded via the same authenticated `FileResponse` pattern |
+
+DB-enforced: at most one **submitted** (open) request per employee per `request_type` — same conditional-
+`UniqueConstraint` shape as `checklist_instance`'s one-active-per-employee-per-direction rule.
+
+Both request types are **reviewed and actioned by hr_admin, never auto-executed** (spec §6.1-6.2). Erasure
+(`documents/services.py::complete_erasure_request`) is a **hardcoded allow-list**, not a `retention_rule`-driven
+delete — it may only ever touch: every `employee_document` and `dependant`/`emergency_contact` row for the
+employee, and exactly three `employee` fields (`preferred_name`, `personal_email`, `phone` — RBAC-Roles.md's own
+ESS-editable set). It never touches `employment_event`, `employment_change`, `audit_log`, or `employee_version`
+history, regardless of any `retention_rule` state — the non-destructive philosophy the employment-exit-states
+spec §6.3 established for the access cascade extends here by construction, not by rule lookup.
+
+## 6. Later-sprint entities (summary — detail in the owning sprint)
 
 | Module | Entities (tier of most sensitive field) | Detailed in |
 |---|---|---|
 | recruitment | requisition (I), applicant (S — demographics, consent-gated), application_stage (I), offer (R — pay) | Sprint 4 |
 | performance | goal (I), review_cycle (I), review (S — ratings), feedback (S) | Sprint 6 |
-| learning | skill (P), employee_skill (I), certification (I), training_record (I — feeds WSP/ATR) | Sprint 8 |
+| learning | skill (P), employee_skill (I), certification (I), training_record (I — feeds WSP/ATR, and since C2, so does certification) | Sprint 8 |
 | compensation | pay_band (R, effective-dated), comp_proposal (R), benefits_election (S) | Sprint 10 |
 | assessments | assessment_assignment (S), assessment_result (S), provider_config (I) | Sprint 12 |
 | ee_reporting | ee_snapshot (S, immutable), ee_report (S, versioned + sign-off chain ending at CEO/Accounting Officer), ee_plan (I — 5-yr sector targets + annual targets per level×group×gender + disability targets), ee_questionnaire (I — justifiable reasons, consultation, 24-category barriers/AA grid, monitoring), employer_config (I — Section A identity: DTI/PAYE/UIF/EE ref, SETA classification, EAP choice), **remuneration_record (R — per-employee annualised fixed + variable remuneration imported from SAP payroll; required to generate EEA4)** | Sprint 13 (spec: `EEA-Form-Spec-Notes.md`) |

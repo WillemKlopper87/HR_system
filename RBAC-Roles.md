@@ -86,6 +86,27 @@ the same split `EmployeeVersion`'s nested `contract_renewal_decision` read gate 
 permission class, for the same reason the tiered-confirmation rule in the exit state machine lives in
 `exits.py`'s service layer: it needs the specific row's data, not just the actor's role.
 
+## Module access: employee documents & POPIA rights (C2)
+
+Spec: `docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md`. New app `documents`
+(`EmployeeDocument`, `DataSubjectRequest`); new `core_hr` models `Dependant`/`EmergencyContact`.
+
+| Action | Roles allowed |
+|---|---|
+| Create/update/delete an `EmployeeDocument` | **Self or hr_admin only** — deliberately narrower than generic row-scope (spec §2.8): no line_manager, even for their own reports |
+| Read/download an `EmployeeDocument` | Row-tier gated per `document_type`'s tier (spec §2.6 table) via `can_access_tier_for_target` — self sees all own tiers; **hr_admin** all; **auditor** all; **ee_manager** Sensitive+ org-wide (disability_verification); **comp_manager** Restricted org-wide (id_copy, employment_contract); **line_manager** Internal only (qualification), own team |
+| `POST /employee-documents/consent/` (required before an `id_copy`/`disability_verification` upload) | Self or hr_admin |
+| Create/read/update/delete a `Dependant`/`EmergencyContact` | **Self or hr_admin only**, full stop — no row-scope extension to line_manager/ee_manager/etc. (spec §2.8-2.9; third-party personal data) |
+| Submit a `DataSubjectRequest` (`POST /data-subject-requests/`) | Self, or hr_admin filing on someone's behalf (spec §6.3 — the exit cascade already disabled their login) |
+| List/read `DataSubjectRequest`s | Self (own); **hr_admin** all; **auditor** all (read-only) |
+| `complete`/`decline` a `DataSubjectRequest` | **hr_admin only** — reviewed and actioned, never auto-executed (spec §6.1-6.2) |
+
+`EmployeeDocument`'s tier is a row-level property (`document_type`-driven), not a `rbac_audit.tiers.FIELD_TIERS`
+entry — sensitivity varies by row (an ID copy and a qualification certificate share a model and a `file` field but
+are not equally sensitive), which the generic per-field tiering shape doesn't express. Read access is computed per
+row via `can_access_tier_for_target`, the same helper `TieredModelSerializer` uses per field, just applied at row
+granularity here instead.
+
 ## Entra ID group mapping (draft — confirm names with IT, ADR-004)
 
 | Entra group | Role |

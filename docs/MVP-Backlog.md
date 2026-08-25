@@ -107,14 +107,14 @@ works. Take one employee from arrival to departure and the breaks are obvious:
 | **Onboard** (tasks, IT, first week) | ✅ Works | C1 ③ slice 3 — shipped 2026-08-25 |
 | Profile, org placement | ✅ Works | — |
 | **See the org visually** | ✅ Works | A1 #3 — `/org-chart` shipped 2026-08-20 |
-| **Personal documents** (ID, contract, quals) | ❌ Missing | C2 — up next |
+| **Personal documents** (ID, contract, quals) | ✅ Works | C2 — shipped 2026-08-25 |
 | **Request leave** | ❌ Missing | A5 #15 — needs a decision |
 | Performance cycle | ✅ Works (deep) | — |
 | Contract renewal | ✅ Works | C1 ② — shipped |
 | **Offboard** (exit cascade + task checklist) | ✅ Works | C1 ③ — shipped (access cascade: slices 1-2; task checklist: slice 3, 2026-08-25) |
 
-Three of the original five breaks are now closed (onboarding, org chart, offboarding). Two remain: personal
-documents (C2, next up) and leave (blocked on a decision, not effort — see Part A5 #15 below).
+Four of the original five breaks are now closed (onboarding, org chart, personal documents, offboarding). One
+remains: leave (blocked on a decision, not effort — see Part A5 #15 below).
 
 ### The reframing
 
@@ -134,11 +134,12 @@ per the original brief's own reasoning (build a standard process, demo it, let H
    onboarding/offboarding templates, an instance per employee created automatically on hire / on an exit
    executing, task completion gated by owner role + reporting chain. Spec:
    `docs/superpowers/specs/2026-08-24-onboarding-offboarding-checklists-design.md`.
-2. **C2 — employee documents.** Next up. Closes the third break; the consent/tiering plumbing already exists,
-   so this is mostly a new model plus the policies module's existing download pattern.
+2. ~~**C2 — employee documents.**~~ **Shipped 2026-08-25.** Closed the third break. New `documents` app
+   (`EmployeeDocument`, `DataSubjectRequest`) plus `core_hr.Dependant`/`EmergencyContact`; spec:
+   `docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md`.
 3. ~~**Org chart view.**~~ **Shipped 2026-08-20.**
-4. **Leave — decide, then build or mirror.** Highest demo value of anything on this list; blocked on a decision
-   rather than on effort.
+4. **Leave — decide, then build or mirror.** The only break left, and the highest demo value of anything on
+   this list; blocked on a decision rather than on effort.
 
 Everything else on the C-series (C3 SSO/SAP, C4 delegation, C5 labour relations, C6 talent depth, C7 UX/NFR)
 stays where it is, sequenced after a coherent lifecycle exists to hang it on.

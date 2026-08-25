@@ -3,9 +3,10 @@
 ### UAT-1 — Rolling gate (needs people)
 - [ ] Walkthrough script from the verification paragraphs; HR/talent/EE stakeholder UAT; security/compliance sign-off; fix sprint from findings
 
-### C2 — Employee documents & POPIA rights
-- [ ] `EmployeeDocument` (tiered, consent-aware, authenticated download); qualifications → WSP/ATR + EE
-- [ ] Dependants / emergency contacts; data-subject export/erasure workflow; retention scopes for documents/evidence
+### C2 — Employee documents & POPIA rights — Shipped 2026-08-25
+Spec: `docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md`.
+- [x] `EmployeeDocument` (tiered, consent-aware, authenticated download); qualifications → WSP/ATR + EE
+- [x] Dependants / emergency contacts; data-subject export/erasure workflow; retention scopes for documents/evidence
 
 ### C3 — Identity & integrations
 - [ ] OIDC/Entra SSO (ADR-004), single-IdP identity mapping with collab

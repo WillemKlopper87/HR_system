@@ -106,6 +106,19 @@ hcm/
                 core_hr/lifecycle_hooks.py registry (same shape as
                 access_cascade.py/data_quality.py) — core_hr is SHARED_KERNEL
                 and never imports this app.
+    documents/ employee documents & POPIA data-subject rights (C2, spec
+                docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md):
+                EmployeeDocument (tier is a document_type-driven row-level
+                property, not a rbac_audit/tiers.py field entry — sensitivity
+                varies by row, not by field; content-sniffed upload via
+                validation.py, same fix policies/extraction.py established;
+                authenticated download reuses PolicyViewSet.download's exact
+                FileResponse pattern) and DataSubjectRequest (export/erasure
+                workflow, hr_admin-reviewed, never auto-executed — erasure is
+                a hardcoded allow-list, never a RetentionRule-driven delete,
+                so it can never reach employment history/audit logs). New
+                core_hr models Dependant/EmergencyContact ride alongside
+                (self-or-hr_admin only, third-party data).
   frontend/    React 19 + TypeScript (Vite) + React Router
     auth/      session login/logout, route guards; RequirePayrollStepUp.tsx —
                TOTP enrollment + step-up challenge UI, a children-wrapper (not a
@@ -126,7 +139,14 @@ hcm/
                server-side, same unrouted-from-RequireRole shape as my-verification);
                policies (hr_admin-only library + upload/publish workflow),
                dashboards/policy-acknowledgment (hr_admin-only compliance %),
-               my-policies (every employee — read + acknowledge, Policy section)
+               my-policies (every employee — read + acknowledge, Policy section);
+               my-documents (C2 — every employee: documents, dependants,
+               emergency contacts, POPIA export/erasure requests, one
+               combined self-service page); Documents/Dependants/Emergency
+               Contacts sections on EmployeeDetailPage (hr_admin manages
+               anyone's, same page self reaches for their own); hr_admin +
+               auditor data-subject-requests review queue (auditor read-only
+               — action buttons hidden client-side, 403'd server-side)
     liveness/  face-api.js wrapper + shared camera-capture component (Sprint 12c);
                lazy-loaded (React.lazy) since TensorFlow.js is ~1MB and only this
                one page needs it
