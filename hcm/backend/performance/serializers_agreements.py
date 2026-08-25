@@ -16,6 +16,7 @@ from decimal import Decimal
 from rest_framework import serializers
 
 from .evidence import UnsupportedEvidenceFileError, validate_evidence_file
+from .serializers_calibration import CalibrationAdjustmentSerializer
 from .services import STAGE_ELEMENT_FIELDS, STAGE_FLOW, STAGE_HEAD_FIELDS
 
 from .models import (
@@ -272,6 +273,7 @@ class PerformanceAgreementSerializer(serializers.ModelSerializer):
     improvement_plans = ImprovementPlanSerializer(many=True, read_only=True)
     signatures = AgreementSignatureSerializer(many=True, read_only=True)
     documents = AgreementDocumentSerializer(many=True, read_only=True)
+    calibration_adjustments = CalibrationAdjustmentSerializer(many=True, read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     employee_name = serializers.SerializerMethodField()
     head_name = serializers.SerializerMethodField()
@@ -286,7 +288,8 @@ class PerformanceAgreementSerializer(serializers.ModelSerializer):
                   "template", "template_version", "revision", "status", "status_display",
                   "return_reason", "amendment_reason", "final_score", "hr_attention", "hr_attention_reason",
                   "submitted_at", "agreed_at", "total_weight", "current_stage", "is_editable",
-                  "elements", "pdp_items", "improvement_plans", "signatures", "documents"]
+                  "elements", "pdp_items", "improvement_plans", "signatures", "documents",
+                  "calibration_adjustments"]
         read_only_fields = fields  # every mutation goes through a named action
 
     def get_employee_name(self, obj) -> str:

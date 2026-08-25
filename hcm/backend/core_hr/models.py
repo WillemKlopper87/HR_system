@@ -508,6 +508,7 @@ class DataQualityException(TimestampedModel):
         COMP_PROPOSAL_STALE = "comp_proposal_stale", "Compensation proposal awaiting review too long"
         MANDATORY_TRAINING_OVERDUE = "mandatory_training_overdue", "Overdue mandatory training"
         CRITICAL_POST_NO_SUCCESSOR = "critical_post_no_successor", "Critical post without a ready successor"
+        PERFORMANCE_NO_CALIBRATION = "performance_no_calibration", "Final-signed agreement with no calibration session"
 
     employee = models.ForeignKey(
         Employee, related_name="data_quality_exceptions", on_delete=models.CASCADE

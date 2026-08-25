@@ -299,7 +299,7 @@ class PerformanceAgreementViewSet(
     `generate-agreements` action or `create` below (hr_admin), never a bare POST."""
 
     queryset = PerformanceAgreement.objects.select_related("employee", "head", "period", "template").prefetch_related(
-        "elements", "pdp_items", "signatures", "documents"
+        "elements", "pdp_items", "signatures", "documents", "calibration_adjustments__adjusted_by"
     )
     serializer_class = PerformanceAgreementSerializer
     permission_classes = [PerformanceAgreementPermission]

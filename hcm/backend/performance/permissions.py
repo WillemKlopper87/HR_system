@@ -113,6 +113,56 @@ class IsHRAdminOrReadOnlyForPerformance(permissions.IsAuthenticated):
         return is_admin(employee)
 
 
+class CalibrationSessionPermission(permissions.IsAuthenticated):
+    """Design spec §5.1: a department-wide committee record is a comparative
+    judgement about a group of named individuals, the same risk shape as
+    succession's `SuccessionCandidate` (spec §2.6 there) -- hr_admin/auditor
+    only, no self/team browsing. One agreement's own outcome still reaches
+    its subject/Head via the nested `calibration_adjustments` field on
+    `PerformanceAgreementSerializer`, gated by the agreement's own
+    permission instead."""
+
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
+        employee = get_request_employee(request)
+        if employee is None:
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return can_read_all(employee)
+        return is_admin(employee)
+
+    def has_object_permission(self, request, view, obj):
+        employee = get_request_employee(request)
+        if employee is None:
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return can_read_all(employee)
+        return is_admin(employee)
+
+
+class Feedback360RaterPermission(permissions.IsAuthenticated):
+    """Broad "is this row reachable at all" gate (design spec §5.2): the
+    parent agreement's own audience (self/Head/delegate/hr_admin/auditor —
+    `can_view_agreement`), or the named rater looking at their own slot even
+    when they have no other access to the agreement (a plain peer/direct-
+    report rater usually can't view the agreement itself at all). The finer
+    "may you approve/decline/respond" authority test lives in each action in
+    views_feedback360.py, the same two-layer shape return_agreement /
+    approve_agreement already use in views_agreements.py."""
+
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
+        return get_request_employee(request) is not None
+
+    def has_object_permission(self, request, view, obj):
+        employee = get_request_employee(request)
+        if employee is None:
+            return False
+        return can_view_agreement(obj.request.agreement, employee) or employee.pk == obj.rater_id
+
+
 class SigningDelegationPermission(permissions.IsAuthenticated):
     """A Head delegates their own signing authority; hr_admin may do it on
     their behalf (someone must be able to fix it when the Head is already

@@ -14,6 +14,8 @@ from .views_agreements import (
     TemplateElementViewSet,
     TemplateSectionViewSet,
 )
+from .views_calibration import CalibrationSessionViewSet
+from .views_feedback360 import Feedback360RaterViewSet, Feedback360RequestViewSet
 
 router = DefaultRouter()
 router.register("review-cycles", ReviewCycleViewSet, basename="review-cycle")
@@ -35,5 +37,9 @@ router.register("signing-delegations", SigningDelegationViewSet, basename="signi
 router.register("agreement-evidence", EvidenceItemViewSet, basename="agreement-evidence")
 # PC-3: corrective-action stub behind hr_attention
 router.register("improvement-plans", ImprovementPlanViewSet, basename="improvement-plan")
+# C6: calibration/moderation + 360 feedback
+router.register("calibration-sessions", CalibrationSessionViewSet, basename="calibration-session")
+router.register("feedback-360-requests", Feedback360RequestViewSet, basename="feedback-360-request")
+router.register("feedback-360-raters", Feedback360RaterViewSet, basename="feedback-360-rater")
 
 urlpatterns = router.urls

@@ -11,6 +11,7 @@ class PerformanceConfig(AppConfig):
         from core_hr.data_quality import register
         from core_hr.models import DataQualityException
 
-        from .data_quality import overdue_agreement_handler
+        from .data_quality import missing_calibration_handler, overdue_agreement_handler
 
         register(DataQualityException.ExceptionType.PERFORMANCE_OVERDUE, overdue_agreement_handler)
+        register(DataQualityException.ExceptionType.PERFORMANCE_NO_CALIBRATION, missing_calibration_handler)
