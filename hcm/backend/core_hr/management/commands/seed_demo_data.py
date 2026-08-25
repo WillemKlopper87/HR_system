@@ -74,8 +74,9 @@ from performance.models import Feedback, Goal, Review, ReviewCycle
 from performance.services import launch_review_cycle
 from policies.models import Policy
 from policies.services import acknowledge_policy, create_policy, publish_policy
-from recruitment.models import Applicant, Offer, Requisition
-from recruitment.services import transition_applicant
+from django.core.files.uploadedfile import SimpleUploadedFile
+from recruitment.models import Applicant, BackgroundCheck, InterviewScorecard, InterviewSession, Offer, Requisition
+from recruitment.services import submit_portal_application, transition_applicant
 from succession.models import CriticalPost, SuccessionCandidate
 
 User = get_user_model()
@@ -371,7 +372,7 @@ class Command(BaseCommand):
 
             demo_requisitions = self._seed_recruitment_demo_data(
                 departments=departments, levels=levels, grades_by_level=grades_by_level,
-                locations=locations, recruiter=slm_head, rng=rng,
+                locations=locations, recruiter=slm_head, interviewers=[eng_head, ops_head], rng=rng,
             )
 
             self._seed_performance_demo_data(manager=eng_head, direct_report=staff)
@@ -414,11 +415,17 @@ class Command(BaseCommand):
             "auditor/auditor123 (Auditor), employee/employee123 (Employee). Local development only."
         )
 
-    def _seed_recruitment_demo_data(self, *, departments, levels, grades_by_level, locations, recruiter, rng):
+    def _seed_recruitment_demo_data(self, *, departments, levels, grades_by_level, locations, recruiter, interviewers, rng):
         """A handful of requisitions/applicants spanning the pipeline —
         including one carried all the way through transition_applicant to
         HIRED, so the demo shows the Sprint 4 acceptance criterion (hire
         creates an employees row) with real seeded data, not just tests.
+
+        C6: also seeds a scheduled interview session with two scorecards
+        (one already submitted, so /my-interviews has a real blind-review
+        example on first login), two background checks, `eng_req` flagged
+        externally postable, and one portal-sourced applicant so
+        submit_portal_application's whole path is demoable, not just tested.
 
         Returns the two requisitions so _seed_establishment_demo_data can
         link real approved posts to them once every employee exists (C1)."""
@@ -431,7 +438,11 @@ class Command(BaseCommand):
         eng_req = Requisition.objects.create(
             title="Backend Engineer", department=eng_dept, occupational_level=junior_level, job_grade=grade,
             location=locations[0], headcount=2, status=Requisition.Status.OPEN,
-            opened_at=date(2026, 6, 1), created_by=recruiter,
+            opened_at=date(2026, 6, 1), created_by=recruiter, external_posting=True,
+            description=(
+                "We're growing the platform team and looking for a backend engineer comfortable across the stack. "
+                "You'll work closely with product and design to ship features end to end, in a small, senior team."
+            ),
         )
         fin_req = Requisition.objects.create(
             title="Financial Analyst", department=fin_dept, occupational_level=mid_level,
@@ -450,6 +461,28 @@ class Command(BaseCommand):
         for stage in (Applicant.Stage.SCREENED, Applicant.Stage.INTERVIEW):
             transition_applicant(interviewing, to_stage=stage, actor=recruiter)
 
+        session = InterviewSession.objects.create(
+            applicant=interviewing, round_number=1,
+            scheduled_at=timezone.make_aware(datetime(2026, 8, 20, 10, 0)),
+            duration_minutes=45, location="Boardroom 2", status=InterviewSession.Status.COMPLETED,
+            notes="Technical + culture-fit round.", created_by=recruiter,
+        )
+        session.interviewers.set(interviewers)
+        # Only the first interviewer has scored so far -- a real,
+        # demoable example of blind-review masking (design spec §2.2): log
+        # in as the second interviewer's account and their peer's score is
+        # still hidden until they submit their own.
+        InterviewScorecard.objects.create(
+            session=session, interviewer=interviewers[0], skill_rating=4, communication_rating=5,
+            culture_fit_rating=4, recommendation=InterviewScorecard.Recommendation.HIRE,
+            comments="Strong technical fundamentals, communicates clearly.",
+        )
+        BackgroundCheck.objects.create(
+            applicant=interviewing, check_type=BackgroundCheck.CheckType.REFERENCE,
+            status=BackgroundCheck.Status.IN_PROGRESS, requested_by=recruiter,
+            requested_at=timezone.now(), notes="Awaiting response from second listed referee.",
+        )
+
         with_offer = Applicant.objects.create(
             requisition=fin_req, first_name="Aisha", last_name="Cassim",
             email="aisha.cassim@applicant-demo.example", date_of_birth=date(1991, 11, 20),
@@ -459,6 +492,12 @@ class Command(BaseCommand):
         Offer.objects.create(
             applicant=with_offer, proposed_job_grade=grades_by_level[mid_level.code][0],
             proposed_annual_salary="420000.00", proposed_by=recruiter,
+        )
+        BackgroundCheck.objects.create(
+            applicant=with_offer, check_type=BackgroundCheck.CheckType.CRIMINAL_RECORD,
+            status=BackgroundCheck.Status.CLEARED, requested_by=recruiter,
+            requested_at=timezone.now() - timedelta(days=5), completed_at=timezone.now(),
+            notes="No record found. Cleared for offer.",
         )
 
         to_hire = Applicant.objects.create(
@@ -482,6 +521,20 @@ class Command(BaseCommand):
         )
         transition_applicant(
             rejected, to_stage=Applicant.Stage.REJECTED, actor=recruiter, rejected_reason="Not enough relevant experience"
+        )
+
+        # Careers portal (C6): a real self-application through the same
+        # public path a genuine anonymous visitor would use, against the
+        # requisition flagged external_posting=True above.
+        submit_portal_application(
+            requisition=eng_req, first_name="Naledi", last_name="Dlamini",
+            email="naledi.dlamini@portal-demo.example", phone="0821234567", date_of_birth=date(1997, 3, 14),
+            resume=SimpleUploadedFile(
+                "naledi-dlamini-cv.pdf", b"%PDF-1.7\nDemo CV content for Naledi Dlamini.",
+                content_type="application/pdf",
+            ),
+            race=_weighted_choice(RACE_WEIGHTS, rng), gender=_weighted_choice(GENDER_WEIGHTS, rng),
+            disability_status=_weighted_choice(DISABILITY_WEIGHTS, rng), demographic_consent=True,
         )
 
         return [eng_req, fin_req]
