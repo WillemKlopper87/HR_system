@@ -30,8 +30,15 @@ export function MyPerformancePage() {
     { errorMessage: 'Failed to load performance periods.' },
   )
 
-  const current = agreements?.[0] ?? null
-  const period = periods?.results.find((p) => p.id === current?.period) ?? null
+  const [openId, setOpenId] = useState<number | null>(null)
+  // Default to the most recent year (highest period.start_date, per the
+  // API's own ordering), but any past year can be opened into the same
+  // full card -- calibration outcomes and 360 rounds can exist on an older,
+  // already-archived agreement (C6), not just the current one, so "only the
+  // latest gets the full view" would silently hide them.
+  const activeId = openId ?? agreements?.[0]?.id ?? null
+  const active = agreements?.find((a) => a.id === activeId) ?? null
+  const period = periods?.results.find((p) => p.id === active?.period) ?? null
 
   return (
     <div className="page">
@@ -51,11 +58,11 @@ export function MyPerformancePage() {
         </p>
       )}
 
-      {current && <AgreementCard agreement={current} period={period} onChanged={reload} />}
+      {active && <AgreementCard agreement={active} period={period} onChanged={reload} />}
 
       {agreements && agreements.length > 1 && (
         <section className="detail-card">
-          <h2>Previous years</h2>
+          <h2>All years</h2>
           <div className="table-scroll">
             <table className="data-table">
               <thead>
@@ -64,10 +71,11 @@ export function MyPerformancePage() {
                   <th>Status</th>
                   <th>Final score</th>
                   <th>Document</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
-                {agreements.slice(1).map((a) => (
+                {agreements.map((a) => (
                   <tr key={a.id}>
                     <td>{a.period_name}</td>
                     <td>{a.status_display}</td>
@@ -80,6 +88,11 @@ export function MyPerformancePage() {
                       ) : (
                         '—'
                       )}
+                    </td>
+                    <td>
+                      <button type="button" className="btn-link" onClick={() => setOpenId(a.id)}>
+                        {a.id === activeId ? 'Viewing' : 'Open'}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1070,7 +1083,10 @@ function Feedback360RequestPanel({
       )}
       {close.error && <p className="form-error">{close.error}</p>}
       {showNominate && (
-        <NominateForm requestId={request.id} agreement={agreement} onDone={() => { setShowNominate(false); onChanged() }} />
+        <NominateForm
+          requestId={request.id} agreement={agreement} existingRaterIds={request.raters.map((r) => r.rater)}
+          onDone={() => { setShowNominate(false); onChanged() }}
+        />
       )}
     </>
   )
@@ -1136,10 +1152,12 @@ function RaterRow({
 function NominateForm({
   requestId,
   agreement,
+  existingRaterIds,
   onDone,
 }: {
   requestId: number
   agreement: PerformanceAgreement
+  existingRaterIds: number[]
   onDone: () => void
 }) {
   const { data: employees } = useApiQuery<Employee[]>(
@@ -1152,6 +1170,7 @@ function NominateForm({
     () => api.post('/feedback-360-raters/', { request: requestId, rater: Number(raterId) }),
     { onSuccess: () => { setRaterId(''); onDone() }, errorMessage: 'That nomination could not be recorded.' },
   )
+  const alreadyRaters = new Set(existingRaterIds)
 
   return (
     <form
@@ -1166,7 +1185,7 @@ function NominateForm({
         <select value={raterId} onChange={(e) => setRaterId(e.target.value)} required>
           <option value="">— Select a colleague —</option>
           {(employees ?? [])
-            .filter((e) => e.id !== agreement.employee)
+            .filter((e) => e.id !== agreement.employee && !alreadyRaters.has(e.id))
             .map((e) => (
               <option key={e.id} value={e.id}>
                 {e.first_name} {e.last_name}
