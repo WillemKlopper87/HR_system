@@ -54,3 +54,47 @@ class TotpSustainedThrottle(UserRateThrottle):
 
 LOGIN_THROTTLES = [LoginBurstThrottle, LoginSustainedThrottle, LoginUsernameThrottle]
 TOTP_THROTTLES = [TotpBurstThrottle, TotpSustainedThrottle]
+
+
+# C6 careers portal (design spec §3.4): the second-ever anonymous-write
+# surface in the system, after login -- same category of defence, same
+# burst+sustained+identifier-keyed shape as LOGIN_THROTTLES above.
+class CareersApplicationBurstThrottle(AnonRateThrottle):
+    scope = "careers_application_burst"
+
+
+class CareersApplicationSustainedThrottle(AnonRateThrottle):
+    scope = "careers_application_sustained"
+
+
+class CareersApplicationEmailThrottle(SimpleRateThrottle):
+    """Keyed by the applicant's submitted email (lower-cased), regardless of
+    IP -- mirrors LoginUsernameThrottle exactly. Closes the same asymmetry:
+    a per-IP-only limit can't stop a distributed attacker hammering one
+    specific email's ability to apply, or spamming one requisition with junk
+    from many source IPs but a handful of reused emails."""
+
+    scope = "careers_application_email"
+
+    def get_cache_key(self, request, view):
+        email = ""
+        try:
+            email = str(request.data.get("email", "") or "").strip().lower()
+        except Exception:  # noqa: BLE001 — malformed body: fall through to no throttle key
+            email = ""
+        if not email:
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": email[:150]}
+
+
+class CareersReadThrottle(AnonRateThrottle):
+    """The public postings list/detail — read-only, but still worth a
+    generous per-IP cap as defence-in-depth against scraping/DoS."""
+
+    scope = "careers_read"
+
+
+CAREERS_APPLICATION_THROTTLES = [
+    CareersApplicationBurstThrottle, CareersApplicationSustainedThrottle, CareersApplicationEmailThrottle,
+]
+CAREERS_READ_THROTTLES = [CareersReadThrottle]

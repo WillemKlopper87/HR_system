@@ -404,7 +404,8 @@ Mirrors `recruitment/test_api.py`'s existing shape, extended:
   detail; a non-panel employee gets nothing.
 - `BackgroundCheck`: recruiter/hr_admin CRUD; every other role (including an assigned interviewer) 403.
 - Careers portal: postings list only returns `OPEN` + `external_posting=True` rows; a closed or
-  non-externally-posted requisition 404s a direct apply attempt; a valid submission creates a real `Applicant`
+  non-externally-posted requisition 400s a direct apply attempt (the `PrimaryKeyRelatedField`'s own queryset
+  filter rejects it as an invalid choice); a valid submission creates a real `Applicant`
   (`source=portal`) that then flows through the ordinary stage machine and retention/anonymisation path
   unchanged; a duplicate email for the same requisition 400s, not 500s; an unrecognised/oversized resume 400s;
   the honeypot field silently no-ops (201, no row created); demographic fields are dropped when

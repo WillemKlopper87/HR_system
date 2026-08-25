@@ -5,12 +5,21 @@ from django.utils import timezone
 
 from core_hr.models import Employee, EmployeeVersion
 from establishment.models import Position
+from rbac_audit.consent import record_consent
+from rbac_audit.models import ConsentRecord
 
 from .models import Applicant, ApplicantStageEvent, Requisition
+from .validation import ResumeValidationError, validate_resume_upload
 
 
 class StageTransitionError(ValueError):
     pass
+
+
+class DuplicateApplicationError(ValueError):
+    """Raised (→ 400, not a raw IntegrityError → 500) when a careers-portal
+    submission collides with the existing
+    one_application_per_email_per_requisition constraint."""
 
 
 def validate_requisition_positions(
@@ -190,10 +199,20 @@ def backfill_requisition_positions() -> int:
     just the first one found. Requisitions with no resulting hire predate
     establishment control entirely and stay unlinked. Idempotent:
     already-linked requisitions are skipped. Returns the count of
-    requisitions backfilled (not positions linked)."""
+    requisitions backfilled (not positions linked).
+
+    Called from migration 0004 via the live (not historical-state)
+    Requisition model — `.only("id")` below is load-bearing, not just an
+    optimisation: a fresh-database migration replay runs 0004 before any
+    LATER migration that adds a Requisition column, so a query selecting
+    every current field would reference a column that doesn't exist yet at
+    that point in schema history (C6 surfaced this against `description`/
+    `external_posting`). Restricting the SELECT to just the pk sidesteps it
+    for any future field addition too, not only this one — nothing else in
+    this loop reads a Requisition scalar field, only its relations."""
     linked = 0
     closed_statuses = [Requisition.Status.CLOSED, Requisition.Status.FILLED]
-    for requisition in Requisition.objects.filter(status__in=closed_statuses):
+    for requisition in Requisition.objects.filter(status__in=closed_statuses).only("id"):
         if requisition.positions.exists():
             continue
         hired = requisition.applicants.filter(
@@ -209,3 +228,63 @@ def backfill_requisition_positions() -> int:
             requisition.positions.add(*position_ids)
             linked += 1
     return linked
+
+
+# --- C6: careers portal --------------------------------------------------
+# Design spec §4.4. The one genuinely multi-step write among C6's new
+# surfaces (validate -> create Applicant -> conditionally record consent ->
+# conditionally set demographic fields, atomically) -- everything else in
+# this slice (InterviewSession/InterviewScorecard/BackgroundCheck) is a
+# single-row write validated in its own serializer, per the design spec's
+# "no services.py for A-C" reasoning (§2.4).
+
+@transaction.atomic
+def submit_portal_application(
+    *, requisition, first_name, last_name, email, phone, date_of_birth, resume,
+    race="", gender="", disability_status="", demographic_consent=False,
+) -> Applicant:
+    """Raises ValueError (-> 400, never a 500) for a requisition that isn't
+    open to public applications, a resume that fails content-sniffing or
+    the size cap, or a duplicate email for this requisition. Spec §3.4.5:
+    consent gates STORAGE of demographic answers, not submission of the
+    application -- an unconsented demographic value is silently dropped,
+    never a submission-blocking error."""
+    if requisition.status != Requisition.Status.OPEN or not requisition.external_posting:
+        raise ValueError("This requisition is not currently open for applications.")
+
+    try:
+        content_type = validate_resume_upload(resume)
+    except ResumeValidationError as exc:
+        raise ValueError(str(exc)) from exc
+
+    try:
+        with transaction.atomic():
+            applicant = Applicant.objects.create(
+                requisition=requisition, first_name=first_name, last_name=last_name, email=email,
+                phone=phone or "", date_of_birth=date_of_birth, source=Applicant.Source.PORTAL,
+                resume=resume, resume_content_type=content_type, resume_size_bytes=resume.size,
+            )
+    except IntegrityError as exc:
+        raise DuplicateApplicationError(
+            "An application for this position already exists for this email address."
+        ) from exc
+
+    if demographic_consent:
+        record_consent(
+            applicant=applicant, purpose=ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID,
+            lawful_basis=ConsentRecord.LawfulBasis.CONSENT, text_version="v1", actor=None,
+        )
+        update_fields = []
+        if race:
+            applicant.race = race
+            update_fields.append("race")
+        if gender:
+            applicant.gender = gender
+            update_fields.append("gender")
+        if disability_status:
+            applicant.disability_status = disability_status
+            update_fields.append("disability_status")
+        if update_fields:
+            applicant.save(update_fields=update_fields)
+
+    return applicant

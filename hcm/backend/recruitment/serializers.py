@@ -4,12 +4,21 @@ from rbac_audit.audit import log_access
 from rbac_audit.consent import has_active_consent
 from rbac_audit.drf import get_request_employee
 from rbac_audit.models import AuditLogEntry, ConsentRecord
-from rbac_audit.permissions import can_access_tier
+from rbac_audit.permissions import can_access_tier, has_role
 from rbac_audit.tiers import FieldTier, highest_tier, tier_of
 from rest_framework import serializers
 
-from .models import Applicant, ApplicantStageEvent, Offer, Requisition
+from .models import (
+    Applicant,
+    ApplicantStageEvent,
+    BackgroundCheck,
+    InterviewScorecard,
+    InterviewSession,
+    Offer,
+    Requisition,
+)
 from .services import validate_requisition_positions
+from .validation import ResumeValidationError, sniff_resume_content_type, validate_resume_upload
 
 DEMOGRAPHIC_FIELDS = {"race", "gender", "disability_status"}
 
@@ -20,7 +29,7 @@ class RequisitionSerializer(serializers.ModelSerializer):
         fields = [
             "id", "title", "department", "occupational_level", "job_grade", "location",
             "headcount", "status", "hiring_manager", "created_by", "positions",
-            "opened_at", "target_fill_date", "closed_at",
+            "opened_at", "target_fill_date", "closed_at", "description", "external_posting",
         ]
         # status is directly writable (draft/open/on_hold/closed) — the
         # view auto-stamps opened_at/closed_at as a side effect. Simpler
@@ -90,9 +99,46 @@ class ApplicantSerializer(serializers.ModelSerializer):
         fields = [
             "id", "requisition", "first_name", "last_name", "email", "phone", "date_of_birth",
             "current_stage", "rejected_reason", "race", "gender", "disability_status",
-            "has_demographic_consent", "resulting_employee",
+            "has_demographic_consent", "resulting_employee", "source", "resume",
+            "resume_content_type", "resume_size_bytes",
         ]
-        read_only_fields = ["current_stage", "rejected_reason", "resulting_employee"]
+        # source is set only by the create path (recruiter-entered defaults
+        # to "internal"; the careers portal's own submit_portal_application
+        # sets "portal" directly, bypassing this serializer entirely) — never
+        # writable through this endpoint, so a recruiter can't relabel a
+        # portal-sourced applicant's provenance after the fact.
+        # resume_content_type/resume_size_bytes are server-derived (see
+        # validate_resume/create/update below) — never client-supplied.
+        read_only_fields = [
+            "current_stage", "rejected_reason", "resulting_employee", "source",
+            "resume_content_type", "resume_size_bytes",
+        ]
+
+    def validate_resume(self, value):
+        """A recruiter can attach a CV to an internally-sourced applicant
+        too (design spec §2.5) — same content-sniffing discipline as the
+        careers portal's own submission path, not a portal-only check."""
+        if value:
+            try:
+                validate_resume_upload(value)
+            except ResumeValidationError as exc:
+                raise serializers.ValidationError(str(exc)) from exc
+        return value
+
+    @staticmethod
+    def _derive_resume_fields(validated_data):
+        resume = validated_data.get("resume")
+        if resume:
+            validated_data["resume_content_type"] = sniff_resume_content_type(resume)
+            validated_data["resume_size_bytes"] = resume.size
+
+    def create(self, validated_data):
+        self._derive_resume_fields(validated_data)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        self._derive_resume_fields(validated_data)
+        return super().update(instance, validated_data)
 
     def get_has_demographic_consent(self, instance) -> bool:
         return instance.pk is not None and has_active_consent(
@@ -158,3 +204,115 @@ class OfferSerializer(serializers.ModelSerializer):
             "proposed_by", "approved_by", "approved_at", "start_date",
         ]
         read_only_fields = ["status", "proposed_by", "approved_by", "approved_at"]
+
+
+# --- C6: interview scheduling, panel scorecards, background checks --------
+
+class InterviewApplicantSummarySerializer(serializers.ModelSerializer):
+    """Design spec §3.1: deliberately narrow, and — unlike ApplicantSerializer
+    above — the SAME shape for every caller including recruiter/hr_admin. No
+    demographics, no email/phone/date_of_birth, no rejected_reason, no prior
+    stage-event notes. This is what an assigned interviewer (who may hold no
+    recruitment-module role at all) is allowed to know about the applicant
+    they're interviewing."""
+
+    requisition_title = serializers.CharField(source="requisition.title", read_only=True)
+
+    class Meta:
+        model = Applicant
+        fields = ["id", "first_name", "last_name", "requisition", "requisition_title", "current_stage", "resume"]
+        read_only_fields = fields
+
+
+class InterviewSessionSerializer(serializers.ModelSerializer):
+    applicant_summary = InterviewApplicantSummarySerializer(source="applicant", read_only=True)
+
+    class Meta:
+        model = InterviewSession
+        fields = [
+            "id", "applicant", "applicant_summary", "round_number", "scheduled_at", "duration_minutes",
+            "location", "status", "notes", "interviewers", "created_by", "created_at",
+        ]
+        read_only_fields = ["created_by"]
+
+    def validate(self, attrs):
+        applicant = attrs.get("applicant", self.instance.applicant if self.instance else None)
+        if applicant is not None and applicant.current_stage != Applicant.Stage.INTERVIEW:
+            raise serializers.ValidationError(
+                {"applicant": "Interviews can only be scheduled for an applicant at the 'interview' stage."}
+            )
+        interviewers = attrs.get("interviewers")
+        if interviewers is not None and len(interviewers) == 0:
+            raise serializers.ValidationError({"interviewers": "At least one interviewer is required."})
+        return attrs
+
+
+class InterviewScorecardSerializer(serializers.ModelSerializer):
+    """Design spec §2.2, §3.2: `interviewer` is force-set server-side (see
+    create() below) to whoever is authenticated — never client-supplied, so
+    nobody can submit "on behalf of" someone else. Blind-review masking
+    (peer scorecards hidden until the viewer has submitted their own for the
+    same session) lives in to_representation, not in the permission class —
+    the permission class only decides whether the ROW is reachable at all."""
+
+    class Meta:
+        model = InterviewScorecard
+        fields = [
+            "id", "session", "interviewer", "skill_rating", "communication_rating",
+            "culture_fit_rating", "comments", "recommendation", "created_at",
+        ]
+        read_only_fields = ["interviewer"]
+
+    def validate(self, attrs):
+        session = attrs.get("session", self.instance.session if self.instance else None)
+        request = self.context.get("request")
+        employee = get_request_employee(request) if request is not None else None
+        if session is None or employee is None:
+            return attrs
+        if not session.interviewers.filter(pk=employee.pk).exists():
+            raise serializers.ValidationError(
+                {"session": "You are not an assigned interviewer for this session."}
+            )
+        duplicate = InterviewScorecard.objects.filter(session=session, interviewer=employee)
+        if self.instance is not None:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if duplicate.exists():
+            raise serializers.ValidationError("You have already submitted a scorecard for this session.")
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        validated_data["interviewer"] = get_request_employee(request) if request is not None else None
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        viewer = get_request_employee(request) if request is not None else None
+        if viewer is None:
+            return data
+        if has_role(viewer, "recruiter") or has_role(viewer, "hr_admin"):
+            return data
+        if viewer.id == instance.interviewer_id:
+            return data
+        has_submitted_own = InterviewScorecard.objects.filter(
+            session_id=instance.session_id, interviewer=viewer
+        ).exists()
+        if has_submitted_own:
+            return data
+        # Blind until the viewer has committed their own scorecard for this
+        # session (design spec §2.2) — the row's existence is still visible
+        # (id/session/interviewer/created_at), just not its content.
+        for field in ("skill_rating", "communication_rating", "culture_fit_rating", "comments", "recommendation"):
+            data.pop(field, None)
+        return data
+
+
+class BackgroundCheckSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BackgroundCheck
+        fields = [
+            "id", "applicant", "check_type", "status", "requested_by", "requested_at",
+            "completed_at", "notes", "created_at",
+        ]
+        read_only_fields = ["requested_by"]

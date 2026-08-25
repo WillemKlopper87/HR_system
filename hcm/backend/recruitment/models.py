@@ -27,6 +27,12 @@ class Requisition(TimestampedModel):
     location = models.ForeignKey(Location, on_delete=models.PROTECT, related_name="requisitions")
     headcount = models.PositiveSmallIntegerField(default=1)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    # C6 (careers portal design spec §2.5, §4.1): free-text job description
+    # -- also useful for internal-only requisitions, not portal-exclusive.
+    description = models.TextField(blank=True)
+    # HR opts a requisition INTO public visibility; default False so every
+    # existing requisition stays internal-only the moment this field ships.
+    external_posting = models.BooleanField(default=False)
     # Which specific approved, vacant posts this requisition targets (C1) --
     # M2M, not a single FK: headcount can already be >1 (several identical
     # hires), so one requisition may claim several identical vacant posts
@@ -74,6 +80,10 @@ class Applicant(TimestampedModel):
         Stage.REJECTED: set(),
     }
 
+    class Source(models.TextChoices):
+        INTERNAL = "internal", "Internal"
+        PORTAL = "portal", "Careers portal"
+
     requisition = models.ForeignKey(Requisition, on_delete=models.PROTECT, related_name="applicants")
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
@@ -81,6 +91,17 @@ class Applicant(TimestampedModel):
     phone = models.CharField(max_length=30, blank=True)
     date_of_birth = models.DateField()
     current_stage = models.CharField(max_length=20, choices=Stage.choices, default=Stage.APPLIED)
+    # C6 (careers portal design spec §2.5): provenance only -- never read by
+    # the stage machine, retention handler, or hire flow. A portal-sourced
+    # row is byte-for-byte the same kind of row an internal one is.
+    source = models.CharField(max_length=20, choices=Source.choices, default=Source.INTERNAL)
+    # General, not portal-only: an internally-created applicant can also get
+    # a CV attached via a recruiter PATCH. Server-sniffed (recruitment/
+    # validation.py) -- never client-trusted, same discipline
+    # documents.EmployeeDocument's content_type/size_bytes already use.
+    resume = models.FileField(upload_to="applicant_resumes/%Y/%m/", null=True, blank=True)
+    resume_content_type = models.CharField(max_length=120, blank=True)
+    resume_size_bytes = models.PositiveIntegerField(default=0)
     rejected_reason = models.CharField(max_length=200, blank=True)
     # Set by recruitment/retention.py when a rejected applicant is anonymised
     # per RetentionRule; identifying fields are blanked, the row is kept for
@@ -176,3 +197,133 @@ class Offer(TimestampedModel):
 
     def __str__(self):
         return f"Offer for {self.applicant} ({self.get_status_display()})"
+
+
+# --- C6: interview scheduling, panel scorecards, background checks --------
+# Design spec: docs/superpowers/specs/2026-08-25-recruitment-interviews-careers-portal-design.md
+
+# 1-5, matching performance's own rating vocabulary (performance/models/
+# agreements.py RATING_MIN/MAX, performance/models/cycles.py RATING_CHOICES)
+# -- duplicated as a plain tuple rather than imported: performance is an
+# ordinary domain app (not kernel) and this is a constant, not a query, so
+# there's no queries.py seam it could come through.
+INTERVIEW_RATING_CHOICES = [(i, str(i)) for i in range(1, 6)]
+
+
+class InterviewSession(TimestampedModel):
+    """One scheduled interview round for an applicant (spec §2.1). Plain M2M
+    `interviewers` -- no through-model, since no per-panelist attribute is
+    needed beyond "have they submitted a scorecard yet", which
+    InterviewScorecard's own (session, interviewer) uniqueness already
+    answers. Multiple rounds are just multiple rows, ordered by
+    round_number -- no separate "round" object."""
+
+    class Status(models.TextChoices):
+        SCHEDULED = "scheduled", "Scheduled"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    applicant = models.ForeignKey(Applicant, on_delete=models.CASCADE, related_name="interview_sessions")
+    round_number = models.PositiveSmallIntegerField(default=1)
+    scheduled_at = models.DateTimeField()
+    duration_minutes = models.PositiveSmallIntegerField(default=60)
+    # Free text: a room name or a video-call URL. No calendar integration.
+    location = models.CharField(max_length=300, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
+    # Recruiter's own logistics/context notes -- distinct from a scorecard's
+    # per-interviewer notes below.
+    notes = models.TextField(blank=True)
+    interviewers = models.ManyToManyField(Employee, related_name="interview_panels")
+    created_by = models.ForeignKey(
+        Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name="interview_sessions_created"
+    )
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["applicant", "round_number", "scheduled_at"]
+
+    def __str__(self):
+        return f"{self.applicant} — round {self.round_number} ({self.get_status_display()})"
+
+
+class InterviewScorecard(TimestampedModel):
+    """One interviewer's structured feedback for one session (spec §2.2).
+    Fixed three-criterion vocabulary (not per-requisition configurable —
+    see the spec for why); blind-review visibility (whether a viewer other
+    than the author can see rating/comments/recommendation) is enforced in
+    InterviewScorecardSerializer.to_representation, not here — the model
+    itself carries no visibility state, only the data."""
+
+    class Recommendation(models.TextChoices):
+        STRONG_HIRE = "strong_hire", "Strong hire"
+        HIRE = "hire", "Hire"
+        NO_HIRE = "no_hire", "No hire"
+        STRONG_NO_HIRE = "strong_no_hire", "Strong no hire"
+
+    session = models.ForeignKey(InterviewSession, on_delete=models.CASCADE, related_name="scorecards")
+    interviewer = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="interview_scorecards")
+    skill_rating = models.PositiveSmallIntegerField(choices=INTERVIEW_RATING_CHOICES)
+    communication_rating = models.PositiveSmallIntegerField(choices=INTERVIEW_RATING_CHOICES)
+    culture_fit_rating = models.PositiveSmallIntegerField(choices=INTERVIEW_RATING_CHOICES)
+    comments = models.TextField(blank=True)
+    recommendation = models.CharField(max_length=20, choices=Recommendation.choices)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["session", "created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["session", "interviewer"], name="one_scorecard_per_interviewer_per_session")
+        ]
+
+    def __str__(self):
+        return f"{self.session}: {self.interviewer} — {self.get_recommendation_display()}"
+
+
+class BackgroundCheck(TimestampedModel):
+    """Tracking only, per docs/MVP-Backlog.md A3 #9 ("SA vetting is often
+    manual/legal rather than API-shaped — low leverage") -- no vendor
+    integration. No ALLOWED_TRANSITIONS state machine (unlike
+    Applicant.Stage): a real vetting process can legitimately move
+    non-monotonically (e.g. a flagged result revised to cleared after a
+    documented review), so `status` is free-form, validated only for a
+    legal enum value. Sensitive-tier by nature of the WHOLE model (spec
+    §2.3) — gated by IsRecruiterOrHRAdmin at the endpoint level, same
+    "whole-endpoint, not per-field" exception rbac_audit/tiers.py already
+    documents for performance.Review/Feedback and succession.
+    SuccessionCandidate."""
+
+    class CheckType(models.TextChoices):
+        REFERENCE = "reference", "Reference check"
+        CRIMINAL_RECORD = "criminal_record", "Criminal record check"
+        QUALIFICATION_VERIFICATION = "qualification_verification", "Qualification verification"
+        CREDIT_CHECK = "credit_check", "Credit check"
+        OTHER = "other", "Other"
+
+    class Status(models.TextChoices):
+        NOT_STARTED = "not_started", "Not started"
+        REQUESTED = "requested", "Requested"
+        IN_PROGRESS = "in_progress", "In progress"
+        CLEARED = "cleared", "Cleared"
+        FLAGGED = "flagged", "Flagged"
+
+    applicant = models.ForeignKey(Applicant, on_delete=models.CASCADE, related_name="background_checks")
+    check_type = models.CharField(max_length=30, choices=CheckType.choices)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.NOT_STARTED)
+    requested_by = models.ForeignKey(
+        Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name="background_checks_requested"
+    )
+    requested_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    # Outcome/context -- can legitimately hold criminal-record or
+    # credit-check detail, hence the whole-model sensitivity gating above.
+    notes = models.TextField(blank=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.applicant}: {self.get_check_type_display()} — {self.get_status_display()}"

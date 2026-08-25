@@ -104,6 +104,13 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
         "race": FieldTier.SENSITIVE,
         "gender": FieldTier.SENSITIVE,
         "disability_status": FieldTier.SENSITIVE,
+        # C6 careers portal (design spec §2.5): a personal document, same
+        # tier as email/phone above, not the file's actual content.
+        "resume": FieldTier.INTERNAL,
+        "resume_content_type": FieldTier.INTERNAL,
+        "resume_size_bytes": FieldTier.INTERNAL,
+        # Provenance only (internal vs portal) — not sensitive metadata.
+        "source": FieldTier.PUBLIC,
     },
     "performance.Goal": {
         "title": FieldTier.INTERNAL,

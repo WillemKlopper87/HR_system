@@ -154,6 +154,12 @@ REST_FRAMEWORK = {
         "login_username": os.environ.get("THROTTLE_LOGIN_USERNAME", "10/min"),
         "totp_burst": os.environ.get("THROTTLE_TOTP_BURST", "5/min"),
         "totp_sustained": os.environ.get("THROTTLE_TOTP_SUSTAINED", "30/hour"),
+        # C6 careers portal — the second-ever anonymous-write surface, same
+        # burst/sustained/identifier-keyed shape as login above.
+        "careers_application_burst": os.environ.get("THROTTLE_CAREERS_APPLICATION_BURST", "5/min"),
+        "careers_application_sustained": os.environ.get("THROTTLE_CAREERS_APPLICATION_SUSTAINED", "20/day"),
+        "careers_application_email": os.environ.get("THROTTLE_CAREERS_APPLICATION_EMAIL", "3/hour"),
+        "careers_read": os.environ.get("THROTTLE_CAREERS_READ", "60/min"),
     },
     "DEFAULT_PAGINATION_CLASS": "config.pagination.DefaultCursorPagination",
     "PAGE_SIZE": 50,

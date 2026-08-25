@@ -7,17 +7,32 @@ from drf_spectacular.utils import extend_schema
 from rbac_audit.consent import record_consent
 from rbac_audit.drf import get_request_employee
 from rbac_audit.models import ConsentRecord
-from rbac_audit.permissions import can_see_unsuppressed_aggregates
+from rbac_audit.permissions import can_see_unsuppressed_aggregates, has_role
 from rbac_audit.tiers import FieldTier
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Applicant, ApplicantStageEvent, Offer, Requisition
-from .permissions import IsRecruiterOrHRAdmin
+from .models import (
+    Applicant,
+    ApplicantStageEvent,
+    BackgroundCheck,
+    InterviewScorecard,
+    InterviewSession,
+    Offer,
+    Requisition,
+)
+from .permissions import (
+    InterviewScorecardPermission,
+    IsRecruiterOrHRAdmin,
+    IsRecruiterOrHRAdminOrAssignedInterviewer,
+)
 from .serializers import (
     ApplicantSerializer,
     ApplicantStageEventSerializer,
+    BackgroundCheckSerializer,
+    InterviewScorecardSerializer,
+    InterviewSessionSerializer,
     OfferSerializer,
     RequisitionSerializer,
 )
@@ -155,6 +170,69 @@ class OfferViewSet(viewsets.ModelViewSet):
         offer.status = Offer.Status.DECLINED
         offer.save(update_fields=["status"])
         return Response(self.get_serializer(offer).data)
+
+
+# --- C6: interview scheduling, panel scorecards, background checks --------
+
+class InterviewSessionViewSet(viewsets.ModelViewSet):
+    """Design spec §3.1: recruiter/hr_admin manage the whole pipeline; an
+    assigned interviewer gets read-only access to sessions they're on the
+    panel for, via get_queryset's row-filtering below plus
+    IsRecruiterOrHRAdminOrAssignedInterviewer's object-level check."""
+
+    queryset = InterviewSession.objects.select_related("applicant", "applicant__requisition").prefetch_related(
+        "interviewers"
+    )
+    serializer_class = InterviewSessionSerializer
+    permission_classes = [IsRecruiterOrHRAdminOrAssignedInterviewer]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        employee = get_request_employee(self.request)
+        if employee is None:
+            return qs.none()
+        if has_role(employee, "recruiter") or has_role(employee, "hr_admin"):
+            return qs
+        return qs.filter(interviewers=employee)
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=get_request_employee(self.request))
+
+
+class InterviewScorecardViewSet(viewsets.ModelViewSet):
+    queryset = InterviewScorecard.objects.select_related("session", "interviewer", "session__applicant")
+    serializer_class = InterviewScorecardSerializer
+    permission_classes = [InterviewScorecardPermission]
+    http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        employee = get_request_employee(self.request)
+        if employee is None:
+            return qs.none()
+        if has_role(employee, "recruiter") or has_role(employee, "hr_admin"):
+            return qs
+        # Own scorecards plus peers' on any session this employee is on the
+        # panel for — to_representation (InterviewScorecardSerializer) masks
+        # peer content until the viewer has submitted their own (spec §2.2).
+        return qs.filter(session__interviewers=employee).distinct()
+
+
+class BackgroundCheckViewSet(viewsets.ModelViewSet):
+    """Tracking only, no vendor integration (design spec §2.3) — reuses
+    IsRecruiterOrHRAdmin unchanged: the whole model is Sensitive-tier by
+    nature, and that permission class's audience is already the correct
+    one. No interviewer access at all, unlike InterviewSession/
+    InterviewScorecard above."""
+
+    queryset = BackgroundCheck.objects.select_related("applicant", "requested_by")
+    serializer_class = BackgroundCheckSerializer
+    permission_classes = [IsRecruiterOrHRAdmin]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def perform_create(self, serializer):
+        serializer.save(requested_by=get_request_employee(self.request))
 
 
 @extend_schema(responses=OpenApiTypes.OBJECT)
