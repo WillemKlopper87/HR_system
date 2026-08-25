@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "integrations",
     "notifications",
     "establishment",
+    "onboarding",
     # third-party (OpenAPI schema generation, H3)
     "drf_spectacular",
 ]

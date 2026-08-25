@@ -29,7 +29,7 @@ from rbac_audit.audit import log_access
 from rbac_audit.models import AuditLogEntry, RoleAssignment
 from rbac_audit.tiers import FieldTier
 
-from . import access_cascade
+from . import access_cascade, lifecycle_hooks
 from .models import EmploymentChange, EmploymentEvent
 
 logger = logging.getLogger(__name__)
@@ -249,6 +249,11 @@ def execute_employment_change(change: EmploymentChange) -> EmploymentChange:
                     f"termination_reason={termination_reason}"
                 ),
             )
+            # C1 part 3 slice 3 (onboarding/offboarding checklists design
+            # spec §6.2): fires only here, for ENDING types, never for
+            # SUSPENSION -- a suspended employee hasn't left. Additive only;
+            # does not touch the access-cascade steps above.
+            lifecycle_hooks.run_exit_completion_handlers(employee, change)
         # SUSPENSION: no lifecycle event, no version change (spec §2.1) --
         # the employee stays open on their current version.
 

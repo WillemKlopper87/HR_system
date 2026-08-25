@@ -175,6 +175,12 @@ class EmployeeManager(models.Manager):
             from_version=None,
             to_version=version,
         )
+        # C1 part 3 slice 3 (onboarding/offboarding checklists, spec
+        # docs/superpowers/specs/2026-08-24-onboarding-offboarding-checklists-design.md
+        # §6.1): dispatched via a registry, never a direct import -- core_hr
+        # is SHARED_KERNEL and must not import the onboarding app.
+        from . import lifecycle_hooks
+        lifecycle_hooks.run_hire_handlers(employee)
         return employee
 
 

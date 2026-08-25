@@ -153,7 +153,10 @@ is this data's history, the same choice `AgreementTemplate`'s template layer mak
 | `created_by` | FK employee, null | `SET_NULL` |
 | `published_at` | datetime, null | |
 
-`UniqueConstraint(name, version)` — mirrors `AgreementTemplate`'s `unique_template_name_version`.
+`UniqueConstraint(name, direction, version)` — extends `AgreementTemplate`'s `unique_template_name_version`
+with `direction`, since that model has no direction-like field but this one does: two different directions
+legitimately share a `name`+`version` (both seeded as "Standard onboarding"/"Standard offboarding" v1, say),
+because `version` is auto-assigned per `name`+`direction`, not per `name` alone.
 `ChecklistTemplate.current_for(direction)` — the latest `published` row for that direction, highest `version`
 first; this is what §6's automatic triggers resolve against, and what a manual create defaults to when no
 explicit template is given.
