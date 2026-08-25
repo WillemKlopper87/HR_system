@@ -9,8 +9,13 @@ test.describe('Mandatory-training compliance (C6)', () => {
     await expectHeading(page, 'Course Catalogue')
     await settled(page)
 
-    await expect(page.locator('table tbody tr', { hasText: 'POPIA Awareness Refresher' })).toBeVisible()
-    await expect(page.locator('table tbody tr', { hasText: 'Workplace Safety Induction' })).toBeVisible()
+    // Two tables on this page (courses, then requirements) -- a seeded
+    // requirement's "Course" column also contains the course name, so an
+    // unscoped `table tbody tr` matches rows in both. Scope to the first
+    // table (courses) here.
+    const coursesTable = page.locator('table').first()
+    await expect(coursesTable.locator('tbody tr', { hasText: 'POPIA Awareness Refresher' })).toBeVisible()
+    await expect(coursesTable.locator('tbody tr', { hasText: 'Workplace Safety Induction' })).toBeVisible()
 
     const courseName = `E2E Compliance Course ${Date.now().toString().slice(-5)}`
     await page.getByRole('button', { name: '+ New course' }).click()
@@ -18,7 +23,7 @@ test.describe('Mandatory-training compliance (C6)', () => {
     await page.getByLabel('Mandatory / compliance course').check()
     await page.getByRole('button', { name: 'Create course' }).click()
     await settled(page)
-    await expect(page.locator('table tbody tr', { hasText: courseName })).toBeVisible()
+    await expect(coursesTable.locator('tbody tr', { hasText: courseName })).toBeVisible()
 
     await page.getByRole('button', { name: '+ New requirement' }).click()
     await page.getByLabel('Course (mandatory only)').selectOption({ label: courseName })
@@ -26,7 +31,8 @@ test.describe('Mandatory-training compliance (C6)', () => {
     await page.getByLabel('Due within (days)').fill('90')
     await page.getByRole('button', { name: 'Create requirement' }).click()
     await settled(page)
-    await expect(page.locator('table tbody tr', { hasText: courseName }).last()).toContainText('Org-wide')
+    const requirementsTable = page.locator('table').nth(1)
+    await expect(requirementsTable.locator('tbody tr', { hasText: courseName })).toContainText('Org-wide')
   })
 
   test('hr_admin: training compliance dashboard shows completion-rate rollup', async ({ page }) => {
@@ -57,12 +63,14 @@ test.describe('Mandatory-training compliance (C6)', () => {
     await settled(page)
 
     await expect(page.getByRole('heading', { name: 'Overdue mandatory training' })).toBeVisible()
-    // Seeded: the demo "employee" login is a direct report of "manager" and
-    // is deliberately overdue on Workplace Safety Induction (department-
-    // scoped to Engineering) while compliant on the org-wide POPIA course —
-    // see seed_demo_data.py::_seed_learning_demo_data.
-    const overdueRow = page.locator('table tbody tr', { hasText: 'Workplace Safety Induction' })
-    await expect(overdueRow).toBeVisible()
+    // Seeded: Workplace Safety Induction is required org-wide across
+    // Engineering (department-scoped, effective long in the past, nobody
+    // in the seed data has a completed record for it), so the whole
+    // Engineering reporting chain under "manager" shows up here, not just
+    // one row -- assert at least one row exists rather than exactly one.
+    // See seed_demo_data.py::_seed_learning_demo_data.
+    const overdueRows = page.locator('table tbody tr', { hasText: 'Workplace Safety Induction' })
+    await expect(overdueRows.first()).toBeVisible()
   })
 
   test('employee: my learning enrollment form can reference a catalogue course', async ({ page }) => {
@@ -72,7 +80,10 @@ test.describe('Mandatory-training compliance (C6)', () => {
     await settled(page)
 
     await page.getByRole('button', { name: '+ Request enrollment' }).click()
-    await page.getByLabel('From the catalogue (optional)').selectOption({ label: /Workplace Safety Induction/ })
+    // Option label is the exact rendered text -- MyLearningPage appends
+    // " (mandatory)" for a mandatory catalogue course (selectOption's
+    // `label` must be an exact string match, not a pattern).
+    await page.getByLabel('From the catalogue (optional)').selectOption({ label: 'Workplace Safety Induction (mandatory)' })
     await expect(page.getByLabel('Course/training title')).toHaveValue('Workplace Safety Induction')
     await page.getByRole('button', { name: 'Request enrollment' }).click()
     await settled(page)

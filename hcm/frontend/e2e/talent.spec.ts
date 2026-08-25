@@ -111,8 +111,11 @@ test.describe('learning (Sprint 8-9)', () => {
     await page.goto('/team-development')
     await expectHeading(page, 'Team Development')
     await settled(page)
-    await expect(page.locator('table thead')).toContainText('Training completed')
-    await expect(page.locator('table tbody tr').first()).toBeVisible()
+    // C6 added a second table (row-scoped overdue mandatory training) below
+    // the roster table on this page -- scope to the first table so this
+    // assertion still targets the roster, not either table ambiguously.
+    await expect(page.locator('table').first().locator('thead')).toContainText('Training completed')
+    await expect(page.locator('table').first().locator('tbody tr').first()).toBeVisible()
     await page.getByRole('button', { name: 'Sign out' }).click()
     await page.waitForURL(/\/login$/)
 
