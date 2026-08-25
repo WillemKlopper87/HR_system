@@ -9,6 +9,8 @@ import { ApplicantDetailPage } from './pages/ApplicantDetailPage'
 import { ApplicantsPage } from './pages/ApplicantsPage'
 import { AssessmentsPage } from './pages/AssessmentsPage'
 import { BenefitsPage } from './pages/BenefitsPage'
+import { CareersListPage } from './pages/CareersListPage'
+import { CareersPostingPage } from './pages/CareersPostingPage'
 import { ChecklistsPage } from './pages/ChecklistsPage'
 import { ChecklistTemplatesPage } from './pages/ChecklistTemplatesPage'
 import { CompProposalsPage } from './pages/CompProposalsPage'
@@ -63,6 +65,15 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        {/* C6 external careers portal (design spec §5.2) -- the SPA's only
+            genuinely public, unauthenticated routes. Deliberately outside
+            RequireAuth/AppShell: an anonymous visitor has no session and no
+            session-driven nav to render. AuthProvider still wraps them
+            (it wraps the whole tree already) but is inert here -- these
+            endpoints are AllowAny and never trigger its 401/403 handling
+            for a legitimate anonymous request. */}
+        <Route path="/careers" element={<CareersListPage />} />
+        <Route path="/careers/:id" element={<CareersPostingPage />} />
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
             <Route index element={<Navigate to="/employees" replace />} />

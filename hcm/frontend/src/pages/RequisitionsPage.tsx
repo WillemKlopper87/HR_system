@@ -22,6 +22,16 @@ export function RequisitionsPage() {
     }
   }
 
+  async function handleExternalPostingToggle(req: Requisition, externalPosting: boolean) {
+    setError(null)
+    try {
+      const updated = await api.patch<Requisition>(`/requisitions/${req.id}/`, { external_posting: externalPosting })
+      setRequisitions((prev) => prev?.map((r) => (r.id === req.id ? updated : r)) ?? null)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Update failed.')
+    }
+  }
+
   return (
     <div className="page">
       <div className="page-header">
@@ -59,6 +69,7 @@ export function RequisitionsPage() {
                 <th>Headcount</th>
                 <th>Status</th>
                 <th>Opened</th>
+                <th>Careers site</th>
               </tr>
             </thead>
             <tbody>
@@ -82,6 +93,16 @@ export function RequisitionsPage() {
                     </select>
                   </td>
                   <td>{req.opened_at ?? '—'}</td>
+                  <td>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 'normal' }}>
+                      <input
+                        type="checkbox"
+                        checked={req.external_posting}
+                        onChange={(e) => void handleExternalPostingToggle(req, e.target.checked)}
+                      />
+                      Public
+                    </label>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -101,6 +122,8 @@ function NewRequisitionForm({ onCreated }: { onCreated: () => void }) {
   const [location, setLocation] = useState<number | ''>('')
   const [headcount, setHeadcount] = useState(1)
   const [status, setStatus] = useState<RequisitionStatus>('open')
+  const [description, setDescription] = useState('')
+  const [externalPosting, setExternalPosting] = useState(false)
   const [selectedPositions, setSelectedPositions] = useState<number[]>([])
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -130,7 +153,7 @@ function NewRequisitionForm({ onCreated }: { onCreated: () => void }) {
     try {
       await api.post('/requisitions/', {
         title, department, occupational_level: occupationalLevel, job_grade: jobGrade || null, location,
-        headcount, status, positions: selectedPositions,
+        headcount, status, positions: selectedPositions, description, external_posting: externalPosting,
       })
       onCreated()
     } catch (err) {
@@ -226,6 +249,14 @@ function NewRequisitionForm({ onCreated }: { onCreated: () => void }) {
             </option>
           ))}
         </select>
+      </label>
+      <label>
+        Description (shown internally, and on the careers site if posted publicly)
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+      </label>
+      <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <input type="checkbox" checked={externalPosting} onChange={(e) => setExternalPosting(e.target.checked)} />
+        Post to the public careers site
       </label>
 
       {error && <p className="form-error">{error}</p>}
