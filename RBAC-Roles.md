@@ -219,6 +219,25 @@ than the requester's own current one, or any `CompCycle` detail. Current salary 
 `performance/queries.py::latest_final_score` seam) is read-only display for whoever already reads proposals — never
 an input to any amount or budget calculation (spec §2.8).
 
+## Module access: EE plan measures, consultation forum, progress snapshots (C6)
+
+Spec: `docs/superpowers/specs/2026-08-26-ee-plan-consultation-forum-design.md`. All inside `ee_reporting`. The
+questionnaire's Section F Y/N answers stay hr_admin-write and authoritative — these records are the *evidence*
+behind them, cross-checked by `EEReport.validate` (advisory findings, never a generation gate).
+
+| Action | Roles allowed |
+|---|---|
+| Read `EEForumMember` / `EEForumMeeting`, download minutes | **hr_admin · ee_manager · accounting_officer · auditor**, plus the **forum-member carve-out**: an employee who holds (or held) a forum seat sees the roster and the meetings they attended (`attendees` M2M), with `representation`/`notes` **redacted** — `union_nominated` reveals trade-union membership, POPIA s.26 special personal information, gated like race/disability. A non-member gets an empty list, not a 403 (no hint about what exists). Minutes downloads are `log_access`'d as EXPORT at Sensitive tier |
+| `GET /ee-forum-members/composition/` (derived s.16(2) adequacy check: levels uncovered, designated / non-designated represented, union-nominated present — booleans and level codes only, never per-demographic counts of the forum) | EE read roles only — **not** the member carve-out (it summarises the whole workforce's mix) |
+| Create/update/delete a forum member or meeting; upload minutes (content-sniffed PDF/DOCX, 10 MB) | **hr_admin · ee_manager** — a deliberate departure from the module's hr_admin-only form-data writes: the forum, the measures and the monitoring are the EE manager's own operational job (s.24 assigned senior manager) |
+| Read `EEPlanMeasure` / `EEPlanProgressSnapshot` | hr_admin · ee_manager · accounting_officer · auditor. Snapshot matrices are stored unsuppressed and **small-cell-suppressed per requester on read** (same `can_see_unsuppressed_aggregates` rule as the equity dashboard) |
+| Create/update/delete an `EEPlanMeasure` (EEA13: responsible person + time frame inside the plan period, both required) | **hr_admin · ee_manager** |
+| `POST /ee-plan-snapshots/take/` | **hr_admin · ee_manager**; create-only — no update/delete endpoint exists (a snapshot is evidence of what was tabled) |
+| `EEPlan` itself (targets, EAP profile) | unchanged: hr_admin write, EE roles read |
+
+Every other role (line_manager, recruiter, comp_manager, plain employee who isn't a forum member) gets 403 on
+measures/snapshots/composition and an empty list on the forum endpoints.
+
 ## Entra ID group mapping (draft — confirm names with IT, ADR-004)
 
 | Entra group | Role |

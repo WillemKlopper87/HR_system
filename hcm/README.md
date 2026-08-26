@@ -137,7 +137,10 @@ hcm/
                 export, equity dashboard (Sprint 13-14); field/category lists extracted
                 verbatim from the official form documents into constants.py; reads
                 learning data via learning/queries.py, not a direct model import —
-                see Module rules below
+                see Module rules below; since C6, also the EE consultative-forum
+                records (members, meetings, minutes), EEA13-style plan measures and
+                stored progress snapshots that evidence the questionnaire's Section F
+                answers (validated against, never derived — spec 2026-08-26)
     integrations/ outbound adapters (ADR-011): collab.py (httpx client to the collab
                 platform's /integrations surface — work-item upsert/close, announcements,
                 identity lookups; retries; None when COLLAB_ENABLED is off), sync.py +

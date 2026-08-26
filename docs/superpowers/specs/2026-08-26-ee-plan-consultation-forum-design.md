@@ -213,3 +213,36 @@ Meeting scheduling/invites/quorum rules (a quorum is a forum's own constitution,
 "my forum" page; lifting the upload sniffer into the kernel; EEA13 document export (the plan-document render
 itself — the measures/targets are the data, the form render is a C7 report-builder concern); an automatic
 snapshot schedule (on-demand + `monitoring_frequency` is enough until a scheduler exists).
+
+## 10. Regulatory alignment applied after the coordinator's primary-source research (same day)
+
+Checked against the EE Regulations 2025 (Gazette 52515), the sector-target determination (Gazette 52514) and
+the field guide's POPIA notes; adjusted where cheap, recorded where not:
+
+- **EEA13 owner + time frame are required, not optional** (§4.1 amended): `EEPlanMeasure.owner` is a non-null
+  `PROTECT` FK and `target_start`/`target_end` are mandatory and must sit inside the plan period (serializer
+  check).
+- **Sector targets in the gazette's own shape**: `EEPlan.sector_targets` rows may be `{"male", "female",
+  "total"}` designated-group shares per level (sector 1.10 Information and Communication: Top 25.4/31.2/56.6,
+  Senior 28.6/40.0/68.6, PQ 37.9/38.9/76.8, Skilled 46.0/45.7/91.7; disability 3% workforce-wide) — or the
+  older per-column shape; `services._sector_gap` handles either per row. The snapshot stores
+  `designated_group_pct` (per level, by gender, excluding white males without disabilities and foreign
+  nationals) so the comparison is like-for-like.
+- **Both directions flagged (reg. 9(10)–(13))**: `EEPlan.eap_profile` (new JSON field, reg. 9(5) mandatory
+  input) lets a snapshot flag `over_eap` cells as well as `annual_target_shortfall` and
+  `disability_target_shortfall`. Empty occupational levels are skipped — a 0% "shortfall" at a level nobody
+  occupies is noise.
+- **Reg. 16(5) justifiable reasons**: not a new field — `EEQuestionnaire.justifiable_reasons` already holds
+  the seven reasons per level. Instead a new advisory finding (`_shortfall_justification_issues`) flags a
+  level that is below its annual target in the frozen workforce profile with no reason ticked for it.
+- **Retention (reg. 9(15))**: `ee_reporting/migrations/0003_seed_retention_rules.py` seeds 60-month RETAIN
+  rules for `EEPlan`, `EEPlanMeasure`, `EEPlanProgressSnapshot`, `EEForumMember`, `EEForumMeeting`.
+- **Union affiliation is POPIA special personal information**: `EEForumMember.representation` (and `notes`)
+  are redacted from the serializer output for anyone reading through the member carve-out rather than an EE
+  read role. EE roles already hold Sensitive-tier read for race/disability; the same bar applies here.
+- **"Time off for EE consultative committee to meet"** (barrier category 24) is evidenced by the same forum
+  meetings — no separate record; the measure-evidence finding covers it like every other category.
+
+Not done (follow-ups): a per-plan-year container object (the questionnaire's `report_year` already plays that
+role); an EAP reference table per province/sector (the plan stores the applicable EAP as data); the draft
+Amended Code's forum-constitution specifics, pending its final form.
