@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Benefit, BenefitsElection, CompProposal, PayBand
+from .models import Benefit, BenefitsElection, CompCycle, CompProposal, PayBand
 
 
 @admin.register(PayBand)
@@ -10,10 +10,19 @@ class PayBandAdmin(SimpleHistoryAdmin):
     list_filter = ("job_grade",)
 
 
+@admin.register(CompCycle)
+class CompCycleAdmin(SimpleHistoryAdmin):
+    list_display = ("name", "period_start", "period_end", "budget_amount", "department", "status")
+    list_filter = ("status", "department")
+
+
 @admin.register(CompProposal)
 class CompProposalAdmin(SimpleHistoryAdmin):
-    list_display = ("employee", "proposed_annual_salary", "status", "requires_override", "proposed_by", "approved_by")
-    list_filter = ("status", "requires_override")
+    list_display = (
+        "employee", "proposal_type", "proposed_annual_salary", "bonus_amount", "status", "requires_override",
+        "exceeds_cycle_budget", "cycle", "proposed_by", "approved_by",
+    )
+    list_filter = ("status", "proposal_type", "requires_override", "exceeds_cycle_budget")
     search_fields = ("employee__employee_number", "employee__preferred_name")
 
 

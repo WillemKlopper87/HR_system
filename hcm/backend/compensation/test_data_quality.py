@@ -1,17 +1,18 @@
-"""H3 org-wide data-quality sweep: this app's own stale-proposal check,
-registered from `CompensationConfig.ready()` (see compensation/data_quality.py).
+"""H3 org-wide data-quality sweep: this app's own checks, registered from
+`CompensationConfig.ready()` (see compensation/data_quality.py).
 """
 from __future__ import annotations
 
 from datetime import date, timedelta
+from decimal import Decimal
 
 from core_hr.data_quality import run_data_quality_checks
 from core_hr.models import DataQualityException, Department, Employee, JobGrade, Location, OccupationalLevel
 from django.test import TestCase
 from django.utils import timezone
 
-from .data_quality import STALE_AFTER_DAYS, stale_proposal_handler
-from .models import CompProposal
+from .data_quality import STALE_AFTER_DAYS, cycle_overdue_handler, stale_proposal_handler
+from .models import CompCycle, CompProposal
 
 
 class StaleProposalHandlerTests(TestCase):
@@ -53,6 +54,75 @@ class StaleProposalHandlerTests(TestCase):
             DataQualityException.objects.filter(
                 employee=self.employee,
                 exception_type=DataQualityException.ExceptionType.COMP_PROPOSAL_STALE,
+                resolved_at__isnull=True,
+            ).exists()
+        )
+
+
+class CycleOverdueHandlerTests(TestCase):
+    """Design spec §2.7 -- deliberately NOT an "exceeds budget" check
+    (that's already a live flag directly on the proposal); this is the
+    genuinely new signal: a review round whose window has closed but that
+    still has undecided proposals in it."""
+
+    def setUp(self):
+        dept = Department.objects.create(name="Engineering", code="ENG")
+        level = OccupationalLevel.objects.get(code="TOP")
+        self.grade = JobGrade.objects.create(name="Grade 1", code="G1", occupational_level=level)
+        location = Location.objects.create(name="Head Office", code="HO", province=Location.Province.GAUTENG)
+        self.employee = Employee.objects.hire(
+            employee_number="E0061", first_name="Overdue", last_name="Case", date_of_birth=date(1990, 1, 1),
+            work_email="overdue.case@example.com", hire_date=date(2020, 1, 1), department=dept,
+            occupational_level=level, job_grade=self.grade, location=location,
+        )
+
+    def _cycle(self, *, status, period_end):
+        return CompCycle.objects.create(
+            name=f"Cycle {status}-{period_end}", period_start=date(2020, 1, 1), period_end=period_end,
+            budget_amount=Decimal("100000"), status=status,
+        )
+
+    def test_open_cycle_past_period_end_with_unresolved_proposal_is_flagged(self):
+        cycle = self._cycle(status=CompCycle.Status.OPEN, period_end=timezone.localdate() - timedelta(days=1))
+        CompProposal.objects.create(
+            employee=self.employee, current_job_grade=self.grade, proposed_annual_salary=420000, cycle=cycle,
+        )
+        flagged = list(cycle_overdue_handler())
+        self.assertEqual([e for e, _ in flagged], [self.employee])
+
+    def test_cycle_still_within_its_period_is_not_flagged(self):
+        cycle = self._cycle(status=CompCycle.Status.OPEN, period_end=timezone.localdate() + timedelta(days=30))
+        CompProposal.objects.create(
+            employee=self.employee, current_job_grade=self.grade, proposed_annual_salary=420000, cycle=cycle,
+        )
+        self.assertEqual(list(cycle_overdue_handler()), [])
+
+    def test_closed_cycle_is_not_flagged_even_if_past_period_end(self):
+        cycle = self._cycle(status=CompCycle.Status.CLOSED, period_end=timezone.localdate() - timedelta(days=1))
+        CompProposal.objects.create(
+            employee=self.employee, current_job_grade=self.grade, proposed_annual_salary=420000, cycle=cycle,
+            status=CompProposal.Status.REJECTED,
+        )
+        self.assertEqual(list(cycle_overdue_handler()), [])
+
+    def test_overdue_cycle_with_only_resolved_proposals_is_not_flagged(self):
+        cycle = self._cycle(status=CompCycle.Status.OPEN, period_end=timezone.localdate() - timedelta(days=1))
+        CompProposal.objects.create(
+            employee=self.employee, current_job_grade=self.grade, proposed_annual_salary=420000, cycle=cycle,
+            status=CompProposal.Status.APPROVED,
+        )
+        self.assertEqual(list(cycle_overdue_handler()), [])
+
+    def test_wired_into_the_org_wide_sweep(self):
+        cycle = self._cycle(status=CompCycle.Status.OPEN, period_end=timezone.localdate() - timedelta(days=1))
+        CompProposal.objects.create(
+            employee=self.employee, current_job_grade=self.grade, proposed_annual_salary=420000, cycle=cycle,
+        )
+        run_data_quality_checks()
+        self.assertTrue(
+            DataQualityException.objects.filter(
+                employee=self.employee,
+                exception_type=DataQualityException.ExceptionType.COMP_CYCLE_OVERDUE,
                 resolved_at__isnull=True,
             ).exists()
         )
