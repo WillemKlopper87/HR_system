@@ -1,187 +1,193 @@
-# Session state — 2026-08-26 (session 6)
+# Session state — 2026-08-26 (session 7)
 
 Written as a resume point. **Everything described as done is committed and pushed** —
-`origin/master` is current at `0f0c8b1`. Working tree clean.
+run `git log -1` for the exact hash; `origin/master` matches local HEAD as of this write.
 
-## Where the work is
+## Shipped this session: C6 — salary-review/bonus cycles + total-rewards statement
 
-Last code change: e2e spec + a real `MyPerformancePage` fix, commit `665929d`. Docs (RBAC-Roles.md,
-Data-Dictionary.md, hcm/README.md, backlog) followed in `0f0c8b1`. This doc update is the final commit of the
-session, pushed immediately after — run `git log -1` for the exact hash.
+The product owner's "let's finish C6" instruction named this as the next sub-item after mandatory-training
+compliance, succession/talent pools, interview scheduling/careers-portal, and performance calibration/360 (all
+shipped 2026-08-25/26). Gap per `NEXT_AGENT_BRIEF.md` #22: "proposals are one-off; no cycle object to batch
+increases against a budget, and ESS shows benefits but not a consolidated rewards view." Spec:
+`docs/superpowers/specs/2026-08-26-salary-review-cycles-total-rewards-design.md`.
 
-## Shipped this session: C6 — performance calibration/moderation + 360° feedback
+### A. `CompCycle` — batches proposals against a budget
 
-The product owner's "let's finish C6" instruction from two sessions ago named this as the next sub-item after
-mandatory-training compliance, succession/talent pools, and interview scheduling/careers-portal (all shipped
-2026-08-25). Confirmed absent by grep (`calibrat`, `moderat`, `360`) before starting — the only hits were the
-KPI-contracting spec's own "non-goal" line and `NEXT_AGENT_BRIEF.md` itself. **PDPs were already built**
-(`PDPItem`, untouched) — this slice is genuinely just the two remaining pieces from `NEXT_AGENT_BRIEF.md` §7.3
-#20. Spec: `docs/superpowers/specs/2026-08-25-performance-calibration-360-design.md`.
+Extends `compensation` (not a new app) — `CompProposal` gains a nullable `cycle` FK and a `proposal_type`
+(`increase`/`bonus`) rather than forking a second model, so the existing propose→approve→reject workflow and
+segregation-of-duties check are reused, not duplicated. `CompCycle`: `name`, `period_start`/`period_end`,
+`budget_amount` (flat currency pool — a %-of-payroll option was considered and rejected, spec §2.2: it would need
+a frozen payroll baseline at cycle-open time, a real mechanism this task's brief didn't ask for), `department`
+(nullable = org-wide, matching the brief's own wording rather than `CourseRequirement`'s two-axis scoping — spec
+§2.3), `status` (draft/open/closed).
 
-**Structural decision:** both features extend the existing `performance` app as sibling model modules
-(`models/calibration.py`, `models/feedback360.py`) rather than a new app — the opposite call from succession's
-own precedent, deliberately: everything here is fundamentally *about* one `PerformanceAgreement`, so a new app
-would mean importing it across a boundary for the one thing both features need, for no audience/lifecycle
-reason to justify it.
+**Budget tracking**: `CompProposal.budget_impact` is a **property**, not a stored column — a bonus's full amount,
+or an increase's delta over `baseline_salary_at_proposal` (a snapshot of `RemunerationRecord.fixed_remuneration`
+at proposal time, only required for a cycle-attached increase). Utilization is derived live by summing
+`PROPOSED`+`APPROVED` proposals' impact (never `REJECTED` — it never happened). **Over-budget reuses
+`requires_override`/`override_reason`'s existing "flagged, not blocked" shape** (new `exceeds_cycle_budget` field)
+rather than a second gate — a proposal can still be created/exist over budget, but approving it needs a reason,
+same as an out-of-band pay-band proposal. Guarded against the classic concurrent-proposal race with
+`select_for_update()` on the `CompCycle` row at both create and approve time (`compensation/services.py`) — the
+same row-lock shape `core_hr.Employee.apply_lifecycle_event` already uses for its own read-then-write race.
+`exceeds_cycle_budget` is recomputed **fresh, under lock, at approval time** (not trusted from the creation-time
+flag) since cycle utilization is a shared, moving total across every proposal against it, unlike the
+pay-band check which barely changes once a grade is snapshotted.
 
-### A. Calibration / moderation — `CalibrationSession`, `CalibrationAdjustment`
+**Closing a cycle** auto-rejects any still-`PROPOSED` proposal (via the existing `reject_proposal`, which already
+notifies the proposer) — never silently orphaned, never auto-approved (committing money nobody explicitly
+approved is the wrong default; rejecting just means re-raising it in a future cycle if still wanted).
 
-A committee-style consistency check across a cohort of already-`FINAL_SIGNED`/`ARCHIVED` agreements, before their
-scores are treated as final. **Cohort unit: department** (nullable = org-wide), reusing the exact grouping
-`views_agreements.py::rating_distribution` (PC-3) already uses — the dashboard a real committee would look at
-before meeting and the session's candidate list are the same shape. A shared-Head cohort was considered and
-rejected (too small a sample, and `head` drifts across the year as org changes happen).
+New data-quality check `COMP_CYCLE_OVERDUE` (`compensation/data_quality.py::cycle_overdue_handler`): an open cycle
+past its `period_end` with an unresolved proposal. Deliberately **not** an "exceeds budget" check — that's
+already a live flag directly on the proposal, so a data-quality exception for it would just be noise.
 
-**Not a live multi-party tool** — per the brief's explicit steer, hr_admin records what a committee decided after
-an offline meeting (`CalibrationSession.participants_note`/`summary` are free text), the same single-actor
-authorship pattern `Course`/`CriticalPost`/`ChecklistTemplate` already use.
+`CompProposal` also gained a read-only `performance_context` field (the employee's latest `final_score`, via the
+**existing** `performance/queries.py::latest_final_score` seam succession built) — informational display only for
+whoever already reads proposals, never an input to any amount or budget calculation (spec §2.8).
 
-**Never a silent overwrite, never a re-signature.** Recording an outcome (`record-outcome` action) requires a
-reason even when nothing changes (`new_score=None` = "reviewed, no change" — still a real, reasoned row).
-`CalibrationAdjustment` is create-only (no update/delete route anywhere in the API — a correction is a new row,
-not an edited one, the same shape `AgreementSignature` already uses). Three independent audit trails come free
-when a score does change: the adjustment row itself (previous/new/reason/who), `PerformanceAgreement.history`
-(existing `simple_history`, automatically captures the `final_score`/`hr_attention` diff via the already-installed
-`HistoryRequestMiddleware` — zero new infrastructure), and `log_access`. **Deliberately no re-signature**: the
-brief's own counter-argument ("this system's philosophy elsewhere is amendments as new revision, re-sign") was
-taken seriously and rejected on the merits, not waved away — `amend_agreement` exists for the employee and Head
-jointly reopening *their own* agreement; calibration is a categorically different event, an HR/committee act of
-cross-cohort consistency layered *on top of* an already-signed agreement, not a renegotiation between the two
-original parties. Forcing the full submit→approve→sign chain to re-run for a numeric consistency nudge would
-misrepresent what happened and could leave a calibrated agreement unsigned indefinitely, undermining PC-3's whole
-point of being able to archive a finished year. The original `AgreementSignature`/`AgreementDocument` rows stay
-completely untouched as the historical record of what was mutually agreed at sign-off. Fairness is addressed by
-transparency instead of a re-sign gate — the reason is always visible to the employee and Head via a nested
-`calibration_adjustments` field on `PerformanceAgreementSerializer` (rides the agreement's own existing
-permission, not a second surface), same as `return_reason`/`amendment_reason` already do.
+### B. `GET /my-total-rewards/` — a genuinely new self-scope carve-out
 
-Read of the session/cohort itself: **hr_admin/auditor only** — same "no self/team browsing of a comparative
-judgement about others" precedent `SuccessionCandidate` set (spec §2.6 there).
+**The load-bearing decision.** `compensation`'s entire prior design philosophy was "no carve-out, comp_manager/
+hr_admin only, module-wide, catalog included" (the models' own docstrings). A total-rewards statement is
+fundamentally different in kind — an employee's own confirmed current pay and benefits, shown to themself, the
+same category `MyProfilePage.tsx`/`MyBenefitsPage.tsx` already show for every other domain. Confirmed by grep
+this didn't already exist anywhere (no salary field in `MyProfilePage.tsx` or `api/types.ts`'s `self` scope).
 
-### B. 360° feedback — `Feedback360Request`, `Feedback360Rater`, `Feedback360Response`
+**The boundary** (spec §3): a new function view (not a `ModelViewSet`) resolves the employee **only** from
+`get_request_employee(request)` — no id parameter exists anywhere on the endpoint, for any role, including
+comp_manager/hr_admin acting on their own login. Exposes: the requester's own latest `RemunerationRecord` (fixed/
+variable/total, via new `ee_reporting/queries.py::latest_remuneration_for_employee` — ee_reporting's first read
+seam); the *one* `PayBand` for the requester's own current `job_grade` plus a computed percentile position (never
+any other grade's band, never a list); their own `BenefitsElection` rows joined to the catalog (zero new access —
+`MyBenefitsPage.tsx` already proves this is self-visible, just folded in for convenience); their own
+`latest_final_score` (ditto, already visible via `MyPerformancePage.tsx`). **Never** exposed, to anyone, via this
+surface: any `CompProposal` (pending or historical — a proposed change is not confirmed pay, and premature
+disclosure risks setting expectations the organisation hasn't committed to, or leaking cycle budget dynamics);
+any other employee's data; any `CompCycle` detail. **No `RequiresPayrollStepUp`** — that control exists for
+privileged access to *someone else's* Restricted-tier pay data, not self-view of your own (none of the existing
+`My*` ESS pages require it either, despite touching Sensitive/Restricted fields in the self-view case).
 
-Structured, multi-rater input attached to `PerformanceAgreement`, deliberately **not** an extension of the legacy
-free-text `Feedback` model (`models/cycles.py`) — that model's open-authorship (anyone rates anyone, no
-nomination) is right for a private note and wrong for rated input a Head reads alongside a KPI scorecard.
+**No privileged "view anyone's statement" mode was built** (spec §3.4) — comp_manager currently has **zero**
+standing access to `RemunerationRecord` at all (`ee_reporting.permissions.RemunerationRecordPermission.READ_ROLES
+= ("hr_admin", "auditor")` only, a pre-existing, deliberate restriction); building a second privileged-viewer path
+into this endpoint would either silently widen that table as an unplanned side effect, or need its own separate
+access decision this task's brief didn't ask for. hr_admin already has full, direct access to every underlying
+model independently for a real pay conversation.
 
-**Structure**: fixed 3-criterion 1–5 scale (`collaboration_rating`/`communication_rating`/`reliability_rating`,
-matching `recruitment.InterviewScorecard`'s precedent exactly) plus `strengths`/`development_areas` free text.
+**Current-salary source of truth: `RemunerationRecord`, never `CompProposal`** (spec §4) — per ADR-006/
+`compensation.PayBand`'s own docstring ("actual pay stays in SAP"), confirmed by how `ee_reporting`'s own EEA4
+generation already treats `RemunerationRecord` as ground truth, never cross-checked against `CompProposal`. A
+proposal, even `APPROVED`, is a workflow record of an *intended* change — the number doesn't change until it
+lands in SAP's next extract and appears as a new `RemunerationRecord` row (no live SAP integration exists yet,
+per ADR-006's own noted future Sprint 12b interface), which can be days-to-weeks behind in practice. Showing an
+employee a number payroll hasn't started paying yet would be a worse failure mode than being one reporting cycle
+behind reality.
 
-**Who can be a rater**: `self` and `manager` slots are automatic and pre-approved when a round opens (the
-snapshotted Head, or an active `SigningDelegation`); `peer`/`direct_report` slots are nominated (by the subject,
-their Head, or hr_admin) and need Head/hr_admin approval — not fully open like legacy `Feedback`, since this
-input can shape a real assessment. `relationship` is always derived server-side from the org chart at nomination
-time (mirrors `classify_feedback_type`), never client-trusted.
+### Frontend
 
-**Visibility — the load-bearing decision (spec §2.10):**
-- Head/delegate, hr_admin, auditor, and a rater's own row: **full attribution, always** — they're synthesizing
-  input into a decision, not forming an independent first impression an anchoring risk would protect against.
-- The subject sees their **self** and **manager** responses in full (no new exposure — the manager's comment is
-  already visible elsewhere as `final_head_comment`).
-- The subject **never** sees an individual **peer**/**direct_report** response — not the rater's identity, not
-  their free text, ever, permanently (not just pre-submission). Only a pooled, **ratings-only** average per
-  relationship type, gated on **≥3 responses in that bucket**
-  (`FEEDBACK_360_MIN_RESPONSES_FOR_AGGREGATE = 3`, deliberately **not**
-  `views_agreements.SMALL_CELL_THRESHOLD`'s 5 — that protects a demographic cell inside an org-wide aggregate, a
-  different risk shape/scale from a 360 round's realistic 2–6-person rater pool per relationship type; reusing 5
-  would make the feature almost never surface anything). Peer and direct-report buckets are kept **separate**,
-  not pooled together, even though pooling would clear the floor sooner — protecting the group most likely to
-  fear retaliation (direct reports) was judged more important than that group's feedback reaching the subject
-  more often.
-- No blind-review-style "hidden until you submit your own" sequencing between raters (unlike
-  `InterviewScorecard`) — that pattern protects against anchoring between people deciding the same thing
-  *live and simultaneously*; 360 raters never see each other's answers at all regardless of order, so there's no
-  anchoring surface here in the first place.
+New `CompCyclesPage.tsx` (`/comp-cycles`, comp_manager/hr_admin, **not** wrapped in `RequirePayrollStepUp` —
+matches the backend decision) — list/create/open/close, a budget-utilization bar per cycle, links to that cycle's
+filtered proposal list. `CompProposalsPage.tsx` gains a proposal-type selector (increase/bonus with the
+type-appropriate amount field), an optional cycle attach, `?cycle=` filtering (linked from the cycles page), an
+"Over cycle budget" flag alongside the existing "Outside band" one, and a read-only "Latest rating" column from
+`performance_context`. New `MyTotalRewardsPage.tsx` (`/my-total-rewards`, no role gate, no step-up) — current
+salary, pay-band position with a percentile bar, benefits (read-only here, links to My Benefits to edit),
+performance context. Both new nav entries added (`Compensation` category, `My Space` category).
 
-**Never feeds `final_score`** — qualitative/contextual input only, alongside the KPI-weighted calculation, per the
-guardrail (changing an already-shipped, tested scoring formula was out of scope and unjustified).
+### Backend / frontend status
 
-### Optional `CompProposal` linkage — confirmed unbuilt, explicitly out of scope
-
-`ROADMAP-2026-08.md`'s PC-3 row names this as optional and unbuilt; confirmed by grep (no cross-app import, no
-`compensation` read seam exists for a calibration-adjusted score to flow through without a direct model import,
-which the module-boundary rules forbid). Building a one-way write seam from `performance` into `compensation`
-deserves its own design decision (what triggers it, does an adjustment re-trigger an existing draft) rather than
-being a side effect of this slice. Recorded as a known boundary, not a gap that was missed.
-
-### A real UX gap fixed along the way, not routed around
-
-`MyPerformancePage.tsx` only ever rendered the full `AgreementCard` (KPIs, evidence, signatures, and now
-calibration/360) for the **most recent** agreement by period start_date — every older year was reduced to a
-summary row with just a PDF download link. Calibration outcomes and 360 rounds can exist on a past,
-already-archived agreement, not just the current one, so that would have silently hidden them from the employee.
-Every year now gets an Open/Viewing toggle, the same per-row shape `TeamPerformancePage` already used. Also
-fixed: the 360 nomination dropdown now excludes already-nominated raters (self/manager/existing peer) — a real
-UX bug (nobody should be offered as nominatable twice), found while writing the e2e nomination test.
-
-### Data-quality check
-
-`missing_calibration_handler` (`performance/data_quality.py`, new `ExceptionType.PERFORMANCE_NO_CALIBRATION`):
-once a period's FINAL phase due date has passed and the period has no `CalibrationSession` at all, every
-`FINAL_SIGNED` agreement in it is flagged per-employee (the registry's only shape — a period-level gap surfaced
-per-row, same pattern `overdue_agreement_handler` already uses).
-
-## Backend / frontend status
-
-**Backend: 1046 tests, OK** (up from 1001 last session — net +45: 44 new in `test_calibration.py`/
-`test_feedback360.py`, plus one small addition elsewhere). `manage.py check` and `makemigrations --check
---dry-run` both clean. New migrations: `performance/migrations/0005_calibrationsession_feedback360request_and_more.py`,
-`core_hr/migrations/0015_alter_dataqualityexception_exception_type.py`. `tsc -b` and `oxlint` clean (same 2
+**Backend: 1046 → 1098 tests, OK** (full-suite run to completion, ~31 min on this machine) — net new: `compensation` app grew from
+45 to 94 tests (cycle model/service/API coverage: budget-impact derivation, the department-scope and
+OPEN-cycle-required create-time checks, the fresh-at-approval-time budget recheck, close-cycle auto-reject,
+self-scope negative tests for `/my-total-rewards/`), plus a new `ee_reporting/test_queries.py` (7 tests, the new
+`latest_remuneration_for_employee` seam), plus `core_hr`'s `DataQualityException.ExceptionType` migration.
+`manage.py check` and `makemigrations --check --dry-run` both clean. New migrations:
+`compensation/migrations/0002_historicalcompcycle_and_more.py`,
+`core_hr/migrations/0016_alter_dataqualityexception_exception_type.py`. `tsc -b` and `oxlint` clean (same 2
 pre-existing warnings only: `AuthContext.tsx`, `ReferenceDataContext.tsx`).
 
-**e2e: 61/69 passed** on the final full-suite run (`npm test`, ~11.1 min). The new
-`performance-calibration-360.spec.ts` (3 tests: hr_admin records/closes a calibration session; an unrelated
-employee is blocked entirely from calibration data — route redirect + 403 API, not just a hidden nav link; and
-the load-bearing 360 visibility test end-to-end across four real logins — subject, the originally-nominated peer,
-a newly-nominated second peer, and the Head — proving the masking rule holds even after the peer responds and
-even after a second nomination) **passed both standalone and inside the full 69-test suite**.
+**e2e: 61/73 passed** (full suite run to completion by the coordinating session after this session's process
+was killed mid-verification; 14.3 min, the slowest run yet on this machine) — all 4 new tests green, failure
+analysis in the next paragraph. New `compensation-cycles-total-rewards.spec.ts` (4 tests): comp_manager
+confirms `/comp-cycles` has no step-up gate (unlike `/pay-bands`/`/comp-proposals`) and can create/open a cycle;
+a full budget-race demo (create a small-budget cycle, two bonus proposals, the second correctly flagged "Over
+cycle budget," self-approval blocked even with an override reason supplied); the employee login's
+`/my-total-rewards/` renders real salary/band/benefits/performance sections and the API ignores a foreign
+`?employee=` query param (always answers for self) with no `comp_proposal`/`proposed_annual_salary` shape ever in
+the payload; a non-comp/hr role has no nav link and gets 403 on both the route and the API. One existing assertion
+fixed in `compensation.spec.ts` (`'Proposed salary'` → `'Amount'`, the column header's own necessary rename since
+it now shows either a salary or a bonus amount).
 
-Caught and fixed two real bugs while writing that spec (both fixed, not routed around):
-1. Copy-pasted a `div.detail-card` selector from `recruitment-interviews.spec.ts` into two places where the
-   actual component renders a bare `<section className="detail-card">` — a test bug, not a product bug, but
-   worth recording since it produced a real, reproducible false failure until traced to the actual DOM element
-   type via the error-context snapshot rather than assumed.
-2. The `MyPerformancePage.tsx` "only the latest year gets the full card" gap described above — found because the
-   seeded calibration/360 demo data deliberately lives in a *second*, separate FY period (see seed-data note
-   below), which the old code would have made unreachable from the employee's own login.
+**The 12 failures, each read rather than assumed.** Ten are the documented `settled()` class in its usual shape
+(`Loading…` never clearing on the large `/employees` list within 15 s): `core-hr` ×2, `contract-renewals`,
+`ee-integrity`, `compensation` (the TOTP pay-bands test — a `Loading…` timeout, not a logic error, and the
+`compensation.spec.ts` edit this slice made was one column-header string), `performance` ×4, `succession`. Two are
+newly observed and this slice touched neither: `careers-portal` (`waitForURL('/employees')` timing out — the same
+large-list load behind a different assertion) and `onboarding`. Standalone re-run: `careers-portal` 4/4 passed;
+`onboarding` 4/5, and its one failure has a specific mechanism worth recording rather than filing as "flake": the
+manager's Complete click returned **200** and the checklist refetch came back with the completed item, but
+`ChecklistsPage` reloads checklist instances *and* the full `/employees/` list in one `Promise.all`, and
+`useApiQuery` deliberately keeps old data visible during a reload — so there is no `Loading…` for `settled()` to
+wait on, and the row only flips to Done once the slower employees fetch also lands. On initial load that fetch took
+2–3 s; after the mutation it still hadn't returned 9 s later when the test gave up (10 s assertion window). Same
+root cause as the whole class (`fetchAllPages` at seed scale); C7 server-side pagination is the real fix, and a
+cheap page-level mitigation is to refetch only instances after a mutation.
 
-The other 8 failures are the pre-existing/documented `settled()` timing-flake class, reconfirmed by reading each
-failure's own error, not assumed:
-- `contract-renewals.spec.ts` ×1, `core-hr.spec.ts` ×2, `ee-integrity.spec.ts` ×1 — all the exact documented
-  shape (`getByText('Loading…').toHaveCount(0)` timing out after 15s on the large `/employees` list).
-- `performance.spec.ts` ×3 — the same documented cascade from two sessions running: the "a full year" test times
-  out, and the two tests that depend on its state fail as a direct consequence.
-- `succession.spec.ts` ×1 — **newly observed this session**, not previously documented as affected. Same exact
-  `settled()`-timeout signature (`Loading…` never disappears, `Protocol error: session closed` — a low-level
-  connection failure, not a logic/selector error). **Verified, not assumed, to be machine-load flake and not a
-  regression**: re-ran `succession.spec.ts` in isolation immediately after — failed again with the identical
-  signature, on a test file this session touched zero code for (no succession app/model/permission/page changes
-  anywhere in this session's diff). Recorded honestly as a new instance of the documented class, not force-fit
-  into the old list and not silently ignored either.
+**Real bugs found and fixed while writing the new spec, not routed around:**
+1. `approve_proposal`'s first draft rebound its `proposal` parameter to a freshly-locked DB fetch instead of
+   mutating the caller's own object in place, breaking the pre-existing "the view/tests read the same object back
+   after calling this" contract — reverted to locking only the `CompCycle` row and mutating `proposal` throughout,
+   same shape the original code already had.
+2. The `close_cycle` view action discarded the service function's return value (which — unlike `approve_proposal`
+   — legitimately does need to re-fetch-and-lock a fresh `CompCycle` instance) and serialized the stale pre-close
+   object; fixed to capture and serialize the returned instance.
+3. `approve_proposal`'s budget-flag write only updated `exceeds_cycle_budget` in `update_fields` "if changed from
+   the in-memory value" — which could wrongly skip persisting `True` when a *prior, failed* approve attempt on
+   the same object had already flipped the in-memory attribute without saving (raised before reaching `.save()`).
+   Fixed to always include it in `update_fields` unconditionally; a boolean field costs nothing to always write.
 
-Neither new spec's code, nor any spec this session didn't touch, shows a genuinely new failure mode.
+**e2e authoring lessons** (kept here since they're non-obvious and this machine's characteristics make them worth
+recording): `RequirePayrollStepUp`'s outer "Checking access…" and `StepUpChallenge`'s own inner "Loading…" are
+two *independent* async states — a bare `.count()` check on the challenge heading, or on the enroll-vs-already-
+enrolled branch, immediately after `goto()` races whichever hasn't resolved yet and needs an explicit wait for
+each. `getByLabel('Employee', { exact: true })` on `CompProposalsPage`'s employee `<select>` (~150 options)
+reliably failed to resolve at all — even with `force: true` bypassing actionability checks entirely, proving it
+wasn't a stability/actionability problem — while `page.locator('form.inline-form').locator('select').nth(0)`
+against the exact same element worked instantly; root cause not chased further (not worth the time against a
+working alternative), but recorded in case it recurs elsewhere. `hradmin2`'s seeded password is `hradmin123`
+(matching `hradmin`'s own), **not** the `"<username>123"` pattern every other demo login follows — confirmed via
+`seed_demo_data`'s own printed credentials line; `helpers.ts`'s `login()` computes the wrong password for it, so
+it needs a direct fill rather than the shared helper. A `StepUpGrant` is tied to the **employee**, not the browser
+session — reusing `hradmin`/`compmanager` for a fresh-TOTP-enrollment flow in a new spec silently broke
+`compensation.spec.ts`'s own pre-existing tests that assume those two accounts have never enrolled a device,
+within the same one shared seeded backend (`workers: 1`) — `hradmin2` is the only comp_manager/hr_admin demo
+login nothing else touches, which is also why the "a genuinely different admin approves" happy path isn't
+re-exercised at the UI level (a third such account doesn't exist in the demo data) and is left to the backend
+unit tests that already cover it directly.
 
 ## Seed data
 
-`seed_demo_data.py` gained `_seed_calibration_and_feedback360_demo_data`: a **second, separate FY period**
-("2025/26", already fully elapsed) rather than touching the main "2026/27" period's carefully-curated
-draft/submitted/approved/agreed spread — opening mid-year/final on that period would sweep every already-AGREED
-demo agreement into the new stage as a side effect, contradicting its own "a few fully agreed" narrative. One
-agreement (fin_head, login `compmanager`, under ceo, login `accountingofficer` — both real demo accounts, so the
-whole flow including both password signatures is genuinely reproducible) is taken to `FINAL_SIGNED`, given one
-"reviewed, no change" calibration outcome, and a 360 round with self+manager responded and one approved peer
-(ops_head, login `eemanager`) deliberately left un-responded — a realistic in-progress state for `/calibration`
-and `/my-feedback-requests` to demo, not a finished example. Validated end-to-end against a throwaway sqlite DB
-(`SQLITE_PATH` override, `migrate` + `seed_demo_data`, exit 0, correct summary line) before committing, and again
-implicitly via the full backend test suite and e2e run.
+`seed_demo_data.py` gained `_seed_comp_cycle_demo_data`, called **after** `_seed_ee_reporting_demo_data` (an
+increase proposal attached to a cycle needs the employee's `RemunerationRecord` as its budget baseline, which
+only exists once that loop has run): one open "FY2026 Annual Review" cycle (R100,000 budget), an increase
+proposal for the `employee` demo login (+8% of their current fixed remuneration), and two fixed R60,000 bonus
+proposals for two other sampled employees — the second bonus is guaranteed to flag `exceeds_cycle_budget=True`
+regardless of the (randomised) increase's exact size, since 60,000+60,000 alone already exceeds the 100,000
+budget. Validated against a throwaway SQLite DB (`SQLITE_PATH` override) before trusting it in e2e — confirmed
+correct utilization math and the expected True/False flag split on the actual seeded data.
 
 ## Next up — the menu (accurate as of today, not a recommendation)
 
-- **C6 — remaining talent-depth sub-items**: mandatory-training compliance, succession/talent pools, interview
-  scheduling/careers-portal, and now performance calibration/360 are all shipped. Left: **salary-review/bonus
-  cycles + total-rewards statement** (compensation); **EE plan + consultation-forum records** (ee_reporting);
-  **real assessment-provider adapter** — **still blocked on a vendor decision (Sprint-0 action A4), not effort,
-  same as every prior session — don't pick it expecting an effort-only slice.**
+- **C6 — talent-depth sub-items**: mandatory-training compliance, succession/talent pools, interview
+  scheduling/careers-portal, performance calibration/360, and now salary-review/bonus cycles + total-rewards
+  statement are all shipped. **Left: EE plan + consultation-forum records (ee_reporting) — the only remaining
+  C6 item that's effort-buildable, not vendor-blocked.** `EEPlan` already exists as a model (Sprint 13); the gap
+  is the committee/consultation evidence trail the EEA2 questionnaire's own consultation section asks about,
+  which isn't captured anywhere yet — read `NEXT_AGENT_BRIEF.md` #23 and `ee_reporting/models.py::EEPlan`/
+  `EEQuestionnaire` before starting.
+- **Real assessment-provider adapter (C6)** — **still blocked on a vendor decision (Sprint-0 action A4), not
+  effort, same as every prior session.** Don't pick this expecting an effort-only slice.
 - **Leave / absence management** — still blocked on the cede-to-SAP decision (see below), not effort.
 - **C3 — Identity & integrations**: OIDC/Entra SSO (ADR-004); SAP payroll read-only pull; leave read-only mirror
   (overlaps the blocked leave decision above); field-level step-up for `recruitment.Offer` pay fields.
@@ -189,12 +195,11 @@ implicitly via the full backend test suite and e2e run.
   inbox.
 - **C5 — Labour relations**: disciplinary & grievance cases (warnings, hearings, outcomes, CCMA).
 - **C7 — UX / NFR**: responsive + accessibility pass; server-side pagination/search (this would also be the real
-  fix for the `/employees`-list-style performance flakes above); broader bulk import/export; report builder +
-  scheduled emails.
+  fix for the `/employees`-list-style performance flakes documented below); broader bulk import/export; report
+  builder + scheduled emails.
 
-`docs/sprints/backlog-uat1-and-c2-c7.md`'s C6 line now has all four shipped sub-items ticked off (mandatory-
-training compliance, succession/talent pools, interview scheduling/careers-portal, calibration/360) — use that
-file, not this narrative list, as the source of truth going forward.
+`docs/sprints/backlog-uat1-and-c2-c7.md`'s C6 line now has five of seven sub-items ticked off — use that file, not
+this narrative list, as the source of truth going forward.
 
 ## Blocked on a decision, not effort
 
@@ -208,69 +213,79 @@ file, not this narrative list, as the source of truth going forward.
 - **ESS phone edit does not persist across reload** (`ess-policies.spec.ts`). Real, reproduced at base commit,
   Sprint-15 territory. Unchanged.
 - **`core-hr.spec.ts`/`contract-renewals.spec.ts`/`ee-integrity.spec.ts`/`succession.spec.ts`'s `settled()` timing
-  flake on the large `/employees` list.** `succession.spec.ts` newly observed affected this session (see e2e
-  section above) — still a real performance characteristic (`fetchAllPages`'s unfiltered full-list + full-version
-  fetch on first load at ~153-employee seed scale), not a traditional non-deterministic flake. Server-side
-  pagination (C7) is the real fix.
+  flake on the large `/employees` list.** Still a real performance characteristic (`fetchAllPages`'s unfiltered
+  full-list + full-version fetch on first load at ~153-employee seed scale), not a traditional non-deterministic
+  flake. Server-side pagination (C7) is the real fix. This session's own new spec hit the same underlying
+  slowness (the ~150-employee list load, now fetched a third time alongside proposals/cycles on
+  `CompProposalsPage`) and needed explicit longer per-assertion timeouts rather than the global default — recorded
+  in the e2e-authoring-lessons section above, not treated as a code bug.
 - **`performance.spec.ts`'s "a full year" test (and the tests that build on its state) fails on a `settled()`
-  timeout.** Unchanged from three sessions running now — same root-cause class, not chased (out of scope for
+  timeout.** Unchanged from several sessions running now — same root-cause class, not chased (out of scope for
   every session's own slice so far).
-- **`compensation.spec.ts`** — flagged as newly-observed-and-intermittent two sessions ago; did not reproduce in
-  either of the last two full-suite runs (this session's or the prior one). Not touched this session either.
-  Still worth a look if C7's server-side pagination is ever picked up.
+- **`compensation.spec.ts`** — flagged as newly-observed-and-intermittent a few sessions ago; did not reproduce
+  in this session's runs either (both the pre-existing tests and the new spec passed cleanly once the e2e-authoring
+  issues above were fixed). Still worth a look if C7's server-side pagination is ever picked up.
+- This session's own machine independently reconfirmed the documented "background processes get killed / this
+  machine's load varies" characteristic: several `npx playwright test` invocations against the identical,
+  unchanged spec produced different failure shapes run to run (a `selectOption` actionability timeout, a
+  login-page-not-rendering timeout, a proposals-list-not-reloaded-yet timeout) before finally passing cleanly and
+  repeatably — each was individually investigated (not assumed away) and traced to either a real code/test bug
+  (fixed, see above) or genuine environmental slowness under load (addressed with explicit longer timeouts, not
+  dismissed).
 - Parked residuals from C1 pt 2 (contract-renewal read/write role gaps, missing `@extend_schema`), the deliberate
   `let_lapse` gap, and the POPIA export's `documents`+`core_hr`+`rbac_audit`-only scope — all unchanged, see prior
   session-state history in git log for detail if needed.
-- **From three sessions ago, unchanged:** historical free-text `TrainingRecord.title` rows never retroactively
+- **From four sessions ago, unchanged:** historical free-text `TrainingRecord.title` rows never retroactively
   satisfy a `CourseRequirement` (no backfill attempted); no automatic enrollment when a `CourseRequirement` newly
   applies to someone.
-- **From two sessions ago, unchanged:** no broader "role/career track" talent pool independent of a specific
+- **From three sessions ago, unchanged:** no broader "role/career track" talent pool independent of a specific
   critical post; no manager-nominates/hr_admin-confirms two-step succession nomination workflow; unflagging a
   critical post does not cascade-withdraw its candidates; no "sole ready successor is themselves at-risk
   elsewhere" data-quality enrichment; no reminders/notifications for succession.
-- **From last session, unchanged:** no configurable per-requisition interview scorecard criteria; no scorecard
+- **From two sessions ago, unchanged:** no configurable per-requisition interview scorecard criteria; no scorecard
   edit-lock after submission; no proxy scorecard entry by hr_admin on an interviewer's behalf; an interviewer's
   applicant summary excludes prior stage-event notes; no calendar/video-conferencing integration; no
   staging/quarantine table for public careers-portal submissions; no applicant-facing "track your application
   status" self-service view; no CAPTCHA on the public application form.
-- **New this session, recorded deliberately:** no live multi-party calibration meeting tooling — hr_admin
-  records an offline outcome, by design (spec §2.3); no `CompProposal` linkage from a calibrated/final score,
-  confirmed unbuilt and deliberately out of scope (spec §2.13); no re-signature on a calibration adjustment
-  (spec §2.4) — revisit if a future legal/CCMA review demands it, the service-layer change would be small and the
-  existing audit trail wouldn't need to change either way; peer/direct-report free text never reaches the
-  subject, ever, even pooled/paraphrased (spec §2.10) — a deliberate, not merely not-yet-built, limitation;
-  direct-report feedback may permanently sit below the 3-response floor in a small team and never surface to the
-  subject even as an aggregate — accepted cost of protecting the group most likely to fear retaliation; no
-  automatic re-open of a `Feedback360Request` when its agreement is later amended via `amend_agreement`.
+- **From last session, unchanged:** no live multi-party calibration meeting tooling — hr_admin records an offline
+  outcome, by design; no `CompProposal` linkage from a calibrated/final score (this session's cycle work did NOT
+  build this either — the calibration score surfaces on a proposal as read-only `performance_context`, but there
+  is still no automatic "final band → draft CompProposal" write path, a different, larger feature); no
+  re-signature on a calibration adjustment; peer/direct-report 360 free text never reaches the subject, ever, even
+  pooled/paraphrased; direct-report feedback may permanently sit below the 3-response floor in a small team; no
+  automatic re-open of a `Feedback360Request` when its agreement is later amended.
+- **New this session, recorded deliberately:** no privileged "view any employee's total-rewards statement" mode
+  for comp_manager/hr_admin — self-only, full stop, a deliberate limitation (see §3.4 reasoning above), not a gap;
+  no distinguishing field between "a human rejected this proposal" and "the cycle closed underneath it" (both are
+  reconstructable from `CompCycle.closed_at` vs. `CompProposal.history` timestamps); no payroll-relative (%)
+  budget option, flat currency pool only; a cycle's `department` scope is enforced at proposal-creation time only,
+  not continuously (an employee transferring departments mid-cycle isn't retroactively evicted from an
+  already-created proposal).
 
 ## Environment notes
 
 - **GitHub Actions is billing-blocked** — every job fails in seconds. Push directly; local suites are the gate.
   Not a code problem.
 - The venv at `C:\Users\KlopperW\AppData\Local\venvs\hcm` worked throughout this session with no rebuild needed.
-  `frontend/node_modules` was already present and complete (no `npm install` needed).
 - **The e2e suite's `backend-server.mjs` resolves Python via `$PYTHON`, then `backend/venv/Scripts/python.exe`,
   then bare `python` on PATH — none of which is this machine's actual venv location.** `npm test` fails outright
   (`ModuleNotFoundError: No module named 'django'`) unless you set `$PYTHON` explicitly:
   `PYTHON="C:\Users\KlopperW\AppData\Local\venvs\hcm\Scripts\python.exe" npm test` (or `npx playwright test
-  <file>` for a single spec). Applied correctly from the very start of this session.
-- **This machine's `manage.py test` full-suite run took ~25.9 minutes this session** (1046 tests, up from ~21
-  minutes for 1001 tests last session) and the full e2e suite took ~11.1 minutes. Neither is a code regression
-  (confirmed via the per-app/per-file runs along the way, all consistent with historical timing per-test) — this
-  machine's load varies session to session and has been trending slower across the last several sessions; a
-  future session shouldn't panic and assume something broke purely from a longer wall-clock number.
-- **Validate a new/risky `seed_demo_data.py` change against a throwaway DB before trusting it in e2e**: point
-  `SQLITE_PATH` at a scratch file (`export SQLITE_PATH=/path/to/scratch.sqlite3`), run `manage.py migrate
-  --run-syncdb` then `manage.py seed_demo_data` directly, check for a clean exit + the expected summary line, then
-  delete the scratch file. Much faster to debug a seeding exception this way than through the e2e browser layer —
-  used this session to catch nothing (the new seed function worked first try), but worth keeping as a habit for
-  any future seed-data change of comparable complexity.
+  <file>` for a single spec). Applied correctly from the start of this session.
+- **This session's machine was noticeably slower and more erratic than prior sessions** — a single backend
+  `manage.py test compensation` run went from ~48s to ~100-140s between consecutive invocations with no code
+  change in between, and individual e2e spec runs against the *identical* unchanged file produced different
+  failure shapes run to run before stabilizing. Every failure was independently verified against its own actual
+  error output before being attributed to either a real bug (three found and fixed, see above) or environment
+  slowness (addressed with longer explicit timeouts) — never assumed away without checking. A future session
+  seeing a slow or once-off-flaky run on a machine this variable should do the same: re-run before concluding
+  something is broken, but never skip reading the actual failure either.
 - **Background processes get killed / tool calls time out on this machine.** Commands with an unpredictable
-  runtime (full test suites, `npm test`) were started with `run_in_background`, then polled with bounded
-  (~580s) `Bash` calls chained back-to-back in the foreground — never backgrounded and abandoned; each poll call
-  blocks synchronously so the turn never ends while something in flight still matters. Commit-and-push happened
-  after every slice (spec → backend → backend tests → frontend → seed data → e2e spec + fixes → docs), matching
-  the process lesson from prior sessions.
-- A separate AI agent runs a Django server for an **unrelated** project on port 8000 on occasion — not
-  specifically checked this session, but nothing in this session's own work touched port 8000, and the e2e
-  backend (which does use 8000) ran cleanly throughout.
+  runtime were started with `run_in_background`, then polled with bounded `Bash` calls or awaited via the
+  notification system — never backgrounded and abandoned. Commit-and-push happened after every slice (spec →
+  backend → backend tests → frontend → seed data → e2e spec + fixes → docs), matching the process lesson from
+  every prior session.
+- A separate AI agent runs a Django server for an **unrelated** project on port 8000 on occasion — checked this
+  session (`Get-NetTCPConnection`/`Get-CimInstance Win32_Process`) when e2e runs were behaving unpredictably;
+  found no stale/conflicting server process at the time of checking, so the erratic e2e results this session were
+  general machine load, not a port collision with that other project.
