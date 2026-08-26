@@ -1,8 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import { useApiQuery } from '../api/hooks'
 import { useAuth } from '../auth/AuthContext'
 import { RequirePayrollStepUp } from '../auth/RequirePayrollStepUp'
-import type { EEQuestionnaire, EmployerConfig, RemunerationRecord } from '../api/types'
+import type {
+  EEPlan, EEPlanMeasure, EEPlanMeasureStatus, EEPlanProgressSnapshot, EEQuestionnaire, Employee, EmployerConfig, RemunerationRecord,
+} from '../api/types'
+import { EE_PLAN_MEASURE_STATUS_LABELS } from '../api/types'
 import {
   BARRIER_CATEGORIES,
   BUSINESS_TYPES,
@@ -23,6 +27,10 @@ export function EEConfigurationPage() {
   // auditor (read) only — ee_manager/accounting_officer work from the generated
   // report, never the per-employee rows (RemunerationRecordPermission).
   const canSeeRemuneration = hasRole('hr_admin') || hasRole('auditor')
+  // Plan measures / snapshots are the EE manager's operational records
+  // (design spec 2026-08-26 §5) — unlike the form data above, ee_manager
+  // writes them too.
+  const canWriteOperational = hasRole('hr_admin') || hasRole('ee_manager')
   const [config, setConfig] = useState<EmployerConfig | null>(null)
   const [questionnaire, setQuestionnaire] = useState<EEQuestionnaire | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -62,6 +70,16 @@ export function EEConfigurationPage() {
       <section className="detail-card">
         <h2>EE Questionnaire — {CURRENT_YEAR}</h2>
         <QuestionnaireForm questionnaire={questionnaire} reportYear={CURRENT_YEAR} onSaved={load} />
+      </section>
+
+      <section className="detail-card">
+        <h2>EE Plan measures</h2>
+        <PlanMeasuresSection canWrite={canWriteOperational} />
+      </section>
+
+      <section className="detail-card">
+        <h2>EE Plan progress snapshots</h2>
+        <PlanSnapshotsSection canWrite={canWriteOperational} />
       </section>
 
       {canSeeRemuneration && (
@@ -421,6 +439,273 @@ function QuestionnaireForm({
         </button>
       </div>
     </form>
+  )
+}
+
+/** The plan whose period covers today — the same selection rule the equity
+ * dashboard and report validation use. */
+function useCurrentPlan() {
+  return useApiQuery(async () => {
+    const plans = await fetchAllPages<EEPlan>('/ee-plans/')
+    const today = new Date().toISOString().slice(0, 10)
+    return plans.find((p) => p.plan_period_start <= today && today <= p.plan_period_end) ?? plans[0] ?? null
+  }, [], { errorMessage: 'Failed to load the EE plan.' })
+}
+
+function PlanMeasuresSection({ canWrite }: { canWrite: boolean }) {
+  const plan = useCurrentPlan()
+  const planId = plan.data?.id ?? null
+  const measures = useApiQuery(
+    () => fetchAllPages<EEPlanMeasure>(`/ee-plan-measures/?plan=${planId}`), [planId],
+    { errorMessage: 'Failed to load plan measures.', enabled: planId !== null },
+  )
+  const employees = useApiQuery(() => fetchAllPages<Employee>('/employees/'), [], { errorMessage: 'Failed to load employees.', enabled: canWrite })
+
+  if (plan.error) return <p className="form-error">{plan.error}</p>
+  if (plan.data === null) return <p className="empty-state">{plan.loading ? 'Loading…' : 'No EE Plan exists yet — create one first.'}</p>
+
+  return (
+    <div>
+      <p className="hint-text">
+        EEA13: every barrier / affirmative-action measure on the {plan.data.plan_period_start} – {plan.data.plan_period_end} plan
+        carries a responsible person and a time frame inside the plan period. Report validation cross-checks these against
+        the questionnaire's Section F grid.
+      </p>
+      {measures.error && <p className="form-error">{measures.error}</p>}
+      {measures.data === null ? (
+        !measures.error && <p className="empty-state">Loading…</p>
+      ) : measures.data.length === 0 ? (
+        <p className="empty-state">No measures recorded on this plan yet.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Barrier</th>
+                <th>Measure</th>
+                <th>Responsible</th>
+                <th>Time frame</th>
+                <th>Status</th>
+                {canWrite && <th />}
+              </tr>
+            </thead>
+            <tbody>
+              {measures.data.map((m) => (
+                <tr key={m.id}>
+                  <td>{m.category_label}</td>
+                  <td>{m.barrier_description || '—'}</td>
+                  <td>{m.measure_description}</td>
+                  <td>{m.owner_name} ({m.owner_number})</td>
+                  <td>{m.target_start} – {m.target_end}</td>
+                  <td>
+                    {EE_PLAN_MEASURE_STATUS_LABELS[m.status]}
+                    {m.is_overdue && <span className="warning-badge"> Overdue</span>}
+                  </td>
+                  {canWrite && <td><MeasureStatusSelect measure={m} onChanged={measures.reload} /></td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {canWrite && <AddMeasureForm plan={plan.data} employees={employees.data ?? []} onSaved={measures.reload} />}
+    </div>
+  )
+}
+
+function MeasureStatusSelect({ measure, onChanged }: { measure: EEPlanMeasure; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false)
+  async function change(status: EEPlanMeasureStatus) {
+    setBusy(true)
+    try {
+      await api.patch(`/ee-plan-measures/${measure.id}/`, { status })
+      onChanged()
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <select aria-label={`Status for ${measure.category_label}`} value={measure.status} disabled={busy} onChange={(e) => change(e.target.value as EEPlanMeasureStatus)}>
+      {(Object.keys(EE_PLAN_MEASURE_STATUS_LABELS) as EEPlanMeasureStatus[]).map((s) => (
+        <option key={s} value={s}>{EE_PLAN_MEASURE_STATUS_LABELS[s]}</option>
+      ))}
+    </select>
+  )
+}
+
+function AddMeasureForm({ plan, employees, onSaved }: { plan: EEPlan; employees: Employee[]; onSaved: () => void }) {
+  const [category, setCategory] = useState(BARRIER_CATEGORIES[0][0])
+  const [barrier, setBarrier] = useState('')
+  const [measure, setMeasure] = useState('')
+  const [owner, setOwner] = useState('')
+  const [start, setStart] = useState(plan.plan_period_start)
+  const [end, setEnd] = useState(plan.plan_period_end)
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSaving(true)
+    try {
+      await api.post('/ee-plan-measures/', {
+        plan: plan.id, category, barrier_description: barrier, measure_description: measure,
+        owner: Number(owner), target_start: start, target_end: end,
+      })
+      setBarrier('')
+      setMeasure('')
+      onSaved()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Save failed.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form className="inline-form" onSubmit={handleSubmit} aria-label="Add plan measure">
+      <label>
+        Category
+        <select value={category} onChange={(e) => setCategory(e.target.value)}>
+          {BARRIER_CATEGORIES.map(([key, label]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Barrier
+        <input value={barrier} onChange={(e) => setBarrier(e.target.value)} />
+      </label>
+      <label>
+        Measure
+        <input value={measure} onChange={(e) => setMeasure(e.target.value)} required />
+      </label>
+      <label>
+        Responsible person
+        <select value={owner} onChange={(e) => setOwner(e.target.value)} required>
+          <option value="">— Select —</option>
+          {employees.map((emp) => (
+            <option key={emp.id} value={emp.id}>{emp.employee_number} — {emp.first_name} {emp.last_name}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Start
+        <input type="date" value={start} onChange={(e) => setStart(e.target.value)} required />
+      </label>
+      <label>
+        End
+        <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} required />
+      </label>
+      {error && <p className="form-error">{error}</p>}
+      <div className="form-actions">
+        <button type="submit" className="btn-primary" disabled={saving || !measure || !owner}>
+          {saving ? 'Saving…' : 'Add measure'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+const FLAG_LABELS: Record<EEPlanProgressSnapshot['flags'][number]['basis'], string> = {
+  annual_target_shortfall: 'below annual target',
+  over_eap: 'over-represented vs EAP',
+  disability_target_shortfall: 'below disability target',
+}
+
+function PlanSnapshotsSection({ canWrite }: { canWrite: boolean }) {
+  const plan = useCurrentPlan()
+  const planId = plan.data?.id ?? null
+  const snapshots = useApiQuery(
+    () => fetchAllPages<EEPlanProgressSnapshot>(`/ee-plan-snapshots/?plan=${planId}`), [planId],
+    { errorMessage: 'Failed to load snapshots.', enabled: planId !== null },
+  )
+  const [note, setNote] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [taking, setTaking] = useState(false)
+
+  async function takeSnapshot() {
+    if (planId === null) return
+    setError(null)
+    setTaking(true)
+    try {
+      await api.post('/ee-plan-snapshots/take/', { plan: planId, note })
+      setNote('')
+      snapshots.reload()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Snapshot failed.')
+    } finally {
+      setTaking(false)
+    }
+  }
+
+  if (plan.error) return <p className="form-error">{plan.error}</p>
+  if (plan.data === null) return <p className="empty-state">{plan.loading ? 'Loading…' : 'No EE Plan exists yet.'}</p>
+
+  const ordered = [...(snapshots.data ?? [])].sort((a, b) => a.as_of.localeCompare(b.as_of))
+  const suppressed = ordered.some((s) => s.small_cell_suppression_applied)
+
+  return (
+    <div>
+      <p className="hint-text">
+        Frozen actual-vs-target readings over the plan period — what the forum tabled, not a live recomputation.
+        Shortfalls against the plan's annual targets and over-representation above the EAP are both flagged
+        (EE Regulations 2025 reg. 9(10)–(13)). Disability target: {plan.data.disability_5yr_target_pct ?? '—'}%.
+        {suppressed && ' Small cells (n < 5) are suppressed for your role.'}
+      </p>
+      {canWrite && (
+        <div className="inline-form">
+          <label>
+            Note
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Q3 forum meeting" />
+          </label>
+          <div className="form-actions">
+            <button type="button" className="btn-primary" disabled={taking} onClick={takeSnapshot}>
+              {taking ? 'Taking…' : 'Take snapshot now'}
+            </button>
+          </div>
+        </div>
+      )}
+      {error && <p className="form-error">{error}</p>}
+      {snapshots.error && <p className="form-error">{snapshots.error}</p>}
+      {snapshots.data === null ? (
+        !snapshots.error && <p className="empty-state">Loading…</p>
+      ) : ordered.length === 0 ? (
+        <p className="empty-state">No snapshots taken yet.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>As of</th>
+                <th>Note</th>
+                <th>Disability %</th>
+                <th>Designated % (Top)</th>
+                <th>Designated % (Senior)</th>
+                <th>Flags</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ordered.map((s) => (
+                <tr key={s.id}>
+                  <td>{s.as_of}</td>
+                  <td>{s.note || '—'}</td>
+                  <td>{s.disability_pct ?? '—'}</td>
+                  <td>{s.designated_group_pct.TOP?.total ?? '—'}</td>
+                  <td>{s.designated_group_pct.SENIOR?.total ?? '—'}</td>
+                  <td>
+                    {s.flags.length === 0
+                      ? 'None'
+                      : `${s.flags.length}: ` + s.flags.slice(0, 4).map((f) => `${f.row}/${f.col} ${FLAG_LABELS[f.basis]} (${f.gap_pct > 0 ? '+' : ''}${f.gap_pct})`).join('; ') + (s.flags.length > 4 ? '; …' : '')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   )
 }
 
