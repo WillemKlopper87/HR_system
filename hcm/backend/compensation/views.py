@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rbac_audit.drf import get_request_employee
 from rbac_audit.permissions import has_role
 from rbac_audit.stepup import RequiresPayrollStepUp
@@ -190,6 +192,7 @@ class BenefitsElectionViewSet(viewsets.ModelViewSet):
             serializer.save(employee=employee)
 
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def my_total_rewards_statement(request):
