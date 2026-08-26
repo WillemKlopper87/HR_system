@@ -61,7 +61,7 @@ class Feedback360RaterSerializer(serializers.ModelSerializer):
     def get_has_submitted(self, obj) -> bool:
         return obj.has_submitted
 
-    def get_response(self, obj):
+    def get_response(self, obj) -> dict | None:
         response = getattr(obj, "response", None)
         if response is None:
             return None
@@ -104,10 +104,10 @@ class Feedback360RequestSerializer(serializers.ModelSerializer):
     def get_opened_by_name(self, obj) -> str | None:
         return f"{obj.opened_by.first_name} {obj.opened_by.last_name}" if obj.opened_by_id else None
 
-    def get_peer_aggregate(self, obj):
+    def get_peer_aggregate(self, obj) -> dict | None:
         return aggregate_for(obj, Feedback360Rater.Relationship.PEER)
 
-    def get_direct_report_aggregate(self, obj):
+    def get_direct_report_aggregate(self, obj) -> dict | None:
         return aggregate_for(obj, Feedback360Rater.Relationship.DIRECT_REPORT)
 
 

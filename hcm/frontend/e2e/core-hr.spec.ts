@@ -17,8 +17,10 @@ test.describe('core HR (Sprints 1-3)', () => {
     await page.getByPlaceholder('Search by name, number, or email…').fill('')
     await expect(rows.first()).toBeVisible()
 
-    // open the first employee's detail
-    await rows.first().getByRole('link').first().click()
+    // Open a serving employee. The directory intentionally also includes
+    // departed staff, whose historical detail has no current assignment.
+    const servingRow = rows.filter({ has: page.locator('.status-badge') }).first()
+    await servingRow.getByRole('link').first().click()
     await page.waitForURL(/\/employees\/\d+$/)
     await settled(page)
     await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible()
@@ -64,14 +66,14 @@ test.describe('core HR (Sprints 1-3)', () => {
 
   test('line manager sees only their team; plain employee sees only themselves', async ({ page }) => {
     await login(page, 'manager')
-    await settled(page)
-    const managerRows = await page.locator('table tbody tr').count()
+    const rows = page.locator('table tbody tr')
+    await expect(rows.first()).toBeVisible()
+    const managerRows = await rows.count()
     expect(managerRows).toBeGreaterThan(0)
     await page.getByRole('button', { name: 'Sign out' }).click()
     await page.waitForURL(/\/login$/)
 
     await login(page, 'employee')
-    await settled(page)
     await expect(page.locator('table tbody tr')).toHaveCount(1)
     expect(managerRows).toBeGreaterThan(1)
   })

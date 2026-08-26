@@ -1,6 +1,6 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
-import { useApiQuery } from '../api/hooks'
+import { useAllPages, useApiQuery } from '../api/hooks'
 import {
   CHECKLIST_DIRECTION_LABELS,
   CHECKLIST_OWNER_ROLE_LABELS,
@@ -24,27 +24,17 @@ const DIRECTIONS: ChecklistDirection[] = ['onboarding', 'offboarding']
 export function ChecklistsPage() {
   const { hasRole, user } = useAuth()
   const [direction, setDirection] = useState<ChecklistDirection>('onboarding')
-  const { data, error, reload: load } = useApiQuery(
-    () =>
-      Promise.all([
-        fetchAllPages<ChecklistInstance>(`/checklist-instances/?direction=${direction}`),
-        fetchAllPages<Employee>('/employees/'),
-      ]).then(([instances, employees]) => ({ instances, employees })),
+  const { data: instances, error, reload: load } = useApiQuery(
+    () => fetchAllPages<ChecklistInstance>(`/checklist-instances/?direction=${direction}`),
     [direction],
     { errorMessage: 'Failed to load checklists.' },
   )
-  const instances = data?.instances ?? null
-  const employees = data?.employees ?? null
   const [showForm, setShowForm] = useState(false)
-
-  const nameFor = useMemo(() => {
-    const byId = new Map((employees ?? []).map((e) => [e.id, e]))
-    return (id: number | null) => {
-      if (id === null) return '—'
-      const employee = byId.get(id)
-      return employee ? `${employee.first_name} ${employee.last_name}` : `#${id}`
-    }
-  }, [employees])
+  const { data: employees, error: employeeError } = useAllPages<Employee>(
+    showForm ? '/employees/' : null,
+    [showForm],
+    'Failed to load employees.',
+  )
 
   const canManage = hasRole('hr_admin')
 
@@ -88,6 +78,7 @@ export function ChecklistsPage() {
           }}
         />
       )}
+      {showForm && employeeError && <p className="form-error">{employeeError}</p>}
 
       {error && <p className="form-error">{error}</p>}
 
@@ -100,7 +91,7 @@ export function ChecklistsPage() {
           <InstanceCard
             key={instance.id}
             instance={instance}
-            employeeName={nameFor(instance.employee)}
+            employeeName={instance.employee_display}
             currentEmployeeId={user?.employee_id ?? null}
             onChanged={load}
           />

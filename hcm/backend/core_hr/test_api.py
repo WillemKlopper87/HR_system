@@ -69,6 +69,42 @@ class EmployeeApiTests(TestCase):
         returned_ids = {row["id"] for row in response.data["results"]}
         self.assertIn(self.hr_admin.id, returned_ids)
         self.assertIn(self.staff.id, returned_ids)
+        staff = next(row for row in response.data["results"] if row["id"] == self.staff.id)
+        self.assertEqual(staff["current_department"], self.staff.current_version.department_id)
+        self.assertEqual(staff["current_occupational_level"], self.staff.current_version.occupational_level_id)
+        self.assertEqual(staff["current_employment_status"], self.staff.current_version.employment_status)
+
+    def test_sysadmin_is_denied_the_internal_tier_current_fields(self):
+        """EmployeeSerializer's current_* summary fields carry the same tiers
+        as the EmployeeVersion columns they flatten (rbac_audit.tiers). Without
+        that registration they would default to PUBLIC and leak occupational
+        level / employment status to sysadmin, which holds row_scope=all but
+        I:read=False -- exactly the "no standing access to S/R business data"
+        boundary 0002_seed_roles.py declares."""
+        sysadmin_user = User.objects.create_user(username="sysadmin", password="x")
+        sysadmin = Employee.objects.hire(
+            employee_number="SYS1", first_name="Sys", last_name="Admin", date_of_birth=date(1990, 1, 1),
+            work_email="sysadmin@example.com", hire_date=date(2019, 1, 1),
+            department=Department.objects.get(code="ENG"),
+            occupational_level=OccupationalLevel.objects.get(code="TOP"),
+            job_grade=JobGrade.objects.get(code="G1"),
+            location=Location.objects.get(code="HO"),
+            user=sysadmin_user,
+        )
+        RoleAssignment.objects.create(employee=sysadmin, role=Role.objects.get(name="sysadmin"))
+
+        self.client.force_authenticate(user=sysadmin_user)
+        response = self.client.get("/api/v1/employees/")
+        self.assertEqual(response.status_code, 200)
+        row = next(row for row in response.data["results"] if row["id"] == self.staff.id)
+        # The pre-existing INTERNAL fields are the control: if these ever start
+        # appearing, the tier gate itself broke rather than the registration.
+        for denied in ("hire_date", "phone", "personal_email",
+                       "current_occupational_level", "current_employment_status"):
+            self.assertNotIn(denied, row)
+        # PUBLIC fields still come through, including the department summary.
+        self.assertEqual(row["employee_number"], "E100")
+        self.assertEqual(row["current_department"], self.staff.current_version.department_id)
 
     def test_self_scope_employee_sees_only_self_in_list(self):
         self.client.force_authenticate(user=self.staff.user)
@@ -139,6 +175,10 @@ class EmployeeSelfServiceApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["phone"], "0821234567")
+        self.staff.refresh_from_db()
+        self.assertEqual(self.staff.phone, "0821234567")
+        reloaded = self.client.get(f"/api/v1/employees/{self.staff.id}/")
+        self.assertEqual(reloaded.data["phone"], "0821234567")
 
     def test_employee_cannot_update_identity_fields(self):
         self.client.force_authenticate(user=self.staff.user)

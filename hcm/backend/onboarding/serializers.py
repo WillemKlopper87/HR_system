@@ -51,14 +51,18 @@ class ChecklistInstanceSerializer(serializers.ModelSerializer):
     core_hr.EmploymentChangeSerializer)."""
 
     items = ChecklistInstanceItemSerializer(many=True, read_only=True)
+    employee_display = serializers.SerializerMethodField()
+
+    def get_employee_display(self, instance) -> str:
+        return f"{instance.employee.first_name} {instance.employee.last_name}"
 
     class Meta:
         model = ChecklistInstance
         fields = [
-            "id", "employee", "template", "template_version", "direction", "status",
+            "id", "employee", "employee_display", "template", "template_version", "direction", "status",
             "triggering_change", "created_by", "created_at", "completed_at", "items",
         ]
         read_only_fields = [
-            "template_version", "status", "triggering_change", "created_by", "completed_at",
+            "employee_display", "template_version", "status", "triggering_change", "created_by", "completed_at",
         ]
         extra_kwargs = {"template": {"required": False}}

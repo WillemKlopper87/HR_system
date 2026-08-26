@@ -113,6 +113,8 @@ class InstanceVisibilityTests(ChecklistAPITestCase):
                 row["id"] for row in response.data
             ]
             self.assertIn(self.instance.id, ids)
+            row = next(row for row in response.data["results"] if row["id"] == self.instance.id)
+            self.assertEqual(row["employee_display"], "APIRPT1 Test")
 
     def test_the_reports_own_manager_sees_it_the_outsider_manager_does_not(self):
         self.client.force_authenticate(user=self.manager.user)

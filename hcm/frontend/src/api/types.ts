@@ -23,6 +23,9 @@ export interface Employee {
   phone?: string
   hire_date: string
   has_demographic_consent: boolean
+  current_department: number | null
+  current_occupational_level: number | null
+  current_employment_status: string | null
 }
 
 export interface EmployeeVersion {
@@ -218,6 +221,7 @@ export interface ChecklistInstanceItem {
 export interface ChecklistInstance {
   id: number
   employee: number
+  employee_display: string
   template: number
   template_version: number
   direction: ChecklistDirection

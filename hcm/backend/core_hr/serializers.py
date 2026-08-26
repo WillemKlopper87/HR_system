@@ -75,7 +75,7 @@ class EmployeeVersionSerializer(TieredModelSerializer):
             "race", "gender", "disability_status", "disability_detail", "race_source", "disability_source",
         ]
 
-    def get_contract_renewal_decision(self, obj):
+    def get_contract_renewal_decision(self, obj) -> dict | None:
         try:
             decision = obj.contract_renewal_decision
         except ContractRenewalDecision.DoesNotExist:
@@ -118,6 +118,9 @@ class EmployeeSerializer(TieredModelSerializer):
     # shown, so the ESS self-ID UI knows whether to show "capture consent"
     # or the self-ID form without a separate lookup.
     has_demographic_consent = serializers.SerializerMethodField()
+    current_department = serializers.SerializerMethodField()
+    current_occupational_level = serializers.SerializerMethodField()
+    current_employment_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Employee
@@ -125,12 +128,32 @@ class EmployeeSerializer(TieredModelSerializer):
             "id", "employee_number", "first_name", "last_name", "preferred_name",
             "national_id_number", "passport_number", "date_of_birth", "work_email",
             "personal_email", "phone", "hire_date", "has_demographic_consent",
+            "current_department", "current_occupational_level", "current_employment_status",
         ]
 
     def get_has_demographic_consent(self, instance) -> bool:
         return instance.pk is not None and has_active_consent(
             employee=instance, purpose=ConsentRecord.Purpose.DEMOGRAPHIC_SELF_ID
         )
+
+    @staticmethod
+    def _current_version(instance):
+        prefetched = getattr(instance, "current_versions_for_summary", None)
+        if prefetched is not None:
+            return prefetched[0] if prefetched else None
+        return instance.current_version
+
+    def get_current_department(self, instance) -> int | None:
+        version = self._current_version(instance)
+        return version.department_id if version else None
+
+    def get_current_occupational_level(self, instance) -> int | None:
+        version = self._current_version(instance)
+        return version.occupational_level_id if version else None
+
+    def get_current_employment_status(self, instance) -> str | None:
+        version = self._current_version(instance)
+        return version.employment_status if version else None
 
     def validate(self, attrs):
         request = self.context.get("request")

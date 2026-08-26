@@ -1,33 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchAllPages } from '../api/client'
+import { api, type Paginated } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import { useReferenceData } from '../api/ReferenceDataContext'
-import type { Employee, EmployeeVersion } from '../api/types'
+import type { Employee } from '../api/types'
 
 export function EmployeeListPage() {
   const [search, setSearch] = useState('')
+  const [pagePath, setPagePath] = useState<string | null>(null)
   const { departments, occupationalLevels } = useReferenceData()
   // useApiQuery's stale-response guard replaces the hand-rolled `cancelled` flag this page used to carry.
+  const initialPath = `/employees/${search ? `?search=${encodeURIComponent(search)}` : ''}`
+  const requestPath = pagePath ?? initialPath
   const { data, error } = useApiQuery(
-    () => {
-      const query = search ? `?search=${encodeURIComponent(search)}` : ''
-      return Promise.all([
-        fetchAllPages<Employee>(`/employees/${query}`),
-        fetchAllPages<EmployeeVersion>('/employee-versions/?current=true'),
-      ]).then(([employees, versions]) => ({ employees, versions }))
-    },
-    [search],
+    () => api.get<Paginated<Employee>>(requestPath),
+    [requestPath],
     { errorMessage: 'Failed to load employees.' },
   )
-  const employees = data?.employees ?? null
-  const versions = data?.versions ?? null
-
-  const versionByEmployee = useMemo(() => {
-    const map = new Map<number, EmployeeVersion>()
-    versions?.forEach((v) => map.set(v.employee, v))
-    return map
-  }, [versions])
+  const employees = data?.results ?? null
 
   return (
     <div className="page">
@@ -37,7 +27,10 @@ export function EmployeeListPage() {
           className="search-input"
           placeholder="Search by name, number, or email…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setPagePath(null)
+          }}
         />
       </div>
 
@@ -62,7 +55,6 @@ export function EmployeeListPage() {
             </thead>
             <tbody>
               {employees.map((emp) => {
-                const version = versionByEmployee.get(emp.id)
                 return (
                   <tr key={emp.id}>
                     <td>
@@ -72,16 +64,26 @@ export function EmployeeListPage() {
                       {emp.first_name} {emp.last_name}
                     </td>
                     <td>{emp.work_email}</td>
-                    <td>{version ? (departments.get(version.department)?.name ?? '—') : '—'}</td>
-                    <td>{version ? (occupationalLevels.get(version.occupational_level)?.name ?? '—') : '—'}</td>
+                    <td>{emp.current_department ? (departments.get(emp.current_department)?.name ?? '—') : '—'}</td>
+                    <td>{emp.current_occupational_level ? (occupationalLevels.get(emp.current_occupational_level)?.name ?? '—') : '—'}</td>
                     <td>
-                      {version ? <span className="status-badge">{version.employment_status}</span> : '—'}
+                      {emp.current_employment_status ? <span className="status-badge">{emp.current_employment_status}</span> : '—'}
                     </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+        </div>
+      )}
+      {data && (data.previous || data.next) && (
+        <div className="form-actions">
+          <button type="button" className="btn-secondary" disabled={!data.previous} onClick={() => setPagePath(data.previous)}>
+            Previous
+          </button>
+          <button type="button" className="btn-secondary" disabled={!data.next} onClick={() => setPagePath(data.next)}>
+            Next
+          </button>
         </div>
       )}
     </div>

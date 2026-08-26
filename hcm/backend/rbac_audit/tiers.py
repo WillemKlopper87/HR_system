@@ -35,6 +35,17 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
         "personal_email": FieldTier.INTERNAL,
         "phone": FieldTier.INTERNAL,
         "hire_date": FieldTier.INTERNAL,
+        # EmployeeSerializer's current_* summary fields are the *same values* as
+        # the correspondingly-named EmployeeVersion columns below, flattened onto
+        # the employee row so the directory needs one request instead of a second
+        # full EmployeeVersion fetch. They must therefore carry the same tiers --
+        # an unregistered field defaults to PUBLIC (tier_of), which would hand a
+        # role holding I:read=False (sysadmin, "no standing access to S/R business
+        # data") the occupational level and employment status it is denied on
+        # EmployeeVersion itself.
+        "current_department": FieldTier.PUBLIC,
+        "current_occupational_level": FieldTier.INTERNAL,
+        "current_employment_status": FieldTier.INTERNAL,
     },
     "core_hr.EmployeeVersion": {
         "department": FieldTier.PUBLIC,

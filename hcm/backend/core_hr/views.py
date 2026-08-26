@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
@@ -178,7 +178,15 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return Response({"detail": 'Method "POST" not allowed.'}, status=405)
 
     def get_queryset(self):
-        queryset = Employee.objects.all()
+        queryset = Employee.objects.prefetch_related(
+            Prefetch(
+                "versions",
+                queryset=EmployeeVersion.objects.current().only(
+                    "employee_id", "department_id", "occupational_level_id", "employment_status"
+                ),
+                to_attr="current_versions_for_summary",
+            )
+        )
         search = self.request.query_params.get("search")
         if search:
             queryset = queryset.filter(
