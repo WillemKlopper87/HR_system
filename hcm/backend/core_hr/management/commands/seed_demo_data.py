@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import random
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -8,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.core.files.base import ContentFile
 from django.utils import timezone
 
 from core_hr.data_quality import run_data_quality_checks
@@ -34,8 +36,22 @@ from compensation.models import Benefit, BenefitsElection, CompCycle, CompPropos
 from compensation.services import approve_proposal, propose_compensation_change, reject_proposal
 from ee_reporting.constants import BARRIER_CATEGORIES
 from ee_reporting.constants import OCCUPATIONAL_LEVEL_CODES as EE_LEVEL_CODES
-from ee_reporting.models import EEPlan, EEQuestionnaire, EmployerConfig, RemunerationRecord
-from ee_reporting.services import ee_manager_approve, generate_report, sign_off, submit_for_review
+from ee_reporting.models import (
+    EEForumMeeting,
+    EEForumMember,
+    EEPlan,
+    EEPlanMeasure,
+    EEQuestionnaire,
+    EmployerConfig,
+    RemunerationRecord,
+)
+from ee_reporting.services import (
+    ee_manager_approve,
+    generate_report,
+    sign_off,
+    submit_for_review,
+    take_progress_snapshot,
+)
 from establishment.models import PositionApprovalStep
 from establishment.services import (
     backfill_positions_for_current_employees,
@@ -393,6 +409,9 @@ class Command(BaseCommand):
             self._seed_identity_verification_demo_data(direct_report=staff, rng=rng)
             self._seed_ee_reporting_demo_data(
                 hr_admin=hr_head, ee_manager=ops_head, accounting_officer=ceo, levels=levels, rng=rng,
+            )
+            self._seed_ee_forum_plan_demo_data(
+                hr_admin=hr_head, ee_manager=ops_head, heads=[eng_head, fin_head, slm_head], staff=staff, rng=rng,
             )
             # After ee_reporting: an increase proposal batched against a
             # cycle needs the employee's RemunerationRecord as its budget
@@ -1091,6 +1110,8 @@ class Command(BaseCommand):
             justifiable_reasons={
                 "TOP": ["insufficient_target_individuals"],
                 "SENIOR": ["insufficient_promotion_opportunities"],
+                "SKILLED": ["insufficient_recruitment_opportunities"],
+                "UNSKILLED": ["insufficient_recruitment_opportunities"],
                 "disability": ["insufficient_recruitment_opportunities"],
             },
             consultation={
@@ -1109,14 +1130,26 @@ class Command(BaseCommand):
             updated_by=hr_admin,
         )
 
+        # Plan period and sector targets per the 2025 EE Regulations / sector-
+        # target determination (Gazettes 52514-5): sector 1.10 "Information
+        # and Communication", designated-group share per level by gender
+        # (male / female / total), plus the 3% workforce-wide disability
+        # target. eap_profile: national EAP (illustrative figures) so
+        # progress snapshots can flag over-representation (reg. 9(10)-(11)).
+        eap = {
+            "african_male": 41.9, "coloured_male": 4.6, "indian_male": 1.7, "white_male": 4.3,
+            "african_female": 36.9, "coloured_female": 4.2, "indian_female": 1.0, "white_female": 3.6,
+            "foreign_national_male": 1.0, "foreign_national_female": 0.8,
+        }
         EEPlan.objects.create(
-            plan_period_start=date(2025, 1, 1), plan_period_end=date(2030, 12, 31),
+            plan_period_start=date(2025, 9, 1), plan_period_end=date(2030, 8, 31),
             sector_targets={
-                "TOP": {"african_male": 8, "african_female": 6, "white_male": 3, "white_female": 2},
-                "SENIOR": {"african_male": 10, "african_female": 8, "white_male": 4, "white_female": 3},
-                "PQ": {"african_male": 14, "african_female": 12, "white_male": 3, "white_female": 3},
-                "SKILLED": {"african_male": 20, "african_female": 18, "white_male": 3, "white_female": 3},
+                "TOP": {"male": 25.4, "female": 31.2, "total": 56.6},
+                "SENIOR": {"male": 28.6, "female": 40.0, "total": 68.6},
+                "PQ": {"male": 37.9, "female": 38.9, "total": 76.8},
+                "SKILLED": {"male": 46.0, "female": 45.7, "total": 91.7},
             },
+            eap_profile={level: dict(eap) for level in EE_LEVEL_CODES},
             numerical_goals={
                 "SEMI": {"african_male": 30, "african_female": 28},
                 "UNSKILLED": {"african_male": 32, "african_female": 30},
@@ -1160,6 +1193,82 @@ class Command(BaseCommand):
         generate_report(
             form_type="eea4", report_year=report_year, period_start=period_start, period_end=period_end, actor=hr_admin,
         )
+
+    def _seed_ee_forum_plan_demo_data(self, *, hr_admin, ee_manager, heads, staff, rng):
+        """C6 (design spec 2026-08-26 §8): a forum with the eemanager demo
+        login in the chair, employee-nominated members across levels plus
+        one union-nominated seat; two 2026 meetings (attendance differs;
+        the first carries PDF minutes); six plan measures matching the six
+        barrier categories the seeded questionnaire already answers Yes
+        (so the signed-off EEA2 validates clean against the live plan); and
+        two progress snapshots (plan start, today) so the trend has two
+        points."""
+        plan = EEPlan.objects.order_by("-plan_period_start").first()
+        today = timezone.localdate()
+
+        chair = EEForumMember.objects.create(
+            employee=ee_manager, representation="employer", role="chair", term_start=date(2025, 9, 1),
+        )
+        members = [chair]
+        nominees = [e for e in [staff, *heads] if e is not None]
+        pool = list(Employee.objects.exclude(pk__in=[e.pk for e in nominees + [ee_manager, hr_admin]]).order_by("employee_number")[:40])
+        rng.shuffle(pool)
+        nominees += pool[:3]
+        for i, employee in enumerate(nominees):
+            members.append(EEForumMember.objects.create(
+                employee=employee,
+                representation="union_nominated" if i == 1 else "employee_nominated",
+                role="secretary" if i == 0 else "member",
+                term_start=date(2025, 9, 1),
+                notes="Nominated via the recognised union" if i == 1 else "",
+            ))
+
+        q1 = EEForumMeeting.objects.create(
+            meeting_date=date(2026, 2, 12), title="Q1 2026 EE forum", report_year=2026,
+            agenda="Workforce profile vs annual targets; barriers review; disability accommodation.",
+            summary="Forum reviewed the Q4 snapshot and agreed recruitment and promotion measures.",
+            resolutions="Adopt targeted advertising for Top/Senior vacancies; quarterly snapshot to be tabled.",
+            recorded_by=ee_manager,
+        )
+        q1.attendees.set(members)
+        q1.minutes_file.save(
+            "ee-forum-minutes-2026-02-12.pdf",
+            ContentFile(b"%PDF-1.4\n%demo minutes: Q1 2026 EE consultative forum\n%%EOF\n"),
+            save=False,
+        )
+        q1.minutes_content_type = "application/pdf"
+        q1.minutes_sha256 = hashlib.sha256(q1.minutes_file.read()).hexdigest()
+        q1.save()
+        q2 = EEForumMeeting.objects.create(
+            meeting_date=date(2026, 5, 14), title="Q2 2026 EE forum", report_year=2026,
+            agenda="Progress on measures; consultation on the draft EEA2.",
+            resolutions="Draft EEA2 consultation noted; two measures re-timed to Q4.",
+            recorded_by=ee_manager,
+        )
+        q2.attendees.set(members[:-1])
+
+        # The first six BARRIER_CATEGORIES are the ones _seed_ee_reporting_
+        # demo_data answers barriers=aa_measures=True.
+        owners = [ee_manager, hr_admin, *[h for h in heads if h is not None]]
+        measure_text = {
+            "recruitment": ("Few designated-group applicants for technical vacancies", "Advertise via community media and technical bursary alumni networks"),
+            "advertisement_of_positions": ("Internal-only adverts limit reach", "All vacancies advertised externally with EE statement"),
+            "selection_criteria": ("Experience thresholds exclude capable candidates", "Competency-based criteria with recognition of prior learning"),
+            "appointments": ("Panels lack designated-group representation", "Every panel includes a trained EE representative"),
+            "job_classification_and_grading": ("Grading outdated for converged roles", "Regrade converged technical roles by Q4"),
+            "remuneration_and_benefits": ("Unexplained pay differentials within grade", "Annual pay-equity review with corrective adjustments"),
+        }
+        for i, (key, (barrier, measure)) in enumerate(measure_text.items()):
+            EEPlanMeasure.objects.create(
+                plan=plan, category=key, barrier_description=barrier, measure_description=measure,
+                owner=owners[i % len(owners)], target_start=date(2026, 1, 1),
+                target_end=date(2026, 6, 30) if i == 5 else date(2026, 12, 31),
+                status="completed" if i == 0 else ("in_progress" if i in (1, 2, 5) else "planned"),
+            )
+
+        take_progress_snapshot(plan, as_of=plan.plan_period_start, actor=ee_manager, note="Plan baseline")
+        if today > plan.plan_period_start and today <= plan.plan_period_end:
+            take_progress_snapshot(plan, as_of=today, actor=ee_manager, note="Tabled at Q2 forum")
 
     def _seed_ess_demo_data(self, *, direct_report):
         """Sprint 15 (ESS): deliberately light-touch — the 'employee' demo

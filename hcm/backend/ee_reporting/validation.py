@@ -215,10 +215,13 @@ def _shortfall_justification_issues(report: EEReport) -> list[str]:
     )
     if plan is None or not plan.annual_targets:
         return []
-    gap = _target_gap(report.data.get("workforce_profile") or {}, plan.annual_targets)
+    workforce = report.data.get("workforce_profile") or {}
+    gap = _target_gap(workforce, plan.annual_targets)
     reasons = (report.data.get("questionnaire") or {}).get("justifiable_reasons") or {}
     issues = []
     for level in OCCUPATIONAL_LEVEL_CODES:
+        if not any(isinstance(v, int) and v > 0 for v in (workforce.get(level) or {}).values()):
+            continue  # no one at this level: a 0% "shortfall" against a target is noise, not a finding
         short = [col for col, value in gap.get(level, {}).items() if value < 0]
         if short and not reasons.get(level):
             issues.append(

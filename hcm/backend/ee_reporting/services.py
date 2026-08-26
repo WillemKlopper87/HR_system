@@ -326,6 +326,8 @@ def take_progress_snapshot(plan, *, as_of=None, actor=None, note: str = ""):
 
     flags = []
     for level in OCCUPATIONAL_LEVEL_CODES:
+        if not any(workforce.get(level, {}).get(c, 0) for c in DEMOGRAPHIC_COLUMNS):
+            continue  # an empty level can't be short of, or over, anything
         for col, gap in annual_gap.get(level, {}).items():
             if gap < 0:
                 flags.append({"row": level, "col": col, "basis": "annual_target_shortfall", "gap_pct": gap})
