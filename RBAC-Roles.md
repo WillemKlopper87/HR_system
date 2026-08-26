@@ -197,6 +197,28 @@ change automatically — three independent audit trails, no re-signature (spec �
 top of an already-signed agreement is a different kind of event from `amend_agreement`'s employee-Head
 renegotiation, which stays untouched by calibration).
 
+## Module access: salary-review/bonus cycles + total-rewards statement (C6)
+
+Spec: `docs/superpowers/specs/2026-08-26-salary-review-cycles-total-rewards-design.md`. `CompCycle` extends
+`compensation`; `CompProposal` gains a nullable `cycle` FK + `proposal_type` (increase/bonus) rather than forking a
+second model. `GET /my-total-rewards/` is a new, genuinely self-scoped function view (`compensation/views.py`),
+not a `ModelViewSet`.
+
+| Action | Roles allowed |
+|---|---|
+| Read/write a `CompCycle` (name, dates, budget, department scope, status; open/close actions) | **comp_manager · hr_admin** — same role gate as `PayBand`/`CompProposal`, but **no `RequiresPayrollStepUp`** (spec §6): a cycle carries no individual's pay figure, just a planning envelope, so it doesn't earn the Restricted-tier step-up friction those two models get |
+| Read/write a `CompProposal` (unchanged, now cycle-aware) | comp_manager · hr_admin, **+ `RequiresPayrollStepUp`** — unchanged from Sprint 10-11 |
+| `GET /my-total-rewards/` (own current salary, own grade's pay-band position, own benefits, own latest performance score) | **The requester, self only — no exceptions, for any role, including comp_manager/hr_admin acting on their own login.** No employee-id parameter exists on this endpoint at all — it always resolves from the authenticated session (spec §3.2). **No privileged "view anyone's statement" mode was built** (spec §3.4): comp_manager already has **zero** standing access to `RemunerationRecord` (see `ee_reporting`'s own table below) and this endpoint deliberately doesn't become a side-door around that. No `RequiresPayrollStepUp` either — that control is for privileged access to *someone else's* Restricted-tier pay data, not self-view of your own |
+
+Never exposed via `/my-total-rewards/`, to self or anyone: any `CompProposal` (pending or historical — a proposed
+change is not confirmed pay), any other employee's remuneration/band/benefits, any `PayBand` for a grade other
+than the requester's own current one, or any `CompCycle` detail. Current salary is read from `RemunerationRecord`
+(the SAP-sourced actual, via new `ee_reporting/queries.py::latest_remuneration_for_employee`) — never from
+`CompProposal`, even one already `APPROVED`, which remains "what's being proposed," not "what it currently is"
+(spec §4). Performance context on a `CompProposal` (`performance_context`, from the existing
+`performance/queries.py::latest_final_score` seam) is read-only display for whoever already reads proposals — never
+an input to any amount or budget calculation (spec §2.8).
+
 ## Entra ID group mapping (draft — confirm names with IT, ADR-004)
 
 | Entra group | Role |

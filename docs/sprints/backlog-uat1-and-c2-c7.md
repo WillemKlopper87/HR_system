@@ -28,7 +28,8 @@ Spec: `docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md`.
       `docs/superpowers/specs/2026-08-25-recruitment-interviews-careers-portal-design.md`.
 - [x] Calibration/360 — Shipped 2026-08-26. Spec:
       `docs/superpowers/specs/2026-08-25-performance-calibration-360-design.md`.
-- [ ] Salary-review/bonus cycles + total-rewards statement
+- [x] Salary-review/bonus cycles + total-rewards statement — Shipped 2026-08-26. Spec:
+      `docs/superpowers/specs/2026-08-26-salary-review-cycles-total-rewards-design.md`.
 - [ ] EE plan + consultation-forum records
 - [ ] Real assessment-provider adapter
 

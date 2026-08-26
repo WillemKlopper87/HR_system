@@ -118,7 +118,14 @@ hcm/
                 services.notify/notify_many for due/overdue reminders.
     compensation/ pay bands, comp proposal workflow, benefits catalog + elections (Sprint 10);
                 + Sprint 15 ESS (benefits catalog read-open, elections self-service
-                row-scoped)
+                row-scoped); + C6 salary-review/bonus cycles (CompCycle, budget
+                utilization derived live + row-locked against the create/approve race,
+                not step-up-gated unlike PayBand/CompProposal) and GET /my-total-rewards/
+                (a new, narrow self-only view spanning ee_reporting's RemunerationRecord
+                via a new queries.py seam, own pay-band position, own benefits, and
+                performance's existing latest_final_score seam — never any CompProposal;
+                spec docs/superpowers/specs/2026-08-26-salary-review-cycles-total-
+                rewards-design.md)
     assessments/ provider-agnostic assessment adapter, consent-gated assign workflow,
                 HMAC-signed inbound webhook (Sprint 12); applicant_id is an unconstrained
                 reference, not a cross-app FK — see Module rules below
@@ -413,7 +420,19 @@ shows what they would do.
   to the stored readiness value. `succession` itself imports `establishment`
   and `core_hr` directly rather than through a seam — both are `SHARED_KERNEL`
   (below), which any domain app may import freely; `succession` does not join
-  the kernel itself, since nothing needs a reverse FK into it.
+  the kernel itself, since nothing needs a reverse FK into it. C6's
+  salary-review cycles need "this employee's current actual salary" --
+  per ADR-006/`compensation.PayBand`'s own docstring, that fact lives in
+  `ee_reporting.RemunerationRecord`, not `compensation`'s own models -- so
+  `compensation` reads it through a new `ee_reporting/queries.py::
+  latest_remuneration_for_employee` (ee_reporting's first read seam),
+  both from `compensation/services.py` (a cycle-attached increase
+  proposal's budget baseline) and from `compensation/views.py`'s new
+  `GET /my-total-rewards/` (see RBAC-Roles.md for that endpoint's
+  self-scope boundary). The same view reuses `performance/queries.py::
+  latest_final_score` a second time (succession was its first caller) as
+  read-only context on a `CompProposal` and on the total-rewards
+  statement -- never an input to any amount.
 - All API access goes through the shared RBAC permission classes + field-tier
   serializer mixin from `rbac_audit` (Sprint 2). No per-module access control.
 - Background/scheduled work runs in Celery (`config/celery.py`; worker + beat
