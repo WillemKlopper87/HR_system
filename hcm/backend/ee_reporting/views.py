@@ -1,18 +1,47 @@
 from __future__ import annotations
 
-from django.http import HttpResponse
+import os
+
+from django.db.models import Q
+from django.http import FileResponse, HttpResponse
+from django.utils import timezone
+from rbac_audit.audit import log_access
 from rbac_audit.drf import get_request_employee, int_query_param
-from rbac_audit.permissions import has_role
+from rbac_audit.models import AuditLogEntry
+from rbac_audit.permissions import can_see_unsuppressed_aggregates, has_role
 from rbac_audit.stepup import RequiresPayrollStepUp
+from rbac_audit.tiers import FieldTier
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from . import export
-from .models import EEPlan, EEQuestionnaire, EEReport, EmployerConfig, RemunerationRecord
-from .permissions import EEReportingPermission, RemunerationRecordPermission
+from .dashboards import _suppress_matrix
+from .models import (
+    EEForumMeeting,
+    EEForumMember,
+    EEPlan,
+    EEPlanMeasure,
+    EEPlanProgressSnapshot,
+    EEQuestionnaire,
+    EEReport,
+    EmployerConfig,
+    RemunerationRecord,
+)
+from .permissions import (
+    EEForumPermission,
+    EEOperationalPermission,
+    EEReportingPermission,
+    RemunerationRecordPermission,
+    is_ee_reader,
+)
 from .serializers import (
+    EEForumMeetingSerializer,
+    EEForumMemberSerializer,
+    EEPlanMeasureSerializer,
+    EEPlanProgressSnapshotSerializer,
     EEPlanSerializer,
     EEQuestionnaireSerializer,
     EEReportSerializer,
@@ -20,17 +49,21 @@ from .serializers import (
     GenerateReportSerializer,
     RemunerationRecordSerializer,
     SignOffSerializer,
+    TakeSnapshotSerializer,
 )
 from .services import (
     ApprovalError,
     RemunerationImportError,
     ReportNotReadyError,
     ee_manager_approve,
+    forum_composition,
     generate_report,
     import_remuneration_csv,
     sign_off,
     submit_for_review,
+    take_progress_snapshot,
 )
+from .uploads import MinutesValidationError, validate_minutes_upload
 from .validation import validate_report_data
 
 
@@ -258,3 +291,147 @@ class EEReportViewSet(viewsets.ModelViewSet):
                 headers={"Content-Disposition": f'attachment; filename="{filename}.xml"'},
             )
         raise ValidationError({"detail": "export_format must be one of csv, xlsx, pdf, xml."})
+
+
+# --- C6: consultation forum + plan depth (design spec 2026-08-26) --------
+
+
+class EEForumMemberViewSet(viewsets.ModelViewSet):
+    """EEForumPermission lets any authenticated employee GET; the queryset
+    narrows to the requester's own seat(s) for non-EE roles (spec §5: a
+    member may see who they sit with — the list is the meeting-attendee
+    roster — but a non-member sees nothing). Writes are role-gated in the
+    permission class."""
+
+    queryset = EEForumMember.objects.select_related("employee")
+    serializer_class = EEForumMemberSerializer
+    permission_classes = [EEForumPermission]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        employee = get_request_employee(self.request)
+        if not is_ee_reader(employee):
+            # Members see the whole roster (they sit on it together);
+            # everyone else sees nothing.
+            if not EEForumMember.objects.filter(employee=employee).exists():
+                return qs.none()
+        if self.request.query_params.get("active") == "1":
+            today = timezone.localdate()
+            qs = qs.filter(term_start__lte=today).filter(Q(term_end__isnull=True) | Q(term_end__gte=today))
+        return qs
+
+    @action(detail=False, methods=["get"])
+    def composition(self, request):
+        """Derived s.16(2) adequacy check — EE read roles only (it
+        summarises the whole workforce's level/designated-group mix)."""
+        if not is_ee_reader(get_request_employee(request)):
+            raise PermissionDenied("Only EE reporting roles can view the forum composition check.")
+        return Response(forum_composition())
+
+
+class EEForumMeetingViewSet(viewsets.ModelViewSet):
+    queryset = EEForumMeeting.objects.select_related("recorded_by").prefetch_related("attendees")
+    serializer_class = EEForumMeetingSerializer
+    permission_classes = [EEForumPermission]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        employee = get_request_employee(self.request)
+        if not is_ee_reader(employee):
+            qs = qs.filter(attendees__employee=employee).distinct()
+        report_year = int_query_param(self.request, "report_year")
+        if report_year is not None:
+            qs = qs.filter(report_year=report_year)
+        return qs
+
+    def _validate_minutes(self, serializer):
+        uploaded = serializer.validated_data.get("minutes_file")
+        if uploaded is None:
+            return {}
+        try:
+            content_type, sha256 = validate_minutes_upload(uploaded)
+        except MinutesValidationError as exc:
+            raise ValidationError({"minutes_file": str(exc)})
+        return {"minutes_content_type": content_type, "minutes_sha256": sha256}
+
+    def perform_create(self, serializer):
+        serializer.save(recorded_by=get_request_employee(self.request), **self._validate_minutes(serializer))
+
+    def perform_update(self, serializer):
+        serializer.save(**self._validate_minutes(serializer))
+
+    @action(detail=True, methods=["get"])
+    def download_minutes(self, request, pk=None):
+        """Authenticated FileResponse — same shape as policies/performance
+        evidence; `get_object()` applies the attendee carve-out, so a member
+        can only pull minutes of meetings they attended."""
+        meeting = self.get_object()
+        if not meeting.minutes_file:
+            return Response({"detail": "This meeting has no uploaded minutes."}, status=404)
+        log_access(
+            actor=get_request_employee(request), action=AuditLogEntry.Action.EXPORT,
+            entity_type="ee_reporting.EEForumMeeting", entity_id=meeting.pk, field_tier=FieldTier.SENSITIVE,
+            fields_touched=f"downloaded minutes of {meeting.meeting_date} meeting",
+        )
+        filename = os.path.basename(meeting.minutes_file.name)
+        return FileResponse(meeting.minutes_file.open("rb"), as_attachment=True, filename=filename)
+
+
+class EEPlanMeasureViewSet(viewsets.ModelViewSet):
+    queryset = EEPlanMeasure.objects.select_related("owner", "plan")
+    serializer_class = EEPlanMeasureSerializer
+    permission_classes = [EEOperationalPermission]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        plan_id = int_query_param(self.request, "plan")
+        if plan_id is not None:
+            qs = qs.filter(plan_id=plan_id)
+        for param in ("category", "status"):
+            value = self.request.query_params.get(param)
+            if value:
+                qs = qs.filter(**{param: value})
+        return qs
+
+
+class EEPlanProgressSnapshotViewSet(viewsets.ReadOnlyModelViewSet):
+    """Create-only via `take/` (matrices are always server-computed); no
+    update/delete — a snapshot is evidence of what was tabled."""
+
+    queryset = EEPlanProgressSnapshot.objects.select_related("plan", "taken_by")
+    serializer_class = EEPlanProgressSnapshotSerializer
+    permission_classes = [EEOperationalPermission]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        plan_id = int_query_param(self.request, "plan")
+        if plan_id is not None:
+            qs = qs.filter(plan_id=plan_id)
+        return qs
+
+    def _suppressed(self, data: dict) -> dict:
+        employee = get_request_employee(self.request)
+        suppress = not can_see_unsuppressed_aggregates(employee, FieldTier.SENSITIVE)
+        data["small_cell_suppression_applied"] = suppress
+        for key in ("workforce_profile", "disability_workforce"):
+            data[key] = _suppress_matrix(data[key], suppress=suppress)
+        return data
+
+    def list(self, request, *args, **kwargs):
+        page = self.paginate_queryset(self.get_queryset())
+        items = [self._suppressed(d) for d in self.get_serializer(page, many=True).data]
+        return self.get_paginated_response(items)
+
+    def retrieve(self, request, *args, **kwargs):
+        return Response(self._suppressed(self.get_serializer(self.get_object()).data))
+
+    @action(detail=False, methods=["post"])
+    def take(self, request):
+        input_serializer = TakeSnapshotSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        try:
+            snapshot = take_progress_snapshot(actor=get_request_employee(request), **input_serializer.validated_data)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return Response(self._suppressed(self.get_serializer(snapshot).data), status=201)

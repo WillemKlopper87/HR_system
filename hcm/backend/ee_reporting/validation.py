@@ -143,8 +143,88 @@ def validate_report_data(report: EEReport) -> list[str]:
         issues += _frozen_cross_form_headcount_issues(report)
     else:
         issues += _barrier_grid_completeness_issues(report)
+        issues += _consultation_evidence_issues(report)
+        issues += _measure_evidence_issues(report)
+        issues += _shortfall_justification_issues(report)
 
     issues += _temporary_classification_issues(report)
+    return issues
+
+
+# --- C6 (design spec 2026-08-26 §3.4): Section F evidence checks -----------
+# Validate, don't derive: the frozen questionnaire's Y/N answers stay the
+# employer's own declaration; these findings say where the live forum/plan
+# records don't back them up (or back up an answer that says "No").
+# Advisory only — never part of validate_report_readiness, so a missing
+# forum record can't block generating the draft that surfaces it.
+
+
+def _consultation_evidence_issues(report: EEReport) -> list[str]:
+    from .models import EEForumMeeting
+
+    consultation = (report.data.get("questionnaire") or {}).get("consultation") or {}
+    claimed = consultation.get("consultative_body_or_ee_forum")
+    meetings = EEForumMeeting.objects.filter(report_year=report.report_year).count()
+    if claimed is True and meetings == 0:
+        return [
+            f"Section F claims consultation with the EE forum, but no forum meeting is on record for {report.report_year}."
+        ]
+    if not claimed and meetings > 0:
+        return [
+            f"Section F says the EE forum was not consulted, but {meetings} forum meeting(s) are on record for "
+            f"{report.report_year} — check the answer."
+        ]
+    return []
+
+
+def _measure_evidence_issues(report: EEReport) -> list[str]:
+    from .models import EEPlan, EEPlanMeasure
+
+    plan = (
+        EEPlan.objects.filter(plan_period_start__lte=report.period_end, plan_period_end__gte=report.period_end)
+        .order_by("-plan_period_start")
+        .first()
+    )
+    if plan is None:
+        return []  # no plan at all is its own (readiness/dashboard) problem, not a grid mismatch
+    barriers = (report.data.get("questionnaire") or {}).get("barriers") or {}
+    categories_with_measures = set(EEPlanMeasure.objects.filter(plan=plan).values_list("category", flat=True))
+    issues = []
+    for key, label in BARRIER_CATEGORIES:
+        entry = barriers.get(key) if isinstance(barriers.get(key), dict) else {}
+        claimed = entry.get("aa_measures") is True
+        if claimed and key not in categories_with_measures:
+            issues.append(f"Section F: '{label}' claims affirmative-action measures, but the EE plan has no measure in that category.")
+        elif not claimed and key in categories_with_measures:
+            issues.append(f"Section F: '{label}' answers No to affirmative-action measures, but the EE plan has one on record.")
+    return issues
+
+
+def _shortfall_justification_issues(report: EEReport) -> list[str]:
+    """EE Regs 2025 reg. 16(5) / EEA2 Section B: a level short of its annual
+    target needs a justifiable reason ticked for that level. Uses the same
+    percentage-point gap the dashboard/snapshots use, against the plan
+    covering the report's period end."""
+    from .dashboards import _target_gap
+    from .models import EEPlan
+
+    plan = (
+        EEPlan.objects.filter(plan_period_start__lte=report.period_end, plan_period_end__gte=report.period_end)
+        .order_by("-plan_period_start")
+        .first()
+    )
+    if plan is None or not plan.annual_targets:
+        return []
+    gap = _target_gap(report.data.get("workforce_profile") or {}, plan.annual_targets)
+    reasons = (report.data.get("questionnaire") or {}).get("justifiable_reasons") or {}
+    issues = []
+    for level in OCCUPATIONAL_LEVEL_CODES:
+        short = [col for col, value in gap.get(level, {}).items() if value < 0]
+        if short and not reasons.get(level):
+            issues.append(
+                f"Section B: {level} is below its annual target for {', '.join(short)} but no justifiable reason is "
+                "recorded for that level."
+            )
     return issues
 
 

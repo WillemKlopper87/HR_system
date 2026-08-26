@@ -48,3 +48,43 @@ class RemunerationRecordPermission(EEReportingPermission):
 
     READ_ROLES = ("hr_admin", "auditor")
     WRITE_ROLES = ("hr_admin",)
+
+
+EE_OPERATIONAL_WRITE_ROLES = ("hr_admin", "ee_manager")
+
+
+def is_ee_reader(employee) -> bool:
+    return any(has_role(employee, r) for r in EEReportingPermission.READ_ROLES)
+
+
+def is_ee_writer(employee) -> bool:
+    """Forum records, plan measures and progress snapshots are the EE
+    manager's own operational job (design spec 2026-08-26 §5) — unlike the
+    statutory form data (config/plan/questionnaire), which stays
+    hr_admin-write via views._require_hr_admin."""
+    return any(has_role(employee, r) for r in EE_OPERATIONAL_WRITE_ROLES)
+
+
+class EEOperationalPermission(EEReportingPermission):
+    """Plan measures + progress snapshots: EE read roles read; hr_admin and
+    ee_manager write (accounting_officer is read-only here — signing the
+    report is not the same as running the plan)."""
+
+    WRITE_ROLES = EE_OPERATIONAL_WRITE_ROLES
+
+
+class EEForumPermission(permissions.BasePermission):
+    """Forum members/meetings: any authenticated employee may reach GET —
+    the viewset queryset then narrows to "your own membership and the
+    meetings you attended" unless you hold an EE read role (spec §5's
+    member carve-out; a non-member sees an empty list, not a 403, so the
+    endpoint reveals nothing about what exists). Writes: hr_admin /
+    ee_manager only."""
+
+    def has_permission(self, request, view):
+        employee = get_request_employee(request)
+        if employee is None:
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return is_ee_writer(employee)

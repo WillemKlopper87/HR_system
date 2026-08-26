@@ -5,7 +5,13 @@ from core_hr.models import Employee, Location
 from django.db import models
 from simple_history.models import HistoricalRecords
 
-from .constants import BUSINESS_TYPES, DIFFERENTIAL_REASONS, EMPLOYEE_COUNT_BANDS, MONITORING_FREQUENCIES
+from .constants import (
+    BARRIER_CATEGORIES,
+    BUSINESS_TYPES,
+    DIFFERENTIAL_REASONS,
+    EMPLOYEE_COUNT_BANDS,
+    MONITORING_FREQUENCIES,
+)
 
 
 class EmployerConfig(TimestampedModel):
@@ -77,6 +83,10 @@ class EEPlan(TimestampedModel):
     annual_targets = models.JSONField(default=dict, blank=True)
     annual_target_disability_value = models.PositiveIntegerField(null=True, blank=True)
     annual_target_disability_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    # {level_code: {column: pct}} — the applicable (national/provincial) EAP
+    # the plan was set against (EE Regs 2025 reg. 9(5) mandatory input).
+    # Progress snapshots flag over-representation above it (reg. 9(10)-(11)).
+    eap_profile = models.JSONField(default=dict, blank=True)
 
     created_by = models.ForeignKey(
         Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name="ee_plans_created"
@@ -212,3 +222,162 @@ class EEReport(TimestampedModel):
 
     def __str__(self):
         return f"{self.get_form_type_display()} {self.report_year} v{self.version} ({self.get_status_display()})"
+
+
+# --- C6: EE plan depth + consultation-forum records (design spec
+# docs/superpowers/specs/2026-08-26-ee-plan-consultation-forum-design.md).
+# Everything below exists to put evidence behind Section F's bare Y/N
+# answers and Section E's targets: who consulted, when, what the plan's
+# measures actually are, and how the numerical goals have tracked.
+
+
+class EEForumMember(TimestampedModel):
+    """One seat on the EE consultative forum (EEA s.16). `representation`
+    is the s.16(1) consulting party the member speaks for; occupational
+    level and designated-group status are deliberately NOT stored here —
+    they're derived from the member's current EmployeeVersion at check
+    time (services.py::forum_composition), so a promotion or a demographic
+    correction never leaves a stale copy behind. `union_nominated` reveals
+    trade-union affiliation — POPIA s.26 special personal information, so
+    the serializer redacts `representation`/`notes` for anyone reading
+    through the member carve-out rather than an EE role (spec §5)."""
+
+    class Representation(models.TextChoices):
+        UNION_NOMINATED = "union_nominated", "Nominated by a representative trade union"
+        EMPLOYEE_NOMINATED = "employee_nominated", "Nominated by employees"
+        EMPLOYER = "employer", "Employer / management representative"
+
+    class Role(models.TextChoices):
+        CHAIR = "chair", "Chairperson"
+        SECRETARY = "secretary", "Secretary"
+        MEMBER = "member", "Member"
+
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="ee_forum_memberships")
+    representation = models.CharField(max_length=20, choices=Representation.choices)
+    role = models.CharField(max_length=10, choices=Role.choices, default=Role.MEMBER)
+    term_start = models.DateField()
+    term_end = models.DateField(null=True, blank=True)
+    notes = models.CharField(max_length=300, blank=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["-term_start", "employee__employee_number"]
+
+    def is_active_on(self, day) -> bool:
+        return self.term_start <= day and (self.term_end is None or self.term_end >= day)
+
+    def __str__(self):
+        return f"{self.employee.employee_number} ({self.get_role_display()}, from {self.term_start})"
+
+
+class EEForumMeeting(TimestampedModel):
+    """A sitting of the forum. `report_year` is matched by value against
+    EEQuestionnaire.report_year (not an FK — the first meeting of a year is
+    usually minuted before that year's questionnaire exists). Attendance is
+    an M2M to members so it's factual, never a typed-in count. Minutes are
+    content-sniffed on upload (uploads.py) and served only through the
+    authenticated download action, never a raw MEDIA_URL."""
+
+    meeting_date = models.DateField()
+    title = models.CharField(max_length=200)
+    report_year = models.PositiveIntegerField()
+    agenda = models.TextField(blank=True)
+    summary = models.TextField(blank=True)
+    resolutions = models.TextField(blank=True)
+    attendees = models.ManyToManyField(EEForumMember, related_name="meetings_attended", blank=True)
+    minutes_file = models.FileField(upload_to="ee_forum_minutes/%Y/%m/", null=True, blank=True)
+    minutes_content_type = models.CharField(max_length=120, blank=True)
+    minutes_sha256 = models.CharField(max_length=64, blank=True)
+    recorded_by = models.ForeignKey(
+        Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name="ee_forum_meetings_recorded"
+    )
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["-meeting_date"]
+
+    def __str__(self):
+        return f"{self.meeting_date}: {self.title}"
+
+
+class EEPlanMeasure(TimestampedModel):
+    """One barrier + affirmative-action measure on the plan, per EEA13:
+    every measure carries a responsible person and a time frame inside the
+    plan period (both required — reg. 9 / EEA13 template), which is what
+    turns the questionnaire's per-category Y/N into something an
+    inspector can follow up. `category` keys BARRIER_CATEGORIES (the 24
+    fixed Section F rows; count untouched)."""
+
+    class Status(models.TextChoices):
+        PLANNED = "planned", "Planned"
+        IN_PROGRESS = "in_progress", "In progress"
+        COMPLETED = "completed", "Completed"
+        ABANDONED = "abandoned", "Abandoned"
+
+    plan = models.ForeignKey(EEPlan, on_delete=models.CASCADE, related_name="measures")
+    category = models.CharField(max_length=60, choices=BARRIER_CATEGORIES)
+    barrier_description = models.TextField(blank=True)
+    measure_description = models.TextField()
+    owner = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="ee_plan_measures_owned")
+    target_start = models.DateField()
+    target_end = models.DateField()
+    status = models.CharField(max_length=15, choices=Status.choices, default=Status.PLANNED)
+    progress_notes = models.TextField(blank=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["plan", "category", "target_end"]
+
+    @property
+    def is_overdue(self) -> bool:
+        from django.utils import timezone
+
+        return (
+            self.status in (self.Status.PLANNED, self.Status.IN_PROGRESS)
+            and self.target_end < timezone.localdate()
+        )
+
+    def __str__(self):
+        return f"{self.get_category_display()}: {self.measure_description[:40]}"
+
+
+class EEPlanProgressSnapshot(TimestampedModel):
+    """Point-in-time actual-vs-target for the plan (spec §4.2) — the one
+    place storing beats deriving: EmployeeVersion history is corrected
+    retroactively and subject to retention, so a recomputation years into
+    the plan period is neither cheap nor guaranteed to reproduce what the
+    forum actually tabled. Matrices are stored UNSUPPRESSED (same as
+    EEReport.data) and suppressed per requester on read. Create-only."""
+
+    plan = models.ForeignKey(EEPlan, on_delete=models.CASCADE, related_name="progress_snapshots")
+    as_of = models.DateField()
+    workforce_profile = models.JSONField(default=dict)
+    disability_workforce = models.JSONField(default=dict)
+    # Percentage-point gaps (actual - target), per level x column, against
+    # the plan's own annual targets (reg. 9(13): compliance is assessed
+    # against these), the 5-year sector targets / numerical goals, and the
+    # EAP (reg. 9(10)-(11): over-representation above EAP is a finding too).
+    annual_target_gap_pct = models.JSONField(default=dict)
+    sector_target_gap_pct = models.JSONField(default=dict)
+    eap_gap_pct = models.JSONField(default=dict)
+    # {level: {"male": pct, "female": pct, "total": pct}} — designated-group
+    # share of the level, the shape the sector-target gazette uses.
+    designated_group_pct = models.JSONField(default=dict)
+    disability_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    # [{"row", "col", "basis", "gap_pct"}] — shortfalls vs annual target and
+    # over-representation vs EAP, both directions, so the forum sees them
+    # without re-reading three matrices.
+    flags = models.JSONField(default=list)
+    note = models.CharField(max_length=300, blank=True)
+    taken_by = models.ForeignKey(
+        Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name="ee_plan_snapshots_taken"
+    )
+
+    class Meta:
+        ordering = ["-as_of"]
+        constraints = [
+            models.UniqueConstraint(fields=["plan", "as_of"], name="one_ee_plan_snapshot_per_day"),
+        ]
+
+    def __str__(self):
+        return f"Snapshot {self.as_of} for {self.plan}"

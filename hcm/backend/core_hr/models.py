@@ -510,6 +510,7 @@ class DataQualityException(TimestampedModel):
         CRITICAL_POST_NO_SUCCESSOR = "critical_post_no_successor", "Critical post without a ready successor"
         PERFORMANCE_NO_CALIBRATION = "performance_no_calibration", "Final-signed agreement with no calibration session"
         COMP_CYCLE_OVERDUE = "comp_cycle_overdue", "Open compensation cycle past its period end with unresolved proposals"
+        EE_MEASURE_OVERDUE = "ee_measure_overdue", "EE plan affirmative-action measure past its target date"
 
     employee = models.ForeignKey(
         Employee, related_name="data_quality_exceptions", on_delete=models.CASCADE
