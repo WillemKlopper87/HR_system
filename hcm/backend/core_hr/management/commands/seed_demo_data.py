@@ -30,7 +30,7 @@ from rbac_audit.models import ConsentRecord, Role, RoleAssignment
 # code, not a dev-tooling script that necessarily spans all of them.
 from assessments.models import ProviderConfig
 from assessments.services import assign_assessment, simulate_provider_completion
-from compensation.models import Benefit, BenefitsElection, PayBand
+from compensation.models import Benefit, BenefitsElection, CompCycle, CompProposal, PayBand
 from compensation.services import approve_proposal, propose_compensation_change, reject_proposal
 from ee_reporting.constants import BARRIER_CATEGORIES
 from ee_reporting.constants import OCCUPATIONAL_LEVEL_CODES as EE_LEVEL_CODES
@@ -394,6 +394,11 @@ class Command(BaseCommand):
             self._seed_ee_reporting_demo_data(
                 hr_admin=hr_head, ee_manager=ops_head, accounting_officer=ceo, levels=levels, rng=rng,
             )
+            # After ee_reporting: an increase proposal batched against a
+            # cycle needs the employee's RemunerationRecord as its budget
+            # baseline (design spec 2026-08-26 §2.5), which only exists
+            # once the loop above has run.
+            self._seed_comp_cycle_demo_data(comp_manager=fin_head, hr_admin=hr_head, direct_report=staff, rng=rng)
             self._seed_ess_demo_data(direct_report=staff)
             self._seed_policies_demo_data(hr_admin=hr_head, direct_report=staff, rng=rng)
             self._seed_performance_agreements_demo_data(hr_admin=hr_head, head=eng_head, staff=staff, rng=rng)
@@ -916,6 +921,40 @@ class Command(BaseCommand):
                 justification="Requested adjustment.", proposed_by=comp_manager,
             )
             reject_proposal(rejected, approver=hr_admin)
+
+    def _seed_comp_cycle_demo_data(self, *, comp_manager, hr_admin, direct_report, rng):
+        """C6: an open FY2026 review round batching a couple of proposals
+        against one budget (design spec 2026-08-26) -- so /comp-cycles has
+        something real to show a live utilization bar for, and so the
+        override-reason approval flow (requires_override's own precedent,
+        reused for exceeds_cycle_budget) has a genuine over-budget row to
+        demo. Two fixed-amount bonuses (60000 each) against a 100000
+        budget guarantee the second one is flagged regardless of the
+        first (randomised) increase's exact size -- deterministic given
+        `rng`'s fixed default seed, but not dependent on it here."""
+        cycle = CompCycle.objects.create(
+            name="FY2026 Annual Review", period_start=date(2026, 1, 1), period_end=date(2026, 12, 31),
+            budget_amount=Decimal("100000"), status=CompCycle.Status.OPEN, created_by=hr_admin,
+        )
+
+        candidates = [
+            e for e in Employee.objects.exclude(id=direct_report.id if direct_report else None)
+            if e.current_version and e.current_version.job_grade_id
+        ]
+        bonus_employees = rng.sample(candidates, min(2, len(candidates)))
+
+        if direct_report is not None:
+            record = RemunerationRecord.objects.filter(employee=direct_report).order_by("-period_end").first()
+            if record is not None:
+                propose_compensation_change(
+                    employee=direct_report, proposed_annual_salary=round(Decimal(record.fixed_remuneration) * Decimal("1.08"), -2),
+                    cycle=cycle, justification="Annual merit increase.", proposed_by=comp_manager,
+                )
+        for employee in bonus_employees:
+            propose_compensation_change(
+                employee=employee, proposal_type=CompProposal.ProposalType.BONUS, bonus_amount=Decimal("60000"),
+                cycle=cycle, justification="Performance bonus.", proposed_by=comp_manager,
+            )
 
     def _seed_assessments_demo_data(self, *, ee_manager, hr_admin, recruiter, direct_report, second_employee):
         """One pending employee-subject assignment (so the demo login can

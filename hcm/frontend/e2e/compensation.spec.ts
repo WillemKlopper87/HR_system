@@ -39,7 +39,7 @@ test.describe('compensation (Sprint 10-11) + step-up MFA (ADR-009)', () => {
     await expectHeading(page, 'Compensation Proposals')
     await settled(page)
     await expect(page.getByRole('heading', { name: 'Step-up authentication required' })).toHaveCount(0)
-    await expect(page.locator('table thead')).toContainText('Proposed salary')
+    await expect(page.locator('table thead')).toContainText('Amount')
 
     // benefits are not payroll-restricted
     await page.goto('/benefits')
