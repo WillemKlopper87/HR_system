@@ -1096,6 +1096,124 @@ export interface EquityDashboard {
   target_vs_actual_gap_pct: WorkforceMatrix
 }
 
+// C6: EE plan depth + consultation forum (design spec 2026-08-26)
+
+export interface EEPlan {
+  id: number
+  plan_period_start: string
+  plan_period_end: string
+  sector_targets: Record<string, Record<string, number>>
+  numerical_goals: Record<string, Record<string, number>>
+  disability_5yr_target_pct: string | null
+  annual_targets: Record<string, Record<string, number>>
+  annual_target_disability_value: number | null
+  annual_target_disability_pct: string | null
+  eap_profile: Record<string, Record<string, number>>
+  created_by: number | null
+}
+
+export type EEForumRepresentation = 'union_nominated' | 'employee_nominated' | 'employer'
+export type EEForumRole = 'chair' | 'secretary' | 'member'
+
+export const EE_FORUM_REPRESENTATION_LABELS: Record<EEForumRepresentation, string> = {
+  union_nominated: 'Nominated by a representative trade union',
+  employee_nominated: 'Nominated by employees',
+  employer: 'Employer / management representative',
+}
+export const EE_FORUM_ROLE_LABELS: Record<EEForumRole, string> = {
+  chair: 'Chairperson', secretary: 'Secretary', member: 'Member',
+}
+
+export interface EEForumMember {
+  id: number
+  employee: number
+  employee_number: string
+  employee_name: string
+  /** Absent for a reader who only reaches the roster through the member carve-out (POPIA: union affiliation). */
+  representation?: EEForumRepresentation
+  role: EEForumRole
+  term_start: string
+  term_end: string | null
+  notes?: string
+  is_active: boolean
+}
+
+export interface EEForumComposition {
+  as_of: string
+  active_member_count: number
+  by_representation: Record<EEForumRepresentation, number>
+  levels_in_workforce: string[]
+  levels_uncovered: string[]
+  designated_groups_represented: boolean
+  non_designated_represented: boolean
+  union_nominated_present: boolean
+  adequate: boolean
+}
+
+export interface EEForumMeeting {
+  id: number
+  meeting_date: string
+  title: string
+  report_year: number
+  agenda: string
+  summary: string
+  resolutions: string
+  attendees: number[]
+  attendee_count: number
+  has_minutes: boolean
+  minutes_content_type: string
+  minutes_sha256: string
+  minutes_download_url: string | null
+  recorded_by: number | null
+}
+
+export type EEPlanMeasureStatus = 'planned' | 'in_progress' | 'completed' | 'abandoned'
+export const EE_PLAN_MEASURE_STATUS_LABELS: Record<EEPlanMeasureStatus, string> = {
+  planned: 'Planned', in_progress: 'In progress', completed: 'Completed', abandoned: 'Abandoned',
+}
+
+export interface EEPlanMeasure {
+  id: number
+  plan: number
+  category: string
+  category_label: string
+  barrier_description: string
+  measure_description: string
+  owner: number
+  owner_number: string
+  owner_name: string
+  target_start: string
+  target_end: string
+  status: EEPlanMeasureStatus
+  progress_notes: string
+  is_overdue: boolean
+}
+
+export interface EEPlanSnapshotFlag {
+  row: string
+  col: string
+  basis: 'annual_target_shortfall' | 'over_eap' | 'disability_target_shortfall'
+  gap_pct: number
+}
+
+export interface EEPlanProgressSnapshot {
+  id: number
+  plan: number
+  as_of: string
+  workforce_profile: WorkforceMatrix
+  disability_workforce: WorkforceMatrix
+  annual_target_gap_pct: WorkforceMatrix
+  sector_target_gap_pct: Record<string, Record<string, number>>
+  eap_gap_pct: WorkforceMatrix
+  designated_group_pct: Record<string, { male: number; female: number; total: number }>
+  disability_pct: string | null
+  flags: EEPlanSnapshotFlag[]
+  note: string
+  taken_by: number | null
+  created_at: string
+  small_cell_suppression_applied: boolean
+}
+
 // Policy library (Policy section)
 
 export type PolicyCategory =

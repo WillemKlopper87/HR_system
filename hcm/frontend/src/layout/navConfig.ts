@@ -110,6 +110,10 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
     items: [
       { to: '/dashboards/equity', label: 'Equity Dashboard', roles: EE },
       { to: '/ee-configuration', label: 'EE Configuration', roles: EE },
+      // Forum members who aren't EE staff reach their own meetings via the
+      // API carve-out (design spec 2026-08-26 §5); the page itself is EE-role
+      // gated — no member-facing page in this slice.
+      { to: '/ee-forum', label: 'EE Forum', roles: EE },
       { to: '/ee-reports', label: 'EE Reports', roles: EE },
     ],
   },

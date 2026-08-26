@@ -21,6 +21,7 @@ import { DataSubjectRequestsPage } from './pages/DataSubjectRequestsPage'
 import { EmploymentChangesPage } from './pages/EmploymentChangesPage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { EEConfigurationPage } from './pages/EEConfigurationPage'
+import { EEForumPage } from './pages/EEForumPage'
 import { EEReportsPage } from './pages/EEReportsPage'
 import { EmployeeDetailPage } from './pages/EmployeeDetailPage'
 import { EmployeeListPage } from './pages/EmployeeListPage'
@@ -170,6 +171,7 @@ export default function App() {
             </Route>
             <Route element={<RequireRole roles={['hr_admin', 'ee_manager', 'accounting_officer', 'auditor']} />}>
               <Route path="/ee-configuration" element={<EEConfigurationPage />} />
+              <Route path="/ee-forum" element={<EEForumPage />} />
               <Route path="/ee-reports" element={<EEReportsPage />} />
               <Route path="/dashboards/equity" element={<EquityDashboardPage />} />
             </Route>
