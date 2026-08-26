@@ -71,6 +71,7 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
     label: 'Compensation',
     items: [
       { to: '/pay-bands', label: 'Pay Bands', roles: COMP },
+      { to: '/comp-cycles', label: 'Comp Cycles', roles: COMP },
       { to: '/comp-proposals', label: 'Comp Proposals', roles: COMP },
       { to: '/benefits', label: 'Benefits', roles: COMP },
     ],
@@ -125,6 +126,7 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       // row-level assignment, not a role.
       { to: '/my-feedback-requests', label: 'My 360° Feedback', roles: [] },
       { to: '/my-benefits', label: 'My Benefits', roles: [] },
+      { to: '/my-total-rewards', label: 'My Total Rewards', roles: [] },
       { to: '/my-learning', label: 'My Learning', roles: [] },
       { to: '/my-policies', label: 'My Policies', roles: [] },
       { to: '/my-performance', label: 'My Performance', roles: [] },

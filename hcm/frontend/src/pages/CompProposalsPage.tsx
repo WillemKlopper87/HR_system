@@ -1,31 +1,44 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { formatZAR } from '../lib/format'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
-import { COMP_PROPOSAL_STATUS_LABELS, type CompProposal, type Employee } from '../api/types'
+import {
+  COMP_PROPOSAL_STATUS_LABELS,
+  COMP_PROPOSAL_TYPE_LABELS,
+  type CompCycle,
+  type CompProposal,
+  type CompProposalType,
+  type Employee,
+} from '../api/types'
 
 export function CompProposalsPage() {
   const [showForm, setShowForm] = useState(false)
+  const [searchParams] = useSearchParams()
+  const cycleFilter = searchParams.get('cycle')
 
   const { data, error: loadError, reload: load } = useApiQuery(
     () =>
       Promise.all([
-        fetchAllPages<CompProposal>('/comp-proposals/'),
+        fetchAllPages<CompProposal>(cycleFilter ? `/comp-proposals/?cycle=${cycleFilter}` : '/comp-proposals/'),
         fetchAllPages<Employee>('/employees/'),
-      ]).then(([proposals, employees]) => ({ proposals, employees })),
-    [],
+        fetchAllPages<CompCycle>('/comp-cycles/'),
+      ]).then(([proposals, employees, cycles]) => ({ proposals, employees, cycles })),
+    [cycleFilter],
     { errorMessage: 'Failed to load compensation proposals.' },
   )
   const proposals = data?.proposals ?? null
   const employees = data?.employees ?? null
-
+  const cycles = data?.cycles ?? null
 
   const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
+  const cycleById = useMemo(() => new Map((cycles ?? []).map((c) => [c.id, c])), [cycles])
+  const filteredCycle = cycleFilter ? cycleById.get(Number(cycleFilter)) : undefined
 
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Compensation Proposals</h1>
+        <h1>Compensation Proposals{filteredCycle ? ` — ${filteredCycle.name}` : ''}</h1>
         <button type="button" className="btn-primary" onClick={() => setShowForm((v) => !v)}>
           {showForm ? 'Cancel' : '+ New proposal'}
         </button>
@@ -36,6 +49,8 @@ export function CompProposalsPage() {
       {showForm && (
         <NewProposalForm
           employees={employees ?? []}
+          cycles={(cycles ?? []).filter((c) => c.status === 'open')}
+          defaultCycleId={cycleFilter ? Number(cycleFilter) : null}
           onCreated={() => {
             setShowForm(false)
             load()
@@ -53,10 +68,13 @@ export function CompProposalsPage() {
             <thead>
               <tr>
                 <th>Employee</th>
-                <th>Proposed salary</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Cycle</th>
+                <th>Latest rating</th>
                 <th>Justification</th>
                 <th>Status</th>
-                <th>Pay band check</th>
+                <th>Flags</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -68,6 +86,7 @@ export function CompProposalsPage() {
                     key={proposal.id}
                     proposal={proposal}
                     employeeName={emp ? `${emp.first_name} ${emp.last_name}` : `#${proposal.employee}`}
+                    cycleName={proposal.cycle ? cycleById.get(proposal.cycle)?.name ?? `#${proposal.cycle}` : '—'}
                     onChanged={load}
                   />
                 )
@@ -81,20 +100,22 @@ export function CompProposalsPage() {
 }
 
 function ProposalRow({
-  proposal, employeeName, onChanged,
-}: { proposal: CompProposal; employeeName: string; onChanged: () => void }) {
+  proposal, employeeName, cycleName, onChanged,
+}: { proposal: CompProposal; employeeName: string; cycleName: string; onChanged: () => void }) {
   const [showOverrideInput, setShowOverrideInput] = useState(false)
   const [overrideReason, setOverrideReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  const needsOverride = proposal.requires_override || proposal.exceeds_cycle_budget
+
   async function handleApprove() {
-    if (proposal.requires_override && !showOverrideInput) {
+    if (needsOverride && !showOverrideInput) {
       setShowOverrideInput(true)
       return
     }
     if (showOverrideInput && !overrideReason.trim()) {
-      setError('An override reason is required to approve a proposal outside the pay band.')
+      setError('An override reason is required to approve a flagged proposal.')
       return
     }
     setError(null)
@@ -122,21 +143,37 @@ function ProposalRow({
     }
   }
 
+  const amount = proposal.proposal_type === 'bonus' ? proposal.bonus_amount : proposal.proposed_annual_salary
+
   return (
     <tr>
       <td>{employeeName}</td>
-      <td>{formatZAR(proposal.proposed_annual_salary)}</td>
+      <td>{COMP_PROPOSAL_TYPE_LABELS[proposal.proposal_type]}</td>
+      <td>{amount !== null ? formatZAR(amount) : '—'}</td>
+      <td>{cycleName}</td>
+      <td>
+        {proposal.performance_context
+          ? `${proposal.performance_context.final_score} (${proposal.performance_context.period_name})`
+          : '—'}
+      </td>
       <td>{proposal.justification || '—'}</td>
       <td>
         <span className="status-badge">{COMP_PROPOSAL_STATUS_LABELS[proposal.status]}</span>
       </td>
       <td>
-        {proposal.requires_override ? (
-          <span className="warning-badge" title="Proposed salary falls outside the current pay band">
-            Outside band — override required
-          </span>
-        ) : (
-          'Within band'
+        {proposal.requires_override && (
+          <div>
+            <span className="warning-badge" title="Proposed salary falls outside the current pay band">
+              Outside band
+            </span>
+          </div>
+        )}
+        {proposal.exceeds_cycle_budget && (
+          <div>
+            <span className="warning-badge" title="This would push the cycle over its budget">
+              Over cycle budget
+            </span>
+          </div>
         )}
         {proposal.override_reason && (
           <div className="hint-text" style={{ marginTop: 4 }}>
@@ -172,10 +209,15 @@ function ProposalRow({
   )
 }
 
-function NewProposalForm({ employees, onCreated }: { employees: Employee[]; onCreated: () => void }) {
+function NewProposalForm({
+  employees, cycles, defaultCycleId, onCreated,
+}: { employees: Employee[]; cycles: CompCycle[]; defaultCycleId: number | null; onCreated: () => void }) {
   const [search, setSearch] = useState('')
   const [employee, setEmployee] = useState<number | ''>('')
+  const [proposalType, setProposalType] = useState<CompProposalType>('increase')
   const [salary, setSalary] = useState('')
+  const [bonusAmount, setBonusAmount] = useState('')
+  const [cycle, setCycle] = useState<number | ''>(defaultCycleId ?? '')
   const [justification, setJustification] = useState('')
   const [effectiveDate, setEffectiveDate] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -202,7 +244,10 @@ function NewProposalForm({ employees, onCreated }: { employees: Employee[]; onCr
     try {
       await api.post('/comp-proposals/', {
         employee,
-        proposed_annual_salary: salary,
+        proposal_type: proposalType,
+        proposed_annual_salary: proposalType === 'increase' ? salary : null,
+        bonus_amount: proposalType === 'bonus' ? bonusAmount : null,
+        cycle: cycle || null,
         justification,
         effective_date: effectiveDate || null,
       })
@@ -232,8 +277,31 @@ function NewProposalForm({ employees, onCreated }: { employees: Employee[]; onCr
         </select>
       </label>
       <label>
-        Proposed annual salary (ZAR)
-        <input type="number" min={0} step="0.01" value={salary} onChange={(e) => setSalary(e.target.value)} required />
+        Type
+        <select value={proposalType} onChange={(e) => setProposalType(e.target.value as CompProposalType)}>
+          <option value="increase">Salary increase</option>
+          <option value="bonus">Bonus</option>
+        </select>
+      </label>
+      {proposalType === 'increase' ? (
+        <label>
+          Proposed annual salary (ZAR)
+          <input type="number" min={0} step="0.01" value={salary} onChange={(e) => setSalary(e.target.value)} required />
+        </label>
+      ) : (
+        <label>
+          Bonus amount (ZAR)
+          <input type="number" min={0} step="0.01" value={bonusAmount} onChange={(e) => setBonusAmount(e.target.value)} required />
+        </label>
+      )}
+      <label>
+        Cycle (optional)
+        <select value={cycle} onChange={(e) => setCycle(e.target.value ? Number(e.target.value) : '')}>
+          <option value="">— One-off, no cycle —</option>
+          {cycles.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
       </label>
       <label>
         Justification

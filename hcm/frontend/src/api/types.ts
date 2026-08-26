@@ -731,26 +731,112 @@ export interface PayBand {
 }
 
 export type CompProposalStatus = 'proposed' | 'approved' | 'rejected'
+export type CompProposalType = 'increase' | 'bonus'
+export type CompCycleStatus = 'draft' | 'open' | 'closed'
+
+export interface PerformanceContext {
+  final_score: string
+  period_name: string
+  hr_attention: boolean
+}
 
 export interface CompProposal {
   id: number
   employee: number
   current_job_grade: number
-  proposed_annual_salary: string
+  proposal_type: CompProposalType
+  proposed_annual_salary: string | null
+  bonus_amount: string | null
+  baseline_salary_at_proposal: string | null
+  budget_impact: string | null
   justification: string
   status: CompProposalStatus
   requires_override: boolean
+  exceeds_cycle_budget: boolean
   override_reason: string
   effective_date: string | null
+  cycle: number | null
   proposed_by: number | null
   approved_by: number | null
   approved_at: string | null
+  performance_context: PerformanceContext | null
 }
 
 export const COMP_PROPOSAL_STATUS_LABELS: Record<CompProposalStatus, string> = {
   proposed: 'Proposed',
   approved: 'Approved',
   rejected: 'Rejected',
+}
+
+export const COMP_PROPOSAL_TYPE_LABELS: Record<CompProposalType, string> = {
+  increase: 'Salary increase',
+  bonus: 'Bonus',
+}
+
+export interface CompCycleUtilization {
+  committed_total: string
+  pending_total: string
+  total_used: string
+  remaining: string
+  over_budget: boolean
+}
+
+export interface CompCycle {
+  id: number
+  name: string
+  period_start: string
+  period_end: string
+  budget_amount: string
+  department: number | null
+  status: CompCycleStatus
+  status_display: string
+  created_by: number | null
+  closed_by: number | null
+  closed_at: string | null
+  utilization: CompCycleUtilization
+  proposal_count: number
+}
+
+export const COMP_CYCLE_STATUS_LABELS: Record<CompCycleStatus, string> = {
+  draft: 'Draft',
+  open: 'Open',
+  closed: 'Closed',
+}
+
+export interface TotalRewardsPayBandPosition {
+  job_grade: number
+  job_grade_code: string
+  min_salary: string
+  mid_salary: string
+  max_salary: string
+  valid_from: string
+  percentile: number | null
+}
+
+export interface TotalRewardsSalary {
+  fixed_remuneration: number
+  variable_remuneration: number
+  total_remuneration: number
+  period_start: string
+  period_end: string
+}
+
+export interface TotalRewardsBenefit {
+  benefit_id: number
+  benefit_name: string
+  category: BenefitCategory
+  status: BenefitsElectionStatus
+  effective_date: string | null
+}
+
+export interface TotalRewardsStatement {
+  employee: number
+  job_grade: number | null
+  job_grade_code: string | null
+  salary: TotalRewardsSalary | null
+  pay_band_position: TotalRewardsPayBandPosition | null
+  benefits: TotalRewardsBenefit[]
+  performance_context: PerformanceContext | null
 }
 
 export type BenefitCategory = 'medical' | 'retirement' | 'risk_cover' | 'other'

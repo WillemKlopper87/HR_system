@@ -14,6 +14,7 @@ import { CareersListPage } from './pages/CareersListPage'
 import { CareersPostingPage } from './pages/CareersPostingPage'
 import { ChecklistsPage } from './pages/ChecklistsPage'
 import { ChecklistTemplatesPage } from './pages/ChecklistTemplatesPage'
+import { CompCyclesPage } from './pages/CompCyclesPage'
 import { CompProposalsPage } from './pages/CompProposalsPage'
 import { ContractRenewalsPage } from './pages/ContractRenewalsPage'
 import { DataSubjectRequestsPage } from './pages/DataSubjectRequestsPage'
@@ -32,6 +33,7 @@ import { MyInterviewsPage } from './pages/MyInterviewsPage'
 import { MyLearningPage } from './pages/MyLearningPage'
 import { MyProfilePage } from './pages/MyProfilePage'
 import { MyPerformancePage } from './pages/MyPerformancePage'
+import { MyTotalRewardsPage } from './pages/MyTotalRewardsPage'
 import { PerformancePeriodsPage } from './pages/PerformancePeriodsPage'
 import { AuditLogPage } from './pages/AuditLogPage'
 import { PerformanceRecordsPage } from './pages/PerformanceRecordsPage'
@@ -138,6 +140,11 @@ export default function App() {
                 path="/comp-proposals"
                 element={<RequirePayrollStepUp><CompProposalsPage /></RequirePayrollStepUp>}
               />
+              {/* CompCycle carries no individual's pay figure (name, dates,
+                  a budget total, a department, a status) -- deliberately
+                  NOT wrapped in RequirePayrollStepUp, unlike PayBands/
+                  Comp Proposals above (design spec §6). */}
+              <Route path="/comp-cycles" element={<CompCyclesPage />} />
               <Route path="/benefits" element={<BenefitsPage />} />
             </Route>
             <Route element={<RequireRole roles={['ee_manager', 'hr_admin']} />}>
@@ -155,6 +162,7 @@ export default function App() {
             <Route path="/my-interviews" element={<MyInterviewsPage />} />
             <Route path="/my-feedback-requests" element={<MyFeedbackRequestsPage />} />
             <Route path="/my-benefits" element={<MyBenefitsPage />} />
+            <Route path="/my-total-rewards" element={<MyTotalRewardsPage />} />
             <Route path="/my-learning" element={<MyLearningPage />} />
             <Route path="/my-documents" element={<MyDocumentsPage />} />
             <Route element={<RequireRole roles={['hr_admin']} />}>
