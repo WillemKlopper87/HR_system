@@ -1,9 +1,86 @@
-# Session state — 2026-08-26 (session 7)
+# Session state — 2026-08-27 (session 8)
 
 Written as a resume point. **Everything described as done is committed and pushed** —
 run `git log -1` for the exact hash; `origin/master` matches local HEAD as of this write.
 
-## Shipped this session: C6 — salary-review/bonus cycles + total-rewards statement
+## Shipped this session
+
+Two slices landed. The first (EE plan + consultation-forum records) was built in an earlier stretch of this
+session whose wrap-up step never ran — its four commits are labelled `wip:` and this file was left describing
+session 7. That is corrected here; nothing about the work itself was incomplete.
+
+### A. C6 — EE plan measures, consultation-forum records, progress snapshots (`13fc617`..`e110cf9`)
+
+**The last effort-buildable C6 item** (assessment-provider adapter is vendor-blocked, leave is decision-blocked).
+Gap per `NEXT_AGENT_BRIEF.md` #23: `EEPlan` existed as a model since Sprint 13, but the consultation-evidence
+trail the EEA2 questionnaire's own Section F asks about was captured nowhere. Spec:
+`docs/superpowers/specs/2026-08-26-ee-plan-consultation-forum-design.md`.
+
+Four new models in `ee_reporting` (not a new app): `EEForumMember`, `EEForumMeeting` (with content-sniffed
+PDF/DOCX minutes upload, 10 MB, `log_access`'d as EXPORT at Sensitive tier), `EEPlanMeasure` (EEA13-style:
+responsible person + time frame, both required and validated inside the plan period), `EEPlanProgressSnapshot`
+(create-only — a snapshot is evidence of what was tabled, so no update/delete endpoint exists). Four new
+routers under the existing `ee_reporting/urls.py`, plus
+`GET /ee-forum-members/composition/` — a derived s.16(2) adequacy check returning booleans and level codes
+only, never per-demographic counts of the forum itself.
+
+Two access decisions worth remembering, both recorded in `RBAC-Roles.md`:
+- **Writes are hr_admin + ee_manager**, a deliberate departure from the module's otherwise hr_admin-only
+  form-data writes — the forum, the measures and the monitoring are the EE manager's own operational job
+  (EEA s.24 assigned senior manager).
+- **A forum-member carve-out** on reads: an employee who holds or held a seat sees the roster and the meetings
+  they attended, with `representation`/`notes` **redacted** (`union_nominated` reveals trade-union membership,
+  POPIA s.26 special personal information). A non-member gets an empty list, not a 403 — no hint about what
+  exists. The `composition/` endpoint is **excluded** from that carve-out, since it summarises the whole
+  workforce's mix.
+
+The questionnaire's Section F Y/N answers stay hr_admin-write and authoritative; these records are the
+*evidence* behind them, cross-checked by `EEReport.validate` as **advisory findings, never a generation gate**.
+Snapshot matrices are stored unsuppressed and small-cell-suppressed per requester on read, reusing the equity
+dashboard's existing `can_see_unsuppressed_aggregates` rule rather than a second one.
+
+Frontend: new `EEForumPage.tsx` (`/ee-forum`), and plan measures + progress snapshots added to
+`EEConfigurationPage.tsx`. Seed data and `ee-forum-plan.spec.ts` (e2e) added. Backend: `ee_reporting` 116 tests
+OK, of which `test_forum_plan.py` is 22.
+
+### B. C7 — server-side pagination for the employee directory + checklists (`28fdcbc`)
+
+Brief item #26, and the real fix for the `settled()` timing-flake class this file has carried under Known
+defects for several sessions. The employee list was the worst `fetchAllPages()` offender: two full collection
+walks (all employees, then all current `EmployeeVersion`s) joined client-side on every load.
+
+`EmployeeListPage` now requests **one server page** with Previous/Next, and the second walk is gone entirely —
+`EmployeeSerializer` gained `current_department` / `current_occupational_level` / `current_employment_status`,
+fed by a `Prefetch(to_attr="current_versions_for_summary")` over `EmployeeVersion.objects.current()`, so the
+summary costs one extra query per page rather than one per row. The `to_attr` is absent on non-list paths (a
+freshly saved instance), where the accessor falls back to `instance.current_version`.
+
+**The trap those three fields set, and the fix** — worth knowing before flattening any other versioned field
+onto a summary serializer. `TieredModelSerializer` resolves each field through
+`tier_of(model_label, field_name)`, and `tier_of` **defaults an unregistered field to `PUBLIC`**. So the three
+new fields were served to every role that can read the employee row — including `sysadmin`, which holds
+`row_scope=all` but `I:read=False` ("no standing access to S/R business data", `0002_seed_roles.py`) — even
+though `occupational_level` and `employment_status` are `INTERNAL` on `core_hr.EmployeeVersion`, and even
+though `hire_date`/`phone`/`personal_email` were being correctly dropped for that same requester in the same
+response. They are now registered in `rbac_audit/tiers.py` under `core_hr.Employee` with the tiers of the
+columns they flatten, and `EmployeeApiTests` has a sysadmin negative test that fails without the registration.
+
+`ChecklistsPage` stops fetching every employee just to render names (`ChecklistInstanceSerializer` supplies
+`employee_display`; the queryset already `select_related("employee")`), and its employee picker loads lazily
+only when HR opens the manual-create form.
+
+Also folded in: the ESS phone-persistence test now asserts the DB row and a fresh GET rather than just the
+PATCH response; `core-hr.spec.ts` picks a serving employee explicitly (the directory deliberately includes
+departed staff, whose historical detail has no current assignment) and waits on row visibility instead of
+`settled()`; four `SerializerMethodField`s got return annotations, clearing their unresolved-type OpenAPI
+warnings.
+
+**Status: backend 1121 tests OK** (`--parallel auto`, 419s), `manage.py check --fail-level WARNING` clean, no
+migration drift, `tsc -b` and `oxlint` clean (same 2 pre-existing fast-refresh warnings in `AuthContext.tsx`
+and `ReferenceDataContext.tsx`). The e2e suite has **not** been re-run since the pagination change — see
+Known defects.
+
+## Shipped in session 7: C6 — salary-review/bonus cycles + total-rewards statement
 
 The product owner's "let's finish C6" instruction named this as the next sub-item after mandatory-training
 compliance, succession/talent pools, interview scheduling/careers-portal, and performance calibration/360 (all
@@ -179,13 +256,18 @@ correct utilization math and the expected True/False flag split on the actual se
 
 ## Next up — the menu (accurate as of today, not a recommendation)
 
-- **C6 — talent-depth sub-items**: mandatory-training compliance, succession/talent pools, interview
-  scheduling/careers-portal, performance calibration/360, and now salary-review/bonus cycles + total-rewards
-  statement are all shipped. **Left: EE plan + consultation-forum records (ee_reporting) — the only remaining
-  C6 item that's effort-buildable, not vendor-blocked.** `EEPlan` already exists as a model (Sprint 13); the gap
-  is the committee/consultation evidence trail the EEA2 questionnaire's own consultation section asks about,
-  which isn't captured anywhere yet — read `NEXT_AGENT_BRIEF.md` #23 and `ee_reporting/models.py::EEPlan`/
-  `EEQuestionnaire` before starting.
+- **C6 is done as far as effort can take it.** All six effort-buildable sub-items are shipped
+  (mandatory-training compliance, succession/talent pools, interview scheduling/careers-portal, performance
+  calibration/360, salary-review/bonus cycles + total rewards, and now EE plan measures + consultation-forum
+  records). The seventh, the assessment-provider adapter, is vendor-blocked — see below. Nothing is left to
+  pick here; `docs/sprints/backlog-uat1-and-c2-c7.md`'s C6 line is the source of truth.
+- **C7 — UX / NFR**, now partly underway: server-side pagination started with the employee directory and
+  checklists (`28fdcbc`). The same `fetchAllPages()` pattern remains on ~40 other call sites — the next most
+  valuable ones are the checklist and data-quality lists, and any page that fetches all employees purely to
+  render a name or a picker (the two fixes used here — a `*_display` field on the serializer, and a lazily
+  loaded picker — generalise directly). Also unstarted in C7: the responsive/accessibility pass, adopting the
+  already-generated OpenAPI types in place of the hand-written `api/types.ts`, and the 1.31 MB
+  identity-verification bundle (face-recognition deps should load only when the camera flow starts).
 - **Real assessment-provider adapter (C6)** — **still blocked on a vendor decision (Sprint-0 action A4), not
   effort, same as every prior session.** Don't pick this expecting an effort-only slice.
 - **Leave / absence management** — still blocked on the cede-to-SAP decision (see below), not effort.
@@ -210,12 +292,17 @@ this narrative list, as the source of truth going forward.
 
 ## Known defects
 
-- **ESS phone edit does not persist across reload** (`ess-policies.spec.ts`). Real, reproduced at base commit,
-  Sprint-15 territory. Unchanged.
+- **ESS phone edit does not persist across reload** (`ess-policies.spec.ts`). **Believed closed** — the backend
+  test now asserts the DB row and a fresh GET after the PATCH, not just the PATCH response, and passes. Left
+  listed here because it has not been re-confirmed against the browser since; drop it once an e2e run is green.
 - **`core-hr.spec.ts`/`contract-renewals.spec.ts`/`ee-integrity.spec.ts`/`succession.spec.ts`'s `settled()` timing
-  flake on the large `/employees` list.** Still a real performance characteristic (`fetchAllPages`'s unfiltered
+  flake on the large `/employees` list.** This was a real performance characteristic (`fetchAllPages`'s unfiltered
   full-list + full-version fetch on first load at ~153-employee seed scale), not a traditional non-deterministic
-  flake. Server-side pagination (C7) is the real fix. This session's own new spec hit the same underlying
+  flake — and `28fdcbc` removed the cause for the `/employees` directory specifically. **Not yet verified:** the
+  e2e suite has not been re-run since that change, so whether the flake class is actually gone (and whether the
+  new Previous/Next pagination broke any spec that assumed the whole list was on screen — several specs search
+  for an employee row by name) is the first thing the next session should check. Any remaining page that still
+  walks the full list on load will keep exhibiting it. This session's own new spec hit the same underlying
   slowness (the ~150-employee list load, now fetched a third time alongside proposals/cycles on
   `CompProposalsPage`) and needed explicit longer per-assertion timeouts rather than the global default — recorded
   in the e2e-authoring-lessons section above, not treated as a code bug.
