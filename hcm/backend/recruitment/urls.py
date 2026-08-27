@@ -10,6 +10,7 @@ from .views import (
     OfferViewSet,
     RequisitionViewSet,
     recruitment_dashboard,
+    recruitment_funnel_by_demographic,
 )
 
 router = DefaultRouter()
@@ -26,5 +27,6 @@ router.register("careers/postings", PublicPostingViewSet, basename="careers-post
 
 urlpatterns = router.urls + [
     path("dashboards/recruitment/", recruitment_dashboard, name="recruitment-dashboard"),
+    path("dashboards/recruitment/funnel/", recruitment_funnel_by_demographic, name="recruitment-funnel"),
     path("careers/apply/", careers_apply, name="careers-apply"),
 ]

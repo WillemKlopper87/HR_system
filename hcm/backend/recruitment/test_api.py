@@ -202,6 +202,61 @@ class RecruitmentDashboardTests(RecruitmentApiTestCase):
         self.assertFalse(response.data["small_cell_suppression_applied"])
 
 
+class RecruitmentFunnelTests(RecruitmentApiTestCase):
+    """A rejected applicant's furthest stage must still count (current_stage
+    alone would collapse them to 'rejected' and erase real progress) --
+    the whole reason the funnel is derived from ApplicantStageEvent."""
+
+    def setUp(self):
+        super().setUp()
+        self.applicant.race = "african"
+        self.applicant.save(update_fields=["race"])
+        transition_applicant(self.applicant, to_stage=Applicant.Stage.SCREENED, actor=self.recruiter)
+        transition_applicant(self.applicant, to_stage=Applicant.Stage.INTERVIEW, actor=self.recruiter)
+        transition_applicant(self.applicant, to_stage=Applicant.Stage.REJECTED, actor=self.recruiter)
+
+        other_requisition = Requisition.objects.create(
+            title="Other Role", department=self.dept, occupational_level=self.level, job_grade=self.grade,
+            location=self.location, headcount=1, status=Requisition.Status.OPEN,
+        )
+        self.other_applicant = Applicant.objects.create(
+            requisition=other_requisition, first_name="Sam", last_name="Second",
+            email="sam@example.com", date_of_birth=date(1994, 2, 2), race="white",
+        )
+        transition_applicant(self.other_applicant, to_stage=Applicant.Stage.SCREENED, actor=self.recruiter)
+
+    def test_non_recruiter_cannot_view_funnel(self):
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.get("/api/v1/dashboards/recruitment/funnel/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_rejected_applicant_still_counted_at_furthest_stage_reached(self):
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.get("/api/v1/dashboards/recruitment/funnel/")
+        self.assertEqual(response.status_code, 200)
+        by_race = {row["stage"]: row for row in response.data["by_race"]}
+        # Both applicants reached "applied" and "screened".
+        self.assertEqual(by_race["applied"]["total"], 2)
+        self.assertEqual(by_race["screened"]["total"], 2)
+        # Only the rejected applicant made it to "interview"; the other
+        # never left "screened".
+        self.assertEqual(by_race["interview"]["total"], 1)
+        self.assertEqual(by_race["offer"]["total"], 0)
+        self.assertEqual(by_race["hired"]["total"], 0)
+        african_at_interview = next(r for r in by_race["interview"]["breakdown"] if r["key"] == "african")
+        self.assertEqual(african_at_interview["count"], 1)
+
+    def test_department_filter_narrows_the_funnel(self):
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.get(f"/api/v1/dashboards/recruitment/funnel/?department={self.dept.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_applicants"], 2)
+
+        other_dept = Department.objects.create(name="Finance", code="FIN")
+        response = self.client.get(f"/api/v1/dashboards/recruitment/funnel/?department={other_dept.id}")
+        self.assertEqual(response.data["total_applicants"], 0)
+
+
 class RequisitionPositionValidationApiTests(RecruitmentApiTestCase):
     def setUp(self):
         super().setUp()

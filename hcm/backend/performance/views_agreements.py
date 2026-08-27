@@ -181,35 +181,57 @@ class PerformancePeriodViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="rating-distribution")
     def rating_distribution(self, request, pk=None):
-        """Rating distribution by division for the hr_admin/auditor dashboard
-        (PC-3) -- crossing a rating with a small division can point back at
-        one individual, so this is small-cell suppressed exactly like
+        """Rating distribution for the hr_admin/auditor dashboard (PC-3) --
+        by division, and by race/gender/disability status (the Code on
+        integrating EE into HR practice's performance section: "appraisal
+        distributions reviewed across designated groups with corrective
+        action on significant variation" -- the moderation-step lens the EE
+        regulatory review flagged as missing). Crossing a rating with a
+        small division or demographic group can point back at one
+        individual, so every matrix is small-cell suppressed exactly like
         ee_reporting's equity dashboard (same SENSITIVE-tier gate, same
-        `f"<{THRESHOLD}"` replacement, just a division x rating matrix
-        instead of a level x demographic one)."""
+        `f"<{THRESHOLD}"` replacement)."""
         period = self.get_object()
         employee = get_request_employee(request)
         can_see_unsuppressed = can_see_unsuppressed_aggregates(employee, FieldTier.SENSITIVE)
         elements = AgreementElement.objects.filter(
             agreement__period=period, final_rating__isnull=False
         ).select_related("agreement__employee")
-        matrix: dict[str, dict[str, int]] = {}
+
+        empty_row = lambda: {str(n): 0 for n in range(RATING_MIN, RATING_MAX + 1)}  # noqa: E731
+        by_division: dict[str, dict[str, int]] = {}
+        by_race: dict[str, dict[str, int]] = {}
+        by_gender: dict[str, dict[str, int]] = {}
+        by_disability_status: dict[str, dict[str, int]] = {}
         for element in elements:
             version = element.agreement.employee.current_version
+            rating = str(element.final_rating)
             division = getattr(version.department, "name", "Unassigned") if version else "Unassigned"
-            row = matrix.setdefault(division, {str(n): 0 for n in range(RATING_MIN, RATING_MAX + 1)})
-            row[str(element.final_rating)] += 1
-        suppressed = {
-            division: {
-                rating: (f"<{SMALL_CELL_THRESHOLD}" if 0 < count < SMALL_CELL_THRESHOLD else count)
-                for rating, count in row.items()
+            by_division.setdefault(division, empty_row())[rating] += 1
+            by_race.setdefault(version.race if version else "not_disclosed", empty_row())[rating] += 1
+            by_gender.setdefault(version.gender if version else "not_disclosed", empty_row())[rating] += 1
+            by_disability_status.setdefault(
+                version.disability_status if version else "not_disclosed", empty_row()
+            )[rating] += 1
+
+        def _suppress(matrix: dict[str, dict[str, int]]) -> dict[str, dict[str, int | str]]:
+            if can_see_unsuppressed:
+                return matrix
+            return {
+                key: {
+                    rating: (f"<{SMALL_CELL_THRESHOLD}" if 0 < count < SMALL_CELL_THRESHOLD else count)
+                    for rating, count in row.items()
+                }
+                for key, row in matrix.items()
             }
-            for division, row in matrix.items()
-        }
+
         return Response({
             "period": period.name,
             "small_cell_suppression_applied": not can_see_unsuppressed,
-            "by_division": suppressed if not can_see_unsuppressed else matrix,
+            "by_division": _suppress(by_division),
+            "by_race": _suppress(by_race),
+            "by_gender": _suppress(by_gender),
+            "by_disability_status": _suppress(by_disability_status),
         })
 
 

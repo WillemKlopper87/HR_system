@@ -248,33 +248,52 @@ function PeriodCard({ period, onChanged }: { period: PerformancePeriod; onChange
           {distribution.small_cell_suppression_applied && (
             <p className="hint-text">Small cells (n &lt; 5) are suppressed for your role.</p>
           )}
-          <div className="table-scroll">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Division</th>
-                  <th>1</th>
-                  <th>2</th>
-                  <th>3</th>
-                  <th>4</th>
-                  <th>5</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(distribution.by_division).map(([division, ratings]) => (
-                  <tr key={division}>
-                    <td>{division}</td>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <td key={n}>{ratings[String(n)] ?? 0}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <RatingDistributionTable label="Division" rows={distribution.by_division} />
+
+          <h3>By designated group</h3>
+          <p className="hint-text">
+            Appraisal-distribution variation across race, gender and disability status — reviewed here so
+            significant variation is caught before scores are treated as final, per the Code on integrating
+            EE into HR practice's performance section.
+          </p>
+          <RatingDistributionTable label="Race" rows={distribution.by_race} />
+          <RatingDistributionTable label="Gender" rows={distribution.by_gender} />
+          <RatingDistributionTable label="Disability status" rows={distribution.by_disability_status} />
         </>
       )}
     </section>
+  )
+}
+
+function RatingDistributionTable({
+  label, rows,
+}: { label: string; rows: Record<string, Record<string, number | string>> }) {
+  if (Object.keys(rows).length === 0) return null
+  return (
+    <div className="table-scroll">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>{label}</th>
+            <th>1</th>
+            <th>2</th>
+            <th>3</th>
+            <th>4</th>
+            <th>5</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.entries(rows).map(([key, ratings]) => (
+            <tr key={key}>
+              <td>{key}</td>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <td key={n}>{ratings[String(n)] ?? 0}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

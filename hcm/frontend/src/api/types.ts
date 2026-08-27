@@ -424,6 +424,20 @@ export interface RecruitmentDashboard {
   by_disability_status: RecruitmentBreakdownRow[]
 }
 
+export interface RecruitmentFunnelStageRow {
+  stage: Exclude<ApplicantStage, 'rejected'>
+  total: number
+  breakdown: RecruitmentBreakdownRow[]
+}
+
+export interface RecruitmentFunnel {
+  small_cell_suppression_applied: boolean
+  total_applicants: number
+  by_race: RecruitmentFunnelStageRow[]
+  by_gender: RecruitmentFunnelStageRow[]
+  by_disability_status: RecruitmentFunnelStageRow[]
+}
+
 export const STAGE_LABELS: Record<ApplicantStage, string> = {
   applied: 'Applied',
   screened: 'Screened',
@@ -1564,6 +1578,9 @@ export interface RatingDistribution {
   period: string
   small_cell_suppression_applied: boolean
   by_division: Record<string, Record<string, number | string>>
+  by_race: Record<string, Record<string, number | string>>
+  by_gender: Record<string, Record<string, number | string>>
+  by_disability_status: Record<string, Record<string, number | string>>
 }
 
 export interface ArchiveResult {

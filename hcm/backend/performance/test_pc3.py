@@ -109,6 +109,31 @@ class RatingDistributionTests(ReviewTestCase):
         division = response.data["by_division"]["Research and Innovation"]
         self.assertEqual(division["4"], "<5")
 
+    def test_hr_admin_sees_unsuppressed_demographic_breakdowns(self):
+        """The Code on integrating EE into HR practice's performance
+        section calls for appraisal distributions reviewed across
+        designated groups -- this is that moderation-step lens, reusing
+        the same suppression rule as by_division rather than a division x
+        demographic matrix."""
+        self._signed_with_rating(self.employee, 4)
+        self._login(self.hr_admin)
+        response = self.client.get(f"/api/v1/performance-periods/{self.period.id}/rating-distribution/")
+        self.assertEqual(response.status_code, 200)
+        # self.employee's race/gender/disability_status are all left at
+        # their NOT_DISCLOSED default by the fixture.
+        self.assertEqual(response.data["by_race"]["not_disclosed"]["4"], 2)
+        self.assertEqual(response.data["by_gender"]["not_disclosed"]["4"], 2)
+        self.assertEqual(response.data["by_disability_status"]["not_disclosed"]["4"], 2)
+
+    def test_line_manager_sees_suppressed_demographic_cells(self):
+        self._signed_with_rating(self.employee, 4)
+        self._login(self.head)
+        response = self.client.get(f"/api/v1/performance-periods/{self.period.id}/rating-distribution/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["by_race"]["not_disclosed"]["4"], "<5")
+        self.assertEqual(response.data["by_gender"]["not_disclosed"]["4"], "<5")
+        self.assertEqual(response.data["by_disability_status"]["not_disclosed"]["4"], "<5")
+
 
 class ImprovementPlanTests(ReviewTestCase):
     def setUp(self):

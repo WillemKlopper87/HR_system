@@ -308,3 +308,87 @@ def recruitment_dashboard(request):
         "by_disability_status": _breakdown("disability_status", suppress=not can_see_unsuppressed),
     }
     return Response(data)
+
+
+# Rejection is a pipeline exit, not a stage anyone "reaches" for funnel
+# purposes — a rejected applicant's progress is still counted up to
+# whichever of these stages they passed through first.
+FUNNEL_STAGES = [
+    Applicant.Stage.APPLIED, Applicant.Stage.SCREENED, Applicant.Stage.INTERVIEW,
+    Applicant.Stage.OFFER, Applicant.Stage.HIRED,
+]
+_FUNNEL_STAGE_ORDER = {stage: index for index, stage in enumerate(FUNNEL_STAGES)}
+
+
+def _funnel_max_stage_reached(applicant_ids: list[int]) -> dict[int, int]:
+    """The highest-order funnel stage each applicant ever passed through,
+    derived from ApplicantStageEvent rather than current_stage — a
+    rejected applicant's current_stage is just "rejected", which would
+    otherwise erase how far they actually got. Forward-only pipeline
+    (Applicant.ALLOWED_TRANSITIONS), so the highest order seen across
+    every event's from_stage/to_stage is the applicant's furthest point;
+    REJECTED itself carries no order and is skipped."""
+    max_order = {aid: _FUNNEL_STAGE_ORDER[Applicant.Stage.APPLIED] for aid in applicant_ids}
+    events = ApplicantStageEvent.objects.filter(applicant_id__in=applicant_ids).values_list(
+        "applicant_id", "from_stage", "to_stage"
+    )
+    for applicant_id, from_stage, to_stage in events:
+        for stage in (from_stage, to_stage):
+            order = _FUNNEL_STAGE_ORDER.get(stage)
+            if order is not None and order > max_order[applicant_id]:
+                max_order[applicant_id] = order
+    return max_order
+
+
+def _funnel_breakdown(applicants_qs, demographic_field: str, max_order: dict[int, int], *, suppress: bool) -> list[dict]:
+    demographics = dict(applicants_qs.values_list("id", demographic_field))
+    table = []
+    for stage in FUNNEL_STAGES:
+        stage_order = _FUNNEL_STAGE_ORDER[stage]
+        counts: dict[str, int] = {}
+        for applicant_id, order in max_order.items():
+            if order >= stage_order:
+                key = demographics.get(applicant_id)
+                counts[key] = counts.get(key, 0) + 1
+        breakdown = []
+        for key, count in sorted(counts.items()):
+            is_small = suppress and count < SMALL_CELL_THRESHOLD
+            breakdown.append({
+                "key": key,
+                "count": f"<{SMALL_CELL_THRESHOLD}" if is_small else count,
+                "suppressed": is_small,
+            })
+        table.append({"stage": stage, "total": sum(counts.values()), "breakdown": breakdown})
+    return table
+
+
+@extend_schema(responses=OpenApiTypes.OBJECT)
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated, IsRecruiterOrHRAdmin])
+def recruitment_funnel_by_demographic(request):
+    """Stage-by-stage conversion cross-tabbed by race/gender/disability
+    status — the Code on integrating EE into HR practice's recruitment
+    section calls for exactly this ('track applicant pool, short-list,
+    interviewed and offered by demographic'). `?department=<id>` or
+    `?requisition=<id>` narrows the applicant set; unfiltered is
+    org-wide."""
+    employee = get_request_employee(request)
+    suppress = not can_see_unsuppressed_aggregates(employee, FieldTier.SENSITIVE)
+
+    applicants = Applicant.objects.all()
+    department_id = int_query_param(request, "department")
+    if department_id is not None:
+        applicants = applicants.filter(requisition__department_id=department_id)
+    requisition_id = int_query_param(request, "requisition")
+    if requisition_id is not None:
+        applicants = applicants.filter(requisition_id=requisition_id)
+
+    max_order = _funnel_max_stage_reached(list(applicants.values_list("id", flat=True)))
+    data = {
+        "small_cell_suppression_applied": suppress,
+        "total_applicants": applicants.count(),
+        "by_race": _funnel_breakdown(applicants, "race", max_order, suppress=suppress),
+        "by_gender": _funnel_breakdown(applicants, "gender", max_order, suppress=suppress),
+        "by_disability_status": _funnel_breakdown(applicants, "disability_status", max_order, suppress=suppress),
+    }
+    return Response(data)
