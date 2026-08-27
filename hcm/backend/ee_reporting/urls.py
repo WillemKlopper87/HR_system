@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .dashboards import equity_dashboard
+from .dashboards import equity_dashboard, management_control_schedule
 from .views import (
     EEForumMeetingViewSet,
     EEForumMemberViewSet,
@@ -29,4 +29,5 @@ router.register("ee-plan-snapshots", EEPlanProgressSnapshotViewSet, basename="ee
 
 urlpatterns = router.urls + [
     path("dashboards/equity/", equity_dashboard, name="equity-dashboard"),
+    path("dashboards/management-control/", management_control_schedule, name="management-control-schedule"),
 ]

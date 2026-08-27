@@ -1124,6 +1124,27 @@ export interface EquityDashboard {
   target_vs_actual_gap_pct: WorkforceMatrix
 }
 
+export interface ManagementControlLevelRow {
+  level: string
+  headcount: number
+  black: number | string
+  black_pct: number | null
+  eap_black_pct: number | null
+  black_female: number | string
+  black_female_pct: number | null
+  eap_black_female_pct: number | null
+  employees_with_disabilities: number | string
+  disability_pct: number | null
+}
+
+export interface ManagementControlSchedule {
+  as_of: string
+  small_cell_suppression_applied: boolean
+  ee_plan_id: number | null
+  disability_target_pct: string | null
+  by_level: ManagementControlLevelRow[]
+}
+
 // C6: EE plan depth + consultation forum (design spec 2026-08-26)
 
 export interface EEPlan {

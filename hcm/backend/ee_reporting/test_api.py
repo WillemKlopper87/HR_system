@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 import pyotp
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
@@ -10,7 +11,7 @@ from rbac_audit.models import Role, RoleAssignment
 from rbac_audit.stepup import confirm_totp_device, enroll_totp_device, request_step_up
 from rest_framework.test import APIClient
 
-from .models import EEQuestionnaire, EEReport, EmployerConfig, RemunerationRecord
+from .models import EEPlan, EEQuestionnaire, EEReport, EmployerConfig, RemunerationRecord
 from .services import ee_manager_approve, generate_report, submit_for_review
 
 User = get_user_model()
@@ -329,3 +330,60 @@ class EquityDashboardApiTests(EEReportingApiTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["small_cell_suppression_applied"])
         self.assertEqual(response.data["workforce_profile"]["TOP"]["indian_female"], "<5")
+
+
+class ManagementControlScheduleApiTests(EEReportingApiTestCase):
+    """B-BBEE ICT Sector Code's Management Control element, derived from
+    the EEA2 workforce profile — fixture's five hr_admin/ee_manager/
+    accounting_officer/auditor/line_manager rows are all african_male
+    (5, not suppressed), plus one plain_employee left NOT_DISCLOSED."""
+
+    def _row(self, response, level="TOP"):
+        return next(row for row in response.data["by_level"] if row["level"] == level)
+
+    def test_hr_admin_sees_unsuppressed_black_representation(self):
+        # plain_employee is left NOT_DISCLOSED on both race and gender, so —
+        # same as every other workforce_profile_matrix consumer in this
+        # app (equity_dashboard, generate_report) — it maps to none of the
+        # 10 tracked demographic columns and isn't part of this row total.
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/dashboards/management-control/")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["small_cell_suppression_applied"])
+        row = self._row(response)
+        self.assertEqual(row["headcount"], 5)
+        self.assertEqual(row["black"], 5)
+        self.assertAlmostEqual(row["black_pct"], 100.0, places=1)
+        self.assertEqual(row["black_female"], 0)
+
+    def test_line_manager_sees_suppressed_small_black_female_count(self):
+        Employee.objects.hire(
+            employee_number="X2", first_name="A", last_name="B", date_of_birth=date(1990, 1, 1),
+            work_email="x2@example.com", hire_date=date(2020, 1, 1), department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location,
+            race="african", gender="female",
+        )
+        self.client.force_authenticate(user=self.line_manager.user)
+        response = self.client.get("/api/v1/dashboards/management-control/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["small_cell_suppression_applied"])
+        row = self._row(response)
+        self.assertEqual(row["black_female"], "<5")
+
+    def test_disability_representation_and_target_included(self):
+        EEPlan.objects.create(
+            plan_period_start=self.period_start, plan_period_end=self.period_end,
+            disability_5yr_target_pct=Decimal("3.0"),
+        )
+        Employee.objects.hire(
+            employee_number="X3", first_name="A", last_name="B", date_of_birth=date(1990, 1, 1),
+            work_email="x3@example.com", hire_date=date(2020, 1, 1), department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location,
+            race="coloured", gender="female", disability_status="yes",
+        )
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/dashboards/management-control/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(str(response.data["disability_target_pct"]), "3.00")
+        row = self._row(response)
+        self.assertEqual(row["employees_with_disabilities"], 1)
