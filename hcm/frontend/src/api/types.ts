@@ -997,6 +997,14 @@ export type DemographicColumn =
 
 export type WorkforceMatrix = Record<string, Partial<Record<DemographicColumn, number>>>
 
+export interface EESector {
+  id: number
+  code: string
+  name: string
+  targets: Record<string, Record<string, number>>
+  disability_target_pct: string
+}
+
 export interface EmployerConfig {
   id: number
   trade_name: string
@@ -1007,6 +1015,8 @@ export interface EmployerConfig {
   ee_reference_number: string
   national_or_provincial_eap: string
   industry_sector: string
+  sector: number | null
+  sector_detail: EESector | null
   seta_classification: string
   bargaining_council: string
   telephone_number: string

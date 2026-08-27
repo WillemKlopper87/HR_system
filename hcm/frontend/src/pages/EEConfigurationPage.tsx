@@ -4,7 +4,7 @@ import { useApiQuery } from '../api/hooks'
 import { useAuth } from '../auth/AuthContext'
 import { RequirePayrollStepUp } from '../auth/RequirePayrollStepUp'
 import type {
-  EEPlan, EEPlanMeasure, EEPlanMeasureStatus, EEPlanProgressSnapshot, EEQuestionnaire, Employee, EmployerConfig, RemunerationRecord,
+  EEPlan, EEPlanMeasure, EEPlanMeasureStatus, EEPlanProgressSnapshot, EEQuestionnaire, EESector, Employee, EmployerConfig, RemunerationRecord,
 } from '../api/types'
 import { EE_PLAN_MEASURE_STATUS_LABELS } from '../api/types'
 import {
@@ -118,6 +118,7 @@ function RemunerationRecordsLoader() {
 const EMPTY_EMPLOYER_CONFIG: Partial<EmployerConfig> = {
   trade_name: '', dti_registration_name: '', dti_registration_number: '', paye_sars_number: '',
   uif_reference_number: '', ee_reference_number: '', national_or_provincial_eap: '', industry_sector: '',
+  sector: null,
   seta_classification: '', bargaining_council: '', telephone_number: '',
   ceo_name: '', ceo_telephone: '', ceo_email: '',
   ee_senior_manager_name: '', ee_senior_manager_telephone: '', ee_senior_manager_email: '',
@@ -128,6 +129,10 @@ function EmployerConfigForm({ config, onSaved }: { config: EmployerConfig | null
   const [form, setForm] = useState<Partial<EmployerConfig>>(config ?? EMPTY_EMPLOYER_CONFIG)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // EEA17 reference data (Gazette 52514) — picking a sector here is what
+  // lets an EE Plan be seeded from gazetted targets instead of hand-typed
+  // percentages (ee_reporting.services.sector_target_defaults).
+  const sectors = useApiQuery(() => fetchAllPages<EESector>('/ee-sectors/'), [], { errorMessage: 'Failed to load EE sectors.' })
 
   // `config` arrives asynchronously (fetched after mount), but useState's
   // initial value only applies once — without this, the form permanently
@@ -177,6 +182,18 @@ function EmployerConfigForm({ config, onSaved }: { config: EmployerConfig | null
       {textField('ee_reference_number', 'EE reference number')}
       {textField('national_or_provincial_eap', 'National or Provincial EAP')}
       {textField('industry_sector', 'Industry/Sector')}
+      <label>
+        EEA17 sector (drives sector-target lookup)
+        <select
+          value={form.sector ?? ''}
+          onChange={(e) => set('sector', (e.target.value ? Number(e.target.value) : null) as never)}
+        >
+          <option value="">— Select —</option>
+          {(sectors.data ?? []).map((s) => (
+            <option key={s.id} value={s.id}>{s.code} {s.name}</option>
+          ))}
+        </select>
+      </label>
       {textField('seta_classification', 'SETA classification')}
       {textField('bargaining_council', 'Bargaining Council')}
       {textField('telephone_number', 'Telephone number')}

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from core_hr.base import TimestampedModel
 from core_hr.models import Employee, Location
 from django.db import models
@@ -12,6 +14,31 @@ from .constants import (
     EMPLOYEE_COUNT_BANDS,
     MONITORING_FREQUENCIES,
 )
+
+
+class EESector(TimestampedModel):
+    """One of the 18 national economic sectors identified under EEA
+    s.15A(1) (EEA17), carrying the 5-year sectoral numerical targets
+    determined for it under s.15A(2) — Gazette 52514, GN 6124, 15 April
+    2025. Reference data, seeded verbatim from the gazette (migration
+    0005) so an employer picks a sector (reg. 9(7): the sector where the
+    majority of employees are engaged) instead of retyping percentages
+    that a single fat-fingered digit would silently misstate a plan's
+    whole compliance basis against."""
+
+    code = models.CharField(max_length=10, unique=True)
+    name = models.CharField(max_length=200, unique=True)
+    # {level_code: {"male": pct, "female": pct, "total": pct}} for
+    # TOP/SENIOR/PQ/SKILLED — same shape as EEPlan.sector_targets, so a
+    # plan can be seeded directly from this without reshaping.
+    targets = models.JSONField(default=dict)
+    disability_target_pct = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("3.00"))
+
+    class Meta:
+        ordering = ["code"]
+
+    def __str__(self):
+        return f"{self.code} {self.name}"
 
 
 class EmployerConfig(TimestampedModel):
@@ -30,6 +57,11 @@ class EmployerConfig(TimestampedModel):
     ee_reference_number = models.CharField(max_length=100, blank=True)
     national_or_provincial_eap = models.CharField(max_length=200, blank=True)
     industry_sector = models.CharField(max_length=200, blank=True)
+    # EEA17 sector classification, driving reg. 9(7)'s sector-target lookup
+    # (EESector). Kept alongside industry_sector (the free-text Section A
+    # form field) rather than replacing it -- a plan generated before a
+    # sector was picked here shouldn't retroactively lose its own record.
+    sector = models.ForeignKey(EESector, null=True, blank=True, on_delete=models.PROTECT, related_name="employers")
     seta_classification = models.CharField(max_length=200, blank=True)
     bargaining_council = models.CharField(max_length=200, blank=True)
     telephone_number = models.CharField(max_length=50, blank=True)

@@ -9,7 +9,7 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from . import aggregation
-from .models import EEQuestionnaire, EEReport, EmployerConfig, RemunerationRecord
+from .models import EEQuestionnaire, EEReport, EESector, EmployerConfig, RemunerationRecord
 from .validation import validate_report_readiness
 
 
@@ -291,6 +291,17 @@ def _sector_gap(designated_pct: dict, sector_targets: dict, numerical_goals: dic
             key: round(actual.get(key, 0.0) - float(target[key]), 1) for key in ("male", "female", "total") if key in target
         }
     return gap
+
+
+def sector_target_defaults(sector: EESector) -> dict:
+    """EEPlan.sector_targets/disability_5yr_target_pct, pre-filled from
+    the gazetted EESector the employer picked — reg. 9(5)'s "mandatory
+    input", entered once at the source (migration 0005 seeds it from
+    Gazette 52514) rather than retyped per plan."""
+    return {
+        "sector_targets": sector.targets,
+        "disability_5yr_target_pct": sector.disability_target_pct,
+    }
 
 
 @transaction.atomic

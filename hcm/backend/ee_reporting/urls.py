@@ -10,11 +10,13 @@ from .views import (
     EEPlanViewSet,
     EEQuestionnaireViewSet,
     EEReportViewSet,
+    EESectorViewSet,
     EmployerConfigViewSet,
     RemunerationRecordViewSet,
 )
 
 router = DefaultRouter()
+router.register("ee-sectors", EESectorViewSet, basename="ee-sector")
 router.register("employer-config", EmployerConfigViewSet, basename="employer-config")
 router.register("ee-plans", EEPlanViewSet, basename="ee-plan")
 router.register("ee-questionnaires", EEQuestionnaireViewSet, basename="ee-questionnaire")

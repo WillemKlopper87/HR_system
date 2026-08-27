@@ -27,6 +27,7 @@ from .models import (
     EEPlanProgressSnapshot,
     EEQuestionnaire,
     EEReport,
+    EESector,
     EmployerConfig,
     RemunerationRecord,
 )
@@ -45,6 +46,7 @@ from .serializers import (
     EEPlanSerializer,
     EEQuestionnaireSerializer,
     EEReportSerializer,
+    EESectorSerializer,
     EmployerConfigSerializer,
     GenerateReportSerializer,
     RemunerationRecordSerializer,
@@ -59,6 +61,7 @@ from .services import (
     forum_composition,
     generate_report,
     import_remuneration_csv,
+    sector_target_defaults,
     sign_off,
     submit_for_review,
     take_progress_snapshot,
@@ -76,6 +79,15 @@ def _require_hr_admin(actor, message):
     narrower rule here instead."""
     if not has_role(actor, "hr_admin"):
         raise PermissionDenied(message)
+
+
+class EESectorViewSet(viewsets.ReadOnlyModelViewSet):
+    """The EEA17 sector table (Gazette 52514) — reference data, not
+    editable through the API; seeded by migration 0005."""
+
+    queryset = EESector.objects.all()
+    serializer_class = EESectorSerializer
+    permission_classes = [EEReportingPermission]
 
 
 class EmployerConfigViewSet(viewsets.ModelViewSet):
@@ -105,6 +117,23 @@ class EEPlanViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         _require_hr_admin(get_request_employee(self.request), "Only hr_admin can edit the EE Plan.")
         serializer.save()
+
+    @action(detail=False, methods=["get"])
+    def sector_defaults(self, request):
+        """sector_targets/disability_5yr_target_pct pre-filled from a
+        gazetted EESector, for the plan form to offer before the user
+        types a single percentage by hand. `?sector=<id>` picks the
+        sector explicitly; otherwise falls back to the employer
+        configuration's own sector (reg. 9(7))."""
+        sector_id = int_query_param(request, "sector")
+        sector = (
+            EESector.objects.filter(pk=sector_id).first()
+            if sector_id is not None
+            else (EmployerConfig.objects.first() or EmployerConfig()).sector
+        )
+        if sector is None:
+            return Response({"detail": "No sector specified and the employer configuration has none set."}, status=404)
+        return Response(sector_target_defaults(sector))
 
 
 class EEQuestionnaireViewSet(viewsets.ModelViewSet):

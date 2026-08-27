@@ -42,6 +42,7 @@ from ee_reporting.models import (
     EEPlan,
     EEPlanMeasure,
     EEQuestionnaire,
+    EESector,
     EmployerConfig,
     RemunerationRecord,
 )
@@ -1080,7 +1081,8 @@ class Command(BaseCommand):
             uif_reference_number="U123456789",
             ee_reference_number="E123456",
             national_or_provincial_eap="National",
-            industry_sector="Telecommunications",
+            industry_sector="Information and Communication",
+            sector=EESector.objects.filter(code="1.10").first(),
             seta_classification="MICT SETA",
             telephone_number="0113141000",
             postal_address="PO Box 21, Honeydew", postal_code="2040", postal_city="Johannesburg",

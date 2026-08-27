@@ -9,9 +9,15 @@ from .models import (
     EEPlanProgressSnapshot,
     EEQuestionnaire,
     EEReport,
+    EESector,
     EmployerConfig,
     RemunerationRecord,
 )
+
+
+@admin.register(EESector)
+class EESectorAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "disability_target_pct")
 
 
 @admin.register(EEForumMember)

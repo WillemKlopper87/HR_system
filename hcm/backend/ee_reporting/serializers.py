@@ -11,13 +11,22 @@ from .models import (
     EEPlanProgressSnapshot,
     EEQuestionnaire,
     EEReport,
+    EESector,
     EmployerConfig,
     RemunerationRecord,
 )
 from .permissions import is_ee_reader
 
 
+class EESectorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EESector
+        fields = ["id", "code", "name", "targets", "disability_target_pct"]
+
+
 class EmployerConfigSerializer(serializers.ModelSerializer):
+    sector_detail = EESectorSerializer(source="sector", read_only=True)
+
     class Meta:
         model = EmployerConfig
         fields = "__all__"
