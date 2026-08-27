@@ -288,6 +288,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "learning.tasks.run_mandatory_training_reminders_task",
         "schedule": 24 * 60 * 60,  # daily; crontab(hour=7) once beat runs against a real broker
     },
+    # EE statutory calendar -- online report window close (15 Jan) and the
+    # EEA14 notice-of-inability deadline (last working day of Aug).
+    "run-ee-statutory-reminders-daily": {
+        "task": "ee_reporting.tasks.run_ee_statutory_reminders_task",
+        "schedule": 24 * 60 * 60,  # daily; crontab(hour=7) once beat runs against a real broker
+    },
 }
 
 # HMAC signing secret for the inbound assessment-provider webhook
@@ -383,3 +389,11 @@ CONTRACT_ESCALATION_DAYS = int(os.environ.get("CONTRACT_ESCALATION_DAYS", "14"))
 MANDATORY_TRAINING_REMINDER_OFFSET_DAYS = int(
     os.environ.get("MANDATORY_TRAINING_REMINDER_OFFSET_DAYS", "14")
 )
+
+# EE statutory calendar (online report window close 15 Jan; EEA14 notice of
+# inability to report, last working day of Aug) -- which offsets (days
+# before each deadline) fire an hr_admin/ee_manager reminder. See
+# ee_reporting/reminders.py.
+EE_STATUTORY_REMINDER_OFFSETS_DAYS = [
+    int(d) for d in os.environ.get("EE_STATUTORY_REMINDER_OFFSETS_DAYS", "60,30,14,7").split(",")
+]
