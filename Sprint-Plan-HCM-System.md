@@ -56,6 +56,7 @@ Sprint 16–17 above is superseded by H1–H3 + UAT-1 below.)*
 | [C5 — Labour relations](docs/sprints/backlog-uat1-and-c2-c7.md) | Disciplinary & grievance case management | Not started |
 | [C6 — Talent depth](docs/sprints/backlog-uat1-and-c2-c7.md) | Succession, interview scheduling, calibration/360, training compliance, etc. (per demand) | Not started |
 | [C7 — UX / NFR](docs/sprints/backlog-uat1-and-c2-c7.md) | Responsive + accessibility pass, server-side pagination, bulk import/export, report builder | Not started |
+| [R1 — SA regulatory review](docs/sprints/regulatory-review-backlog.md) | EE/B-BBEE/Skills/POPIA review fixes, statutory workflows and evidence controls | In progress (2026-08-27) — nine capabilities shipped, four P0 production-integrity fixes closed; P1/P2 statutory workflows remain in the linked backlog |
 
 *(UAT-1 and C2–C7 share one file, `docs/sprints/backlog-uat1-and-c2-c7.md`, since none of them have started yet — each is a short scope stub, not a status block. C1 has its own file because part 1 is real, shipped work.)*
 

@@ -58,8 +58,10 @@ Full backend suite (1130+ tests across the touched apps) and frontend typecheck/
 each push. Remaining items from that same field-guide review — EEA1 self-declaration confidential-disability
 mode, EEA12 analysis record, certificate lifecycle tracker, B-BBEE skills-development scorecard *calculator*
 (the evidence fields for it now exist; the % vs. target computation does not), reasonable-accommodation register,
-harassment intake, enforcement register — are unstarted; none are on
-`backlog-uat1-and-c2-c7.md` today since they came from the external review, not the original sprint backlog.
+harassment intake, enforcement register — are unstarted and are now tracked in the dedicated
+`docs/sprints/regulatory-review-backlog.md`, since they came from the external review rather than the original
+C1–C7 sprint backlog. That file also records the production-integrity fixes identified by the 2026-08-27
+follow-up code review.
 
 ## Shipped in session 8: EE plan measures, consultation-forum records, server-side pagination
 
