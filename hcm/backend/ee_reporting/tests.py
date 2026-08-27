@@ -417,3 +417,13 @@ class ExportTests(TestCase):
         root = ET.fromstring(xml_text)
         self.assertEqual(root.tag, "eea2")
         self.assertEqual(root.get("year"), "2026")
+
+
+class RetentionRuleSeedTests(TestCase):
+    def test_ee_report_is_seeded_as_retain(self):
+        from rbac_audit.models import RetentionRule
+
+        rule = RetentionRule.objects.get(entity_type="ee_reporting.EEReport")
+        self.assertEqual(rule.action, RetentionRule.Action.RETAIN)
+        self.assertEqual(rule.period_months, 60)
+        self.assertTrue(rule.active)
