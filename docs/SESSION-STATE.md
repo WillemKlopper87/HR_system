@@ -1,13 +1,42 @@
-# Session state — 2026-08-27 (session 8)
+# Session state — 2026-08-27 (session 9)
 
 Written as a resume point. **Everything described as done is committed and pushed** —
 run `git log -1` for the exact hash; `origin/master` matches local HEAD as of this write.
 
 ## Shipped this session
 
-Two slices landed. The first (EE plan + consultation-forum records) was built in an earlier stretch of this
+Not a C1-C7 backlog item — a targeted response to an external EE & B-BBEE regulatory field-guide review
+(gazette-sourced research comparing SA employment-equity/B-BBEE/POPIA law against this codebase; see the
+review's own "Consolidated enhancement backlog" for the full list). Three of its highest-exposure/lowest-effort
+findings, in commit order:
+
+1. **`2a2feaf`** — `EEReport` (the frozen EEA2/EEA4 snapshot) had no retention rule; `0003_seed_retention_rules.py`
+   covered the plan and its evidence trail (reg. 9(15)) but missed the report itself (regs. 10(14)/12(3), five
+   years). One migration, one test.
+2. **`45c481e`** — `EESector`: all 18 EEA17 economic sectors seeded with the real 5-year targets from Gazette
+   52514 (downloaded and read the actual PDF, not commentary — sector 1.10 Information and Communication's
+   figures match what session 7/8's demo seed had already hand-entered, so no drift there). `EmployerConfig.sector`
+   FK + a `GET /ee-plans/sector_defaults/` endpoint + a picker on `EEConfigurationPage.tsx`, so a plan's
+   `sector_targets`/`disability_5yr_target_pct` can be pre-filled instead of hand-typed. Demo seed now points
+   Sentech at sector 1.10 with `industry_sector="Information and Communication"` (was "Telecommunications").
+3. **`891a691`** — `ee_reporting/reminders.py` + a new Celery beat entry: online-report-window-close (15 Jan,
+   gated on whether EEA2/EEA4 are actually signed off for the closing report year) and EEA14
+   notice-of-inability (last working day of Aug, ungated — no notice-tracking model exists to gate on).
+   Deliberately **not** built: the certificate's 12-month expiry (no EEA15/16A-D model yet) and WSP/ATR's 30
+   April deadline (a learning-app readiness check, not an ee_reporting one).
+
+Full backend suite (1130 tests) and frontend typecheck/lint/build all green before each push. Remaining items
+from that same field-guide review — EEA1 self-declaration confidential-disability mode, EEA12 analysis record,
+certificate lifecycle tracker, recruitment-funnel-by-demographic cross-tab, calibration/360 demographic
+breakdown, B-BBEE management-control schedule and skills-scorecard calculator, harassment intake, probation
+tracking, exit interviews, enforcement register — are unstarted; none are on `backlog-uat1-and-c2-c7.md` today
+since they came from the external review, not the original sprint backlog.
+
+## Shipped in session 8: EE plan measures, consultation-forum records, server-side pagination
+
+Two slices landed. The first (EE plan + consultation-forum records) was built in an earlier stretch of that
 session whose wrap-up step never ran — its four commits are labelled `wip:` and this file was left describing
-session 7. That is corrected here; nothing about the work itself was incomplete.
+session 7. That was corrected in session 8's own write-up; nothing about the work itself was incomplete.
 
 ### A. C6 — EE plan measures, consultation-forum records, progress snapshots (`13fc617`..`e110cf9`)
 
