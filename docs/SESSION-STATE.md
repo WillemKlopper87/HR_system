@@ -50,11 +50,15 @@ findings, in commit order:
    `cat >>` heredocs via Bash, each under ~50 lines/3KB) -- if that recurs, chunk file writes rather than retrying
    the same large call.
 
+8. **`f13001a`** — `core_hr.ExitInterview`: hr_admin-only (a management record naming individuals'
+   departure reasons, not self-service), optionally linked to an `EmploymentChange` or a `ProbationPeriod`. `GET
+   /dashboards/exit-interviews/` breaks reasons down by race/gender/disability status. New `ExitInterviewsPage.tsx`.
+
 Full backend suite (1130+ tests across the touched apps) and frontend typecheck/lint/build all green before
 each push. Remaining items from that same field-guide review — EEA1 self-declaration confidential-disability
 mode, EEA12 analysis record, certificate lifecycle tracker, B-BBEE skills-development scorecard *calculator*
 (the evidence fields for it now exist; the % vs. target computation does not), reasonable-accommodation register,
-harassment intake, exit interviews, enforcement register — are unstarted; none are on
+harassment intake, enforcement register — are unstarted; none are on
 `backlog-uat1-and-c2-c7.md` today since they came from the external review, not the original sprint backlog.
 
 ## Shipped in session 8: EE plan measures, consultation-forum records, server-side pagination
