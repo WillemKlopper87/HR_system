@@ -24,13 +24,30 @@ findings, in commit order:
    notice-of-inability (last working day of Aug, ungated — no notice-tracking model exists to gate on).
    Deliberately **not** built: the certificate's 12-month expiry (no EEA15/16A-D model yet) and WSP/ATR's 30
    April deadline (a learning-app readiness check, not an ee_reporting one).
+4. **`dfce506`** (two items in one commit) — recruitment funnel by demographic: `GET
+   /dashboards/recruitment/funnel/`, stage-reached derived from `ApplicantStageEvent` (not `current_stage`, which
+   would collapse a rejected applicant to "rejected" and erase how far they actually got) — the Code on
+   integrating EE into HR practice's "track applicant pool, short-list, interviewed and offered by demographic".
+   Same commit: calibration rating distribution now breaks down by race/gender/disability status alongside the
+   existing by-division view (`PerformancePeriodViewSet.rating_distribution`), reusing the same small-cell rule.
+5. **`a0e8ade`** — `TrainingRecord` gains B-BBEE skills-development evidence (Code series 300): a Learning
+   Programme Matrix category slot (A–G — meanings unverified against the gazetted Codes, flagged in the model
+   docstring), a learner-agreement flag, and a content-sniffed evidence upload (`learning/uploads.py` — a fourth
+   copy of the same sniffer already duplicated in `documents`/`recruitment`/`ee_reporting` for the peer-app-import
+   boundary; a real candidate for kernel promotion if a fifth ever shows up). New fields registered at INTERNAL
+   tier in `rbac_audit/tiers.py` — `TieredModelSerializer` silently defaults anything unregistered to PUBLIC, so
+   this was a real gap to catch before push, not paperwork. WSP/ATR export gains the three columns.
+6. **`670454a`** — `GET /dashboards/management-control/`: black/black-female representation per level benchmarked
+   to the EAP, plus employees with disabilities — the evidence schedule (not the scorecard's point value) the
+   ICT Sector Code's Management Control element needs, assembled from data `ee_reporting.aggregation` already
+   computes rather than a new capture surface.
 
-Full backend suite (1130 tests) and frontend typecheck/lint/build all green before each push. Remaining items
-from that same field-guide review — EEA1 self-declaration confidential-disability mode, EEA12 analysis record,
-certificate lifecycle tracker, recruitment-funnel-by-demographic cross-tab, calibration/360 demographic
-breakdown, B-BBEE management-control schedule and skills-scorecard calculator, harassment intake, probation
-tracking, exit interviews, enforcement register — are unstarted; none are on `backlog-uat1-and-c2-c7.md` today
-since they came from the external review, not the original sprint backlog.
+Full backend suite (1130+ tests across the touched apps) and frontend typecheck/lint/build all green before
+each push. Remaining items from that same field-guide review — EEA1 self-declaration confidential-disability
+mode, EEA12 analysis record, certificate lifecycle tracker, B-BBEE skills-development scorecard *calculator*
+(the evidence fields for it now exist; the % vs. target computation doesn't), reasonable-accommodation register,
+harassment intake, probation tracking, exit interviews, enforcement register — are unstarted; none are on
+`backlog-uat1-and-c2-c7.md` today since they came from the external review, not the original sprint backlog.
 
 ## Shipped in session 8: EE plan measures, consultation-forum records, server-side pagination
 
