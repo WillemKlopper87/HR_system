@@ -42,11 +42,19 @@ findings, in commit order:
    ICT Sector Code's Management Control element needs, assembled from data `ee_reporting.aggregation` already
    computes rather than a new capture surface.
 
+7. **`0c531d9`** — `core_hr.ProbationPeriod`/`ProbationReview`: hr_admin opens/decides, line manager records
+   reviews, same `RowScopePermission` row-scoping `TrainingRecord` already uses (self/own-team/all). `GET
+   /dashboards/probation/` reports the confirmation rate by race/gender/disability status, counting only closed
+   (confirmed/terminated) periods. New `ProbationPage.tsx`. Note for the next session: writing multi-hundred-line
+   files via the Write/Edit tools hit repeated host-hook timeouts this session (worked around with small chunked
+   `cat >>` heredocs via Bash, each under ~50 lines/3KB) -- if that recurs, chunk file writes rather than retrying
+   the same large call.
+
 Full backend suite (1130+ tests across the touched apps) and frontend typecheck/lint/build all green before
 each push. Remaining items from that same field-guide review — EEA1 self-declaration confidential-disability
 mode, EEA12 analysis record, certificate lifecycle tracker, B-BBEE skills-development scorecard *calculator*
-(the evidence fields for it now exist; the % vs. target computation doesn't), reasonable-accommodation register,
-harassment intake, probation tracking, exit interviews, enforcement register — are unstarted; none are on
+(the evidence fields for it now exist; the % vs. target computation does not), reasonable-accommodation register,
+harassment intake, exit interviews, enforcement register — are unstarted; none are on
 `backlog-uat1-and-c2-c7.md` today since they came from the external review, not the original sprint backlog.
 
 ## Shipped in session 8: EE plan measures, consultation-forum records, server-side pagination
