@@ -12,7 +12,10 @@ from .views import (
     JobGradeViewSet,
     LocationViewSet,
     OccupationalLevelViewSet,
+    ProbationPeriodViewSet,
+    ProbationReviewViewSet,
     headcount_dashboard,
+    probation_completion_dashboard,
 )
 
 router = DefaultRouter()
@@ -26,7 +29,10 @@ router.register("locations", LocationViewSet, basename="location")
 router.register("data-quality-exceptions", DataQualityExceptionViewSet, basename="data-quality-exception")
 router.register("dependants", DependantViewSet, basename="dependant")
 router.register("emergency-contacts", EmergencyContactViewSet, basename="emergency-contact")
+router.register("probation-periods", ProbationPeriodViewSet, basename="probation-period")
+router.register("probation-reviews", ProbationReviewViewSet, basename="probation-review")
 
 urlpatterns = router.urls + [
     path("dashboards/headcount/", headcount_dashboard, name="headcount-dashboard"),
+    path("dashboards/probation/", probation_completion_dashboard, name="probation-dashboard"),
 ]

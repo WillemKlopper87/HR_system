@@ -80,6 +80,65 @@ export const CONTRACT_ACTION_LABELS: Record<ContractAction, string> = {
   let_lapse: 'Let lapse',
 }
 
+export type ProbationStatus = 'in_progress' | 'confirmed' | 'extended' | 'terminated'
+export type ProbationRecommendation = 'continue' | 'extend' | 'confirm' | 'terminate'
+
+export interface ProbationReview {
+  id: number
+  probation_period: number
+  review_date: string
+  reviewed_by: number | null
+  recommendation: ProbationRecommendation
+  comments: string
+  employee_signed_at: string | null
+}
+
+export interface ProbationPeriod {
+  id: number
+  employee: number
+  employee_number: string
+  start_date: string
+  end_date: string
+  status: ProbationStatus
+  outcome_at: string | null
+  outcome_by: number | null
+  outcome_notes: string
+  reviews: ProbationReview[]
+}
+
+export const PROBATION_STATUS_LABELS: Record<ProbationStatus, string> = {
+  in_progress: 'In progress',
+  confirmed: 'Confirmed',
+  extended: 'Extended',
+  terminated: 'Terminated',
+}
+
+export const PROBATION_RECOMMENDATION_LABELS: Record<ProbationRecommendation, string> = {
+  continue: 'Continue probation',
+  extend: 'Recommend extension',
+  confirm: 'Recommend confirmation',
+  terminate: 'Recommend termination',
+}
+
+export interface ProbationCompletionBreakdownRow {
+  key: string
+  confirmed: number | string
+  terminated: number | string
+  completion_pct: number | null
+  suppressed: boolean
+}
+
+export interface ProbationCompletionDashboard {
+  small_cell_suppression_applied: boolean
+  total_closed: number
+  total_confirmed: number
+  overall_completion_pct: number | null
+  in_progress: number
+  by_race: ProbationCompletionBreakdownRow[]
+  by_gender: ProbationCompletionBreakdownRow[]
+  by_disability_status: ProbationCompletionBreakdownRow[]
+}
+
 // ---- Employment exit states & access cascade (C1 part 3) ----
 
 export type EmploymentChangeType =

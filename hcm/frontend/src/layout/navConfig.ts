@@ -49,6 +49,7 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       // audience (alongside Employees / Data Quality) better than
       // Recruitment does.
       { to: '/contract-renewals', label: 'Contract Renewals', roles: CONTRACTS },
+      { to: '/probation', label: 'Probation', roles: CONTRACTS },
       { to: '/employment-changes', label: 'Employment Changes', roles: EXITS },
       // Visibility is scoped server-side per employee/reporting-chain
       // (design spec §7) -- every authenticated employee can open this and

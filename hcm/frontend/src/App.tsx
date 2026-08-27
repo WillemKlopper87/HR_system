@@ -17,6 +17,7 @@ import { ChecklistTemplatesPage } from './pages/ChecklistTemplatesPage'
 import { CompCyclesPage } from './pages/CompCyclesPage'
 import { CompProposalsPage } from './pages/CompProposalsPage'
 import { ContractRenewalsPage } from './pages/ContractRenewalsPage'
+import { ProbationPage } from './pages/ProbationPage'
 import { DataSubjectRequestsPage } from './pages/DataSubjectRequestsPage'
 import { EmploymentChangesPage } from './pages/EmploymentChangesPage'
 import { DataQualityPage } from './pages/DataQualityPage'
@@ -115,6 +116,7 @@ export default function App() {
             </Route>
             <Route element={<RequireRole roles={['hr_admin', 'line_manager', 'auditor']} />}>
               <Route path="/contract-renewals" element={<ContractRenewalsPage />} />
+              <Route path="/probation" element={<ProbationPage />} />
             </Route>
             {/* Narrower than the contract-renewals set above: line managers
                 do not see or propose exits (design spec §8) — suspensions and

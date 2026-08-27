@@ -12,6 +12,8 @@ from .models import (
     JobGrade,
     Location,
     OccupationalLevel,
+    ProbationPeriod,
+    ProbationReview,
 )
 
 
@@ -77,6 +79,27 @@ class ContractRenewalDecisionAdmin(SimpleHistoryAdmin):
     list_display = ("employee_version", "status", "recommended_action", "decided_action")
     list_filter = ("status",)
     search_fields = ("employee_version__employee__employee_number",)
+
+
+class ProbationReviewInline(admin.TabularInline):
+    model = ProbationReview
+    extra = 0
+    fields = ("review_date", "reviewed_by", "recommendation", "employee_signed_at")
+    show_change_link = True
+
+
+@admin.register(ProbationPeriod)
+class ProbationPeriodAdmin(SimpleHistoryAdmin):
+    list_display = ("employee", "start_date", "end_date", "status")
+    list_filter = ("status",)
+    search_fields = ("employee__employee_number",)
+    inlines = [ProbationReviewInline]
+
+
+@admin.register(ProbationReview)
+class ProbationReviewAdmin(SimpleHistoryAdmin):
+    list_display = ("probation_period", "review_date", "reviewed_by", "recommendation")
+    list_filter = ("recommendation",)
 
 
 @admin.register(DataQualityException)

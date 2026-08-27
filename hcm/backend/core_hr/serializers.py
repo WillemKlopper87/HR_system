@@ -16,6 +16,8 @@ from .models import (
     JobGrade,
     Location,
     OccupationalLevel,
+    ProbationPeriod,
+    ProbationReview,
 )
 from .permissions import is_self_or_hr_admin
 
@@ -61,6 +63,29 @@ class ContractRenewalDecisionSerializer(serializers.ModelSerializer):
             "decided_action", "decided_by", "decided_at", "decided_comment", "decided_end_date",
             "resulting_employee_version",
         ]
+
+
+class ProbationReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProbationReview
+        fields = [
+            "id", "probation_period", "review_date", "reviewed_by", "recommendation", "comments",
+            "employee_signed_at",
+        ]
+        read_only_fields = ["reviewed_by"]
+
+
+class ProbationPeriodSerializer(serializers.ModelSerializer):
+    employee_number = serializers.CharField(source="employee.employee_number", read_only=True)
+    reviews = ProbationReviewSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ProbationPeriod
+        fields = [
+            "id", "employee", "employee_number", "start_date", "end_date", "status",
+            "outcome_at", "outcome_by", "outcome_notes", "reviews",
+        ]
+        read_only_fields = ["status", "outcome_at", "outcome_by"]
 
 
 class EmployeeVersionSerializer(TieredModelSerializer):

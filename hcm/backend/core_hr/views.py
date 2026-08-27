@@ -32,6 +32,8 @@ from .models import (
     JobGrade,
     Location,
     OccupationalLevel,
+    ProbationPeriod,
+    ProbationReview,
 )
 from .permissions import EmploymentChangePermission, IsHRAdmin, IsHRAdminOrReadOnly, IsSelfOrHRAdmin
 from .serializers import (
@@ -47,6 +49,8 @@ from .serializers import (
     JobGradeSerializer,
     LocationSerializer,
     OccupationalLevelSerializer,
+    ProbationPeriodSerializer,
+    ProbationReviewSerializer,
 )
 
 
@@ -151,6 +155,96 @@ class EmployeeVersionViewSet(viewsets.ReadOnlyModelViewSet):
         except ContractDecisionError as exc:
             return Response({"detail": str(exc)}, status=400)
         return Response(ContractRenewalDecisionSerializer(decision).data)
+
+
+class ProbationPeriodViewSet(viewsets.ModelViewSet):
+    """Code on integrating EE into HR practice, probation section — a
+    probation window opened by hr_admin, reviewed by the line manager
+    (ProbationReviewViewSet below), decided by hr_admin. Same
+    RowScopePermission row-scoping learning's per-employee records use:
+    the employee sees their own, their manager sees their reports', hr_admin
+    sees all."""
+
+    queryset = ProbationPeriod.objects.select_related("employee", "outcome_by").prefetch_related("reviews")
+    serializer_class = ProbationPeriodSerializer
+    permission_classes = [permissions.IsAuthenticated, RowScopePermission]
+    http_method_names = ["get", "post", "head", "options"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        target_id = int_query_param(self.request, "employee")
+        if target_id is not None:
+            queryset = queryset.filter(employee_id=target_id)
+        if self.action != "list":
+            return queryset
+        employee = get_request_employee(self.request)
+        return row_scoped_queryset(queryset, employee)
+
+    def get_target_employee(self, obj):
+        return obj.employee
+
+    def perform_create(self, serializer):
+        actor = get_request_employee(self.request)
+        if not has_role(actor, "hr_admin"):
+            raise ValidationError("Only hr_admin can open a probation period.")
+        serializer.save()
+
+    @action(detail=True, methods=["post"])
+    def record_outcome(self, request, pk=None):
+        """hr_admin only. No workflow gate beyond "still open" — a
+        CONFIRMED/TERMINATED period is closed; EXTENDED can still receive
+        a later, final outcome."""
+        period = self.get_object()
+        actor = get_request_employee(request)
+        if not has_role(actor, "hr_admin"):
+            return Response({"detail": "Only hr_admin can record a probation outcome."}, status=403)
+        if period.status not in (ProbationPeriod.Status.IN_PROGRESS, ProbationPeriod.Status.EXTENDED):
+            return Response({"detail": f"Probation is already {period.get_status_display()}."}, status=400)
+        new_status = request.data.get("status")
+        valid_statuses = {
+            ProbationPeriod.Status.CONFIRMED, ProbationPeriod.Status.EXTENDED, ProbationPeriod.Status.TERMINATED,
+        }
+        if new_status not in valid_statuses:
+            return Response({"detail": "status must be one of confirmed, extended, terminated."}, status=400)
+        update_fields = ["status", "outcome_at", "outcome_by", "outcome_notes"]
+        period.status = new_status
+        period.outcome_at = timezone.now()
+        period.outcome_by = actor
+        period.outcome_notes = request.data.get("notes", "")
+        if new_status == ProbationPeriod.Status.EXTENDED:
+            new_end_date = request.data.get("end_date")
+            if not new_end_date:
+                return Response({"detail": "end_date is required when extending probation."}, status=400)
+            period.end_date = new_end_date
+            update_fields.append("end_date")
+        period.save(update_fields=update_fields)
+        return Response(self.get_serializer(period).data)
+
+
+class ProbationReviewViewSet(viewsets.ModelViewSet):
+    queryset = ProbationReview.objects.select_related("probation_period__employee", "reviewed_by")
+    serializer_class = ProbationReviewSerializer
+    permission_classes = [permissions.IsAuthenticated, RowScopePermission]
+    http_method_names = ["get", "post", "head", "options"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        period_id = int_query_param(self.request, "probation_period")
+        if period_id is not None:
+            queryset = queryset.filter(probation_period_id=period_id)
+        if self.action != "list":
+            return queryset
+        employee = get_request_employee(self.request)
+        return row_scoped_queryset(queryset, employee, employee_field="probation_period__employee")
+
+    def get_target_employee(self, obj):
+        return obj.probation_period.employee
+
+    def perform_create(self, serializer):
+        actor = get_request_employee(self.request)
+        if not (has_role(actor, "hr_admin") or has_role(actor, "line_manager")):
+            raise ValidationError("Only hr_admin or a line manager can record a probation review.")
+        serializer.save(reviewed_by=actor)
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
@@ -534,3 +628,63 @@ def headcount_dashboard(request):
         "by_disability_status": _breakdown("disability_status", suppress=not can_see_unsuppressed),
     }
     return Response(data)
+
+
+@extend_schema(responses=OpenApiTypes.OBJECT)
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated, IsHRAdmin])
+def probation_completion_dashboard(request):
+    """Code on integrating EE into HR practice, probation section:
+    "completion rates by designated group". Only CLOSED periods
+    (confirmed or terminated) count towards a rate -- one still
+    IN_PROGRESS/EXTENDED hasn't reached an outcome yet, so including it
+    would understate confirmation until every open case resolves.
+    hr_admin only, same reasoning training_compliance_dashboard uses:
+    this is a management rollup naming individuals' outcomes, not a
+    self-service view."""
+    can_see_unsuppressed = can_see_unsuppressed_aggregates(get_request_employee(request), FieldTier.SENSITIVE)
+    closed = ProbationPeriod.objects.filter(
+        status__in=[ProbationPeriod.Status.CONFIRMED, ProbationPeriod.Status.TERMINATED]
+    ).select_related("employee")
+    versions = {
+        v.employee_id: v for v in EmployeeVersion.objects.current().filter(
+            employee_id__in=closed.values_list("employee_id", flat=True)
+        )
+    }
+
+    def _breakdown(group_field: str):
+        buckets: dict[str, dict[str, int]] = {}
+        for period in closed:
+            version = versions.get(period.employee_id)
+            key = getattr(version, group_field, None) if version else None
+            if key is None:
+                continue
+            bucket = buckets.setdefault(key, {"confirmed": 0, "terminated": 0})
+            bucket["confirmed" if period.status == ProbationPeriod.Status.CONFIRMED else "terminated"] += 1
+        result = []
+        for key, counts in sorted(buckets.items()):
+            total = counts["confirmed"] + counts["terminated"]
+            suppress = not can_see_unsuppressed and total < SMALL_CELL_THRESHOLD
+            result.append({
+                "key": key,
+                "confirmed": f"<{SMALL_CELL_THRESHOLD}" if suppress else counts["confirmed"],
+                "terminated": f"<{SMALL_CELL_THRESHOLD}" if suppress else counts["terminated"],
+                "completion_pct": round(counts["confirmed"] / total * 100, 1) if total else None,
+                "suppressed": suppress,
+            })
+        return result
+
+    total_closed = closed.count()
+    total_confirmed = closed.filter(status=ProbationPeriod.Status.CONFIRMED).count()
+    return Response({
+        "small_cell_suppression_applied": not can_see_unsuppressed,
+        "total_closed": total_closed,
+        "total_confirmed": total_confirmed,
+        "overall_completion_pct": round(total_confirmed / total_closed * 100, 1) if total_closed else None,
+        "in_progress": ProbationPeriod.objects.filter(
+            status__in=[ProbationPeriod.Status.IN_PROGRESS, ProbationPeriod.Status.EXTENDED]
+        ).count(),
+        "by_race": _breakdown("race"),
+        "by_gender": _breakdown("gender"),
+        "by_disability_status": _breakdown("disability_status"),
+    })
