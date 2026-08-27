@@ -139,6 +139,49 @@ export interface ProbationCompletionDashboard {
   by_disability_status: ProbationCompletionBreakdownRow[]
 }
 
+export type ExitInterviewReason =
+  | 'compensation' | 'career_growth' | 'management' | 'work_life_balance'
+  | 'relocation' | 'health' | 'role_fit' | 'other'
+
+export interface ExitInterview {
+  id: number
+  employee: number
+  employment_change: number | null
+  probation_period: number | null
+  interview_date: string
+  conducted_by: number | null
+  primary_reason: ExitInterviewReason
+  would_recommend_employer: boolean | null
+  comments: string
+}
+
+export const EXIT_INTERVIEW_REASON_LABELS: Record<ExitInterviewReason, string> = {
+  compensation: 'Compensation',
+  career_growth: 'Career growth',
+  management: 'Management or relationship with manager',
+  work_life_balance: 'Work-life balance',
+  relocation: 'Relocation',
+  health: 'Health or personal',
+  role_fit: 'Role fit',
+  other: 'Other',
+}
+
+export interface ExitInterviewGroupBreakdownRow {
+  key: string
+  total: number | string
+  by_reason: Partial<Record<ExitInterviewReason, number>>
+  suppressed: boolean
+}
+
+export interface ExitInterviewDashboard {
+  small_cell_suppression_applied: boolean
+  total_interviews: number
+  by_reason: { key: ExitInterviewReason; count: number }[]
+  by_race: ExitInterviewGroupBreakdownRow[]
+  by_gender: ExitInterviewGroupBreakdownRow[]
+  by_disability_status: ExitInterviewGroupBreakdownRow[]
+}
+
 // ---- Employment exit states & access cascade (C1 part 3) ----
 
 export type EmploymentChangeType =

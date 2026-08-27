@@ -9,6 +9,7 @@ from .models import (
     EmployeeVersion,
     EmploymentChange,
     EmploymentEvent,
+    ExitInterview,
     JobGrade,
     Location,
     OccupationalLevel,
@@ -100,6 +101,13 @@ class ProbationPeriodAdmin(SimpleHistoryAdmin):
 class ProbationReviewAdmin(SimpleHistoryAdmin):
     list_display = ("probation_period", "review_date", "reviewed_by", "recommendation")
     list_filter = ("recommendation",)
+
+
+@admin.register(ExitInterview)
+class ExitInterviewAdmin(SimpleHistoryAdmin):
+    list_display = ("employee", "interview_date", "primary_reason", "conducted_by")
+    list_filter = ("primary_reason",)
+    search_fields = ("employee__employee_number",)
 
 
 @admin.register(DataQualityException)

@@ -15,6 +15,7 @@ from .models import (
     EmploymentChange,
     JobGrade,
     Location,
+    ExitInterview,
     OccupationalLevel,
     ProbationPeriod,
     ProbationReview,
@@ -86,6 +87,16 @@ class ProbationPeriodSerializer(serializers.ModelSerializer):
             "outcome_at", "outcome_by", "outcome_notes", "reviews",
         ]
         read_only_fields = ["status", "outcome_at", "outcome_by"]
+
+
+class ExitInterviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExitInterview
+        fields = [
+            "id", "employee", "employment_change", "probation_period", "interview_date", "conducted_by",
+            "primary_reason", "would_recommend_employer", "comments",
+        ]
+        read_only_fields = ["conducted_by"]
 
 
 class EmployeeVersionSerializer(TieredModelSerializer):

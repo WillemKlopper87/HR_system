@@ -20,6 +20,7 @@ import { ContractRenewalsPage } from './pages/ContractRenewalsPage'
 import { ProbationPage } from './pages/ProbationPage'
 import { DataSubjectRequestsPage } from './pages/DataSubjectRequestsPage'
 import { EmploymentChangesPage } from './pages/EmploymentChangesPage'
+import { ExitInterviewsPage } from './pages/ExitInterviewsPage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { EEConfigurationPage } from './pages/EEConfigurationPage'
 import { EEForumPage } from './pages/EEForumPage'
@@ -123,6 +124,9 @@ export default function App() {
                 dismissals originate from a disciplinary process (C5). */}
             <Route element={<RequireRole roles={['hr_admin', 'auditor']} />}>
               <Route path="/employment-changes" element={<EmploymentChangesPage />} />
+            </Route>
+            <Route element={<RequireRole roles={['hr_admin']} />}>
+              <Route path="/exit-interviews" element={<ExitInterviewsPage />} />
             </Route>
             {/* Visibility is scoped server-side per employee/reporting-chain
                 (design spec §7) -- any authenticated employee may open this

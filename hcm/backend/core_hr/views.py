@@ -31,6 +31,7 @@ from .models import (
     EmploymentChange,
     JobGrade,
     Location,
+    ExitInterview,
     OccupationalLevel,
     ProbationPeriod,
     ProbationReview,
@@ -49,6 +50,7 @@ from .serializers import (
     JobGradeSerializer,
     LocationSerializer,
     OccupationalLevelSerializer,
+    ExitInterviewSerializer,
     ProbationPeriodSerializer,
     ProbationReviewSerializer,
 )
@@ -245,6 +247,29 @@ class ProbationReviewViewSet(viewsets.ModelViewSet):
         if not (has_role(actor, "hr_admin") or has_role(actor, "line_manager")):
             raise ValidationError("Only hr_admin or a line manager can record a probation review.")
         serializer.save(reviewed_by=actor)
+
+
+class ExitInterviewViewSet(viewsets.ModelViewSet):
+    """hr_admin only -- same posture as training_compliance_dashboard:
+    a management record naming individuals' departure reasons, not a
+    self-service or line-manager view. Reusable across two triggers
+    (a genuine exit via employment_change, or a probation
+    non-confirmation via probation_period), per the Code on integrating
+    EE into HR practice's own cross-reference between the two."""
+
+    queryset = ExitInterview.objects.select_related("employee", "conducted_by")
+    serializer_class = ExitInterviewSerializer
+    permission_classes = [permissions.IsAuthenticated, IsHRAdmin]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        target_id = int_query_param(self.request, "employee")
+        if target_id is not None:
+            queryset = queryset.filter(employee_id=target_id)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(conducted_by=get_request_employee(self.request))
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
@@ -684,6 +709,61 @@ def probation_completion_dashboard(request):
         "in_progress": ProbationPeriod.objects.filter(
             status__in=[ProbationPeriod.Status.IN_PROGRESS, ProbationPeriod.Status.EXTENDED]
         ).count(),
+        "by_race": _breakdown("race"),
+        "by_gender": _breakdown("gender"),
+        "by_disability_status": _breakdown("disability_status"),
+    })
+
+
+@extend_schema(responses=OpenApiTypes.OBJECT)
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated, IsHRAdmin])
+def exit_interview_dashboard(request):
+    """Code on integrating EE into HR practice, termination/retention
+    section: exit reasons reviewed by designated group. Reuses the
+    current EmployeeVersion for each interviewed employee -- same
+    approach probation_completion_dashboard takes, and the same caveat:
+    an employee whose demographics are NOT_DISCLOSED on both race and
+    gender is invisible to the by_race/by_gender breakdowns (nothing to
+    group them under), same as every other workforce breakdown in this
+    app."""
+    can_see_unsuppressed = can_see_unsuppressed_aggregates(get_request_employee(request), FieldTier.SENSITIVE)
+    interviews = ExitInterview.objects.select_related("employee")
+    versions = {
+        v.employee_id: v for v in EmployeeVersion.objects.current().filter(
+            employee_id__in=interviews.values_list("employee_id", flat=True)
+        )
+    }
+
+    def _breakdown(group_field: str):
+        buckets: dict[str, dict[str, int]] = {}
+        for interview in interviews:
+            version = versions.get(interview.employee_id)
+            key = getattr(version, group_field, None) if version else None
+            if key is None:
+                continue
+            bucket = buckets.setdefault(key, {})
+            bucket[interview.primary_reason] = bucket.get(interview.primary_reason, 0) + 1
+        result = []
+        for key, reasons in sorted(buckets.items()):
+            total = sum(reasons.values())
+            suppress = not can_see_unsuppressed and total < SMALL_CELL_THRESHOLD
+            result.append({
+                "key": key,
+                "total": f"<{SMALL_CELL_THRESHOLD}" if suppress else total,
+                "by_reason": {} if suppress else reasons,
+                "suppressed": suppress,
+            })
+        return result
+
+    reason_counts: dict[str, int] = {}
+    for interview in interviews:
+        reason_counts[interview.primary_reason] = reason_counts.get(interview.primary_reason, 0) + 1
+
+    return Response({
+        "small_cell_suppression_applied": not can_see_unsuppressed,
+        "total_interviews": interviews.count(),
+        "by_reason": [{"key": key, "count": count} for key, count in sorted(reason_counts.items())],
         "by_race": _breakdown("race"),
         "by_gender": _breakdown("gender"),
         "by_disability_status": _breakdown("disability_status"),
