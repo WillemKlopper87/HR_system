@@ -11,7 +11,7 @@ from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rbac_audit.drf import RowScopePermission, get_request_employee, int_query_param, row_scoped_queryset
-from rest_framework import permissions, viewsets
+from rest_framework import permissions, serializers, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
@@ -25,6 +25,7 @@ from .serializers import (
     SkillSerializer,
     TrainingRecordSerializer,
 )
+from .uploads import EvidenceValidationError, validate_evidence_upload
 
 
 class SkillViewSet(viewsets.ModelViewSet):
@@ -95,6 +96,22 @@ class TrainingRecordViewSet(_RowScopedLearningViewSet):
     model = TrainingRecord
     serializer_class = TrainingRecordSerializer
     permission_classes = [permissions.IsAuthenticated, RowScopePermission]
+
+    def _validate_evidence(self, serializer):
+        uploaded = serializer.validated_data.get("evidence_file")
+        if uploaded is None:
+            return {}
+        try:
+            content_type, sha256 = validate_evidence_upload(uploaded)
+        except EvidenceValidationError as exc:
+            raise serializers.ValidationError({"evidence_file": str(exc)})
+        return {"evidence_content_type": content_type, "evidence_sha256": sha256}
+
+    def perform_create(self, serializer):
+        serializer.save(**self._validate_evidence(serializer))
+
+    def perform_update(self, serializer):
+        serializer.save(**self._validate_evidence(serializer))
 
 
 @extend_schema(responses=OpenApiTypes.OBJECT)
@@ -192,6 +209,7 @@ def wsp_atr_export(request):
     writer.writerow([
         "record_type", "employee_number", "occupational_level", "race", "gender", "disability_status",
         "training_title", "provider", "status", "start_date", "completion_date", "hours", "cost",
+        "learning_programme_category", "learner_agreement_signed", "has_evidence_file",
     ])
     for record in training_records:
         version = record.employee.current_version
@@ -209,6 +227,9 @@ def wsp_atr_export(request):
             record.completion_date or "",
             record.hours if record.hours is not None else "",
             record.cost if record.cost is not None else "",
+            record.learning_programme_category,
+            record.learner_agreement_signed,
+            bool(record.evidence_file),
         ])
     for cert in certifications:
         version = cert.employee.current_version
@@ -223,6 +244,9 @@ def wsp_atr_export(request):
             cert.issuing_body,
             "",
             cert.issue_date or "",
+            "",
+            "",
+            "",
             "",
             "",
             "",

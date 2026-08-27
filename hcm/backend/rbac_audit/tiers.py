@@ -158,6 +158,11 @@ FIELD_TIERS: dict[str, dict[str, str]] = {
         "completion_date": FieldTier.INTERNAL,
         "hours": FieldTier.INTERNAL,
         "cost": FieldTier.INTERNAL,
+        "learning_programme_category": FieldTier.INTERNAL,
+        "learner_agreement_signed": FieldTier.INTERNAL,
+        "evidence_file": FieldTier.INTERNAL,
+        "evidence_content_type": FieldTier.INTERNAL,
+        "evidence_sha256": FieldTier.INTERNAL,
     },
 }
 

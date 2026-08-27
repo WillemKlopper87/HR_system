@@ -93,6 +93,24 @@ class TrainingRecord(TimestampedModel):
         COMPLETED = "completed", "Completed"
         CANCELLED = "cancelled", "Cancelled"
 
+    class LearningProgrammeCategory(models.TextChoices):
+        """B-BBEE Skills Development Code (series 300)'s Learning Programme
+        Matrix — which of the seven recognised programme types this record's
+        spend counts toward. Slot only: which category maps to which of a
+        bursary / learnership / apprenticeship / informal-training
+        description should be confirmed against the gazetted Codes before
+        being relied on for an actual scorecard filing, same caveat the EE/
+        B-BBEE regulatory field-guide review attached to its own B-BBEE
+        figures."""
+
+        A = "A", "Category A"
+        B = "B", "Category B"
+        C = "C", "Category C"
+        D = "D", "Category D"
+        E = "E", "Category E"
+        F = "F", "Category F"
+        G = "G", "Category G"
+
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="training_records")
     title = models.CharField(max_length=200)
     provider = models.CharField(max_length=200, blank=True)
@@ -112,6 +130,18 @@ class TrainingRecord(TimestampedModel):
     completion_date = models.DateField(null=True, blank=True)
     hours = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    # B-BBEE skills-development scorecard evidence (Code series 300) --
+    # verification agencies ask for the programme category, an agreement
+    # for learnerships/apprenticeships, and provider invoice/attendance
+    # evidence alongside the cost the field above already carries.
+    learning_programme_category = models.CharField(
+        max_length=1, choices=LearningProgrammeCategory.choices, blank=True
+    )
+    learner_agreement_signed = models.BooleanField(default=False)
+    evidence_file = models.FileField(upload_to="training_evidence/%Y/%m/", null=True, blank=True)
+    evidence_content_type = models.CharField(max_length=120, blank=True)
+    evidence_sha256 = models.CharField(max_length=64, blank=True)
 
     class Meta:
         ordering = ["-created_at"]

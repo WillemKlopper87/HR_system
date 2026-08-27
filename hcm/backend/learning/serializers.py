@@ -86,8 +86,10 @@ class TrainingRecordSerializer(RowScopedLearningSerializer):
         model = TrainingRecord
         fields = [
             "id", "employee", "title", "provider", "course", "status", "start_date", "completion_date",
-            "hours", "cost",
+            "hours", "cost", "learning_programme_category", "learner_agreement_signed",
+            "evidence_file", "evidence_content_type", "evidence_sha256",
         ]
+        read_only_fields = ["evidence_content_type", "evidence_sha256"]
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

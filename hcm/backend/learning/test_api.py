@@ -147,6 +147,57 @@ class CertificationAndTrainingRecordTests(LearningApiTestCase):
         self.assertEqual(response.status_code, 201)
 
 
+class TrainingRecordEvidenceTests(LearningApiTestCase):
+    """B-BBEE skills-development scorecard evidence (Code series 300) --
+    learning-programme category, learner agreement flag, and a
+    content-sniffed provider invoice/attendance-register upload."""
+
+    def test_category_and_learner_agreement_are_saved(self):
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post(
+            "/api/v1/training-records/",
+            {
+                "employee": self.report.id, "title": "Data Engineering Learnership", "status": "completed",
+                "learning_programme_category": "C", "learner_agreement_signed": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["learning_programme_category"], "C")
+        self.assertTrue(response.data["learner_agreement_signed"])
+
+    def test_evidence_upload_is_content_sniffed_and_hashed(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post(
+            "/api/v1/training-records/",
+            {
+                "employee": self.report.id, "title": "AWS Bootcamp", "status": "completed",
+                "evidence_file": SimpleUploadedFile("invoice.pdf", b"%PDF-1.7\ninvoice", content_type="application/pdf"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["evidence_content_type"], "application/pdf")
+        self.assertTrue(response.data["evidence_sha256"])
+
+    def test_mislabelled_evidence_is_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post(
+            "/api/v1/training-records/",
+            {
+                "employee": self.report.id, "title": "AWS Bootcamp", "status": "completed",
+                "evidence_file": SimpleUploadedFile("invoice.pdf", b"not actually a pdf", content_type="application/pdf"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("evidence_file", response.data)
+
+
 class TrainingRecordEnrollmentRequestApiTests(LearningApiTestCase):
     """Sprint 15 (ESS): learning enrollment requests — a self-submission is
     always forced to REQUESTED regardless of what the client sends, and the
@@ -249,6 +300,7 @@ class WspAtrExportTests(LearningApiTestCase):
         TrainingRecord.objects.create(
             employee=self.report, title="AWS Bootcamp", status=TrainingRecord.Status.COMPLETED,
             hours="40.0", cost="5000.00", completion_date=date(2026, 3, 1),
+            learning_programme_category="F", learner_agreement_signed=False,
         )
 
     def test_non_hr_admin_cannot_export(self):
@@ -267,6 +319,8 @@ class WspAtrExportTests(LearningApiTestCase):
         self.assertIn("training,E100", content)
         self.assertIn("AWS Bootcamp", content)
         self.assertIn("5000.00", content)
+        self.assertIn("learning_programme_category,learner_agreement_signed,has_evidence_file", content)
+        self.assertIn(",F,False,False", content)
 
     def test_year_filter_excludes_other_years(self):
         TrainingRecord.objects.create(
