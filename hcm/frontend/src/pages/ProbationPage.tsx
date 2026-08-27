@@ -8,7 +8,7 @@ import type {
 import { PROBATION_RECOMMENDATION_LABELS, PROBATION_STATUS_LABELS } from '../api/types'
 
 export function ProbationPage() {
-  const { hasRole } = useAuth()
+  const { hasRole, user } = useAuth()
   const isHrAdmin = hasRole('hr_admin')
   const isLineManager = hasRole('line_manager')
   const periods = useApiQuery(() => fetchAllPages<ProbationPeriod>('/probation-periods/'), [], {
@@ -69,7 +69,8 @@ export function ProbationPage() {
           periods.data.map((period) => (
             <PeriodCard
               key={period.id} period={period} canRecordOutcome={isHrAdmin}
-              canReview={isHrAdmin || isLineManager} onChanged={periods.reload}
+              canReview={isHrAdmin || isLineManager}
+              canSign={user?.employee_id === period.employee} onChanged={periods.reload}
             />
           ))
         )}
@@ -134,8 +135,11 @@ function OpenPeriodForm({ employees, onSaved }: { employees: Employee[]; onSaved
 }
 
 function PeriodCard({
-  period, canRecordOutcome, canReview, onChanged,
-}: { period: ProbationPeriod; canRecordOutcome: boolean; canReview: boolean; onChanged: () => void }) {
+  period, canRecordOutcome, canReview, canSign, onChanged,
+}: {
+  period: ProbationPeriod; canRecordOutcome: boolean; canReview: boolean;
+  canSign: boolean; onChanged: () => void
+}) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const isOpen = period.status === 'in_progress' || period.status === 'extended'
@@ -162,6 +166,21 @@ function PeriodCard({
     }
   }
 
+  async function signReview(reviewId: number) {
+    const password = window.prompt('Enter your current password to countersign this review:')
+    if (!password) return
+    setError(null)
+    setBusy(true)
+    try {
+      await api.post(`/probation-reviews/${reviewId}/sign/`, { password })
+      onChanged()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to countersign the review.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="detail-card">
       <h3>
@@ -173,7 +192,7 @@ function PeriodCard({
       {period.reviews.length > 0 && (
         <table className="data-table">
           <thead>
-            <tr><th>Date</th><th>Recommendation</th><th>Comments</th></tr>
+            <tr><th>Date</th><th>Recommendation</th><th>Comments</th><th>Employee signature</th></tr>
           </thead>
           <tbody>
             {period.reviews.map((r) => (
@@ -181,6 +200,13 @@ function PeriodCard({
                 <td>{r.review_date}</td>
                 <td>{PROBATION_RECOMMENDATION_LABELS[r.recommendation]}</td>
                 <td>{r.comments || '—'}</td>
+                <td>
+                  {r.employee_signed_at ? (
+                    <>Signed {new Date(r.employee_signed_at).toLocaleString()}</>
+                  ) : canSign ? (
+                    <button type="button" disabled={busy} onClick={() => signReview(r.id)}>Countersign</button>
+                  ) : 'Awaiting employee'}
+                </td>
               </tr>
             ))}
           </tbody>

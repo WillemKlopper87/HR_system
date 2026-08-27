@@ -82,14 +82,25 @@ class CertificationSerializer(RowScopedLearningSerializer):
 
 
 class TrainingRecordSerializer(RowScopedLearningSerializer):
+    has_evidence_file = serializers.SerializerMethodField()
+    evidence_download_url = serializers.SerializerMethodField()
+    evidence_file = serializers.FileField(write_only=True, required=False, allow_null=True)
+
     class Meta:
         model = TrainingRecord
         fields = [
             "id", "employee", "title", "provider", "course", "status", "start_date", "completion_date",
             "hours", "cost", "learning_programme_category", "learner_agreement_signed",
-            "evidence_file", "evidence_content_type", "evidence_sha256",
+            "evidence_file", "has_evidence_file", "evidence_download_url",
+            "evidence_content_type", "evidence_sha256",
         ]
         read_only_fields = ["evidence_content_type", "evidence_sha256"]
+
+    def get_has_evidence_file(self, obj) -> bool:
+        return bool(obj.evidence_file)
+
+    def get_evidence_download_url(self, obj) -> str | None:
+        return f"/api/v1/training-records/{obj.pk}/download_evidence/" if obj.evidence_file else None
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

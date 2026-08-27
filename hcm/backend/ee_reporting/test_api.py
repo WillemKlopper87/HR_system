@@ -330,6 +330,7 @@ class EquityDashboardApiTests(EEReportingApiTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["small_cell_suppression_applied"])
         self.assertEqual(response.data["workforce_profile"]["TOP"]["indian_female"], "<5")
+        self.assertEqual(response.data["workforce_profile"]["TOP"]["african_male"], "Suppressed")
 
 
 class ManagementControlScheduleApiTests(EEReportingApiTestCase):
@@ -369,6 +370,7 @@ class ManagementControlScheduleApiTests(EEReportingApiTestCase):
         self.assertTrue(response.data["small_cell_suppression_applied"])
         row = self._row(response)
         self.assertEqual(row["black_female"], "<5")
+        self.assertIsNone(row["black_female_pct"])
 
     def test_disability_representation_and_target_included(self):
         EEPlan.objects.create(

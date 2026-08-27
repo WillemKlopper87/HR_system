@@ -91,6 +91,7 @@ export interface ProbationReview {
   recommendation: ProbationRecommendation
   comments: string
   employee_signed_at: string | null
+  employee_signature_sha256: string
 }
 
 export interface ProbationPeriod {
@@ -169,7 +170,7 @@ export const EXIT_INTERVIEW_REASON_LABELS: Record<ExitInterviewReason, string> =
 export interface ExitInterviewGroupBreakdownRow {
   key: string
   total: number | string
-  by_reason: Partial<Record<ExitInterviewReason, number>>
+  by_reason: Partial<Record<ExitInterviewReason, number | string>>
   suppressed: boolean
 }
 
@@ -517,7 +518,7 @@ export type RecruitmentBreakdownRow = BreakdownRow
 
 export interface RecruitmentDashboard {
   open_requisitions: number
-  total_applicants: number
+  total_applicants: number | string
   avg_time_to_fill_days: number | null
   small_cell_suppression_applied: boolean
   by_stage: RecruitmentBreakdownRow[]
@@ -528,13 +529,13 @@ export interface RecruitmentDashboard {
 
 export interface RecruitmentFunnelStageRow {
   stage: Exclude<ApplicantStage, 'rejected'>
-  total: number
+  total: number | string
   breakdown: RecruitmentBreakdownRow[]
 }
 
 export interface RecruitmentFunnel {
   small_cell_suppression_applied: boolean
-  total_applicants: number
+  total_applicants: number | string
   by_race: RecruitmentFunnelStageRow[]
   by_gender: RecruitmentFunnelStageRow[]
   by_disability_status: RecruitmentFunnelStageRow[]
@@ -774,6 +775,12 @@ export interface TrainingRecord {
   completion_date?: string | null
   hours?: string | null
   cost?: string | null
+  learning_programme_category?: string
+  learner_agreement_signed?: boolean
+  has_evidence_file?: boolean
+  evidence_download_url?: string | null
+  evidence_content_type?: string
+  evidence_sha256?: string
 }
 
 export const TRAINING_STATUS_LABELS: Record<TrainingStatus, string> = {
@@ -1111,7 +1118,7 @@ export type DemographicColumn =
   | 'african_female' | 'coloured_female' | 'indian_female' | 'white_female'
   | 'foreign_national_male' | 'foreign_national_female'
 
-export type WorkforceMatrix = Record<string, Partial<Record<DemographicColumn, number>>>
+export type WorkforceMatrix = Record<string, Partial<Record<DemographicColumn, number | string | null>>>
 
 export interface EESector {
   id: number
@@ -1228,7 +1235,7 @@ export interface EquityDashboard {
 
 export interface ManagementControlLevelRow {
   level: string
-  headcount: number
+  headcount: number | string
   black: number | string
   black_pct: number | null
   eap_black_pct: number | null

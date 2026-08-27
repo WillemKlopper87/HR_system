@@ -5,7 +5,7 @@ from datetime import date
 from core_hr.models import Department, Employee, EmployeeVersion, JobGrade, Location, OccupationalLevel
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from rbac_audit.models import Role, RoleAssignment
+from rbac_audit.models import AuditLogEntry, Role, RoleAssignment
 from rest_framework.test import APIClient
 
 from .models import ProbationPeriod, ProbationReview
@@ -124,6 +124,82 @@ class ProbationReviewTests(ProbationApiTestCase):
         }, format="json")
         self.assertEqual(response.status_code, 400)
         self.assertFalse(ProbationReview.objects.exists())
+
+    def test_different_line_manager_cannot_review_employee_outside_their_scope(self):
+        period_id = self._open_period()
+        other_manager = Employee.objects.hire(
+            employee_number="MGR10", first_name="Other", last_name="Manager", date_of_birth=date(1982, 1, 1),
+            work_email="manager10@example.com", hire_date=date(2018, 1, 1), department=self.report.current_version.department,
+            occupational_level=self.report.current_version.occupational_level,
+            job_grade=self.report.current_version.job_grade, location=self.report.current_version.location,
+            user=User.objects.create_user(username="manager10", password="x"),
+        )
+        RoleAssignment.objects.create(employee=other_manager, role=Role.objects.get(name="line_manager"))
+        self.client.force_authenticate(user=other_manager.user)
+        response = self.client.post("/api/v1/probation-reviews/", {
+            "probation_period": period_id, "review_date": "2026-07-15", "recommendation": "continue",
+        }, format="json")
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(ProbationReview.objects.exists())
+
+    def test_manager_cannot_set_employee_signature_fields(self):
+        period_id = self._open_period()
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post("/api/v1/probation-reviews/", {
+            "probation_period": period_id, "review_date": "2026-07-15", "recommendation": "continue",
+            "employee_signed_at": "2026-07-15T12:00:00Z", "employee_signature_sha256": "f" * 64,
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertIsNone(response.data["employee_signed_at"])
+        self.assertEqual(response.data["employee_signature_sha256"], "")
+
+
+class ProbationReviewSignatureTests(ProbationApiTestCase):
+    def setUp(self):
+        super().setUp()
+        period_id = self._open_period()
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post("/api/v1/probation-reviews/", {
+            "probation_period": period_id, "review_date": "2026-07-15", "recommendation": "continue",
+            "comments": "On track.",
+        }, format="json")
+        self.review_id = response.data["id"]
+
+    def test_employee_countersigns_with_password_and_audits_hash(self):
+        self.client.force_authenticate(user=self.report.user)
+        response = self.client.post(
+            f"/api/v1/probation-reviews/{self.review_id}/sign/", {"password": "x"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIsNotNone(response.data["employee_signed_at"])
+        self.assertEqual(len(response.data["employee_signature_sha256"]), 64)
+        self.assertTrue(AuditLogEntry.objects.filter(
+            actor=self.report, entity_type="core_hr.ProbationReview", entity_id=str(self.review_id),
+            action=AuditLogEntry.Action.UPDATE,
+        ).exists())
+
+    def test_wrong_password_and_third_party_are_rejected(self):
+        self.client.force_authenticate(user=self.report.user)
+        wrong = self.client.post(
+            f"/api/v1/probation-reviews/{self.review_id}/sign/", {"password": "wrong"}, format="json"
+        )
+        self.assertEqual(wrong.status_code, 400)
+        self.client.force_authenticate(user=self.manager.user)
+        third_party = self.client.post(
+            f"/api/v1/probation-reviews/{self.review_id}/sign/", {"password": "x"}, format="json"
+        )
+        self.assertEqual(third_party.status_code, 403)
+
+    def test_review_cannot_be_countersigned_twice(self):
+        self.client.force_authenticate(user=self.report.user)
+        first = self.client.post(
+            f"/api/v1/probation-reviews/{self.review_id}/sign/", {"password": "x"}, format="json"
+        )
+        self.assertEqual(first.status_code, 200)
+        second = self.client.post(
+            f"/api/v1/probation-reviews/{self.review_id}/sign/", {"password": "x"}, format="json"
+        )
+        self.assertEqual(second.status_code, 409)
 
 
 class ProbationOutcomeTests(ProbationApiTestCase):

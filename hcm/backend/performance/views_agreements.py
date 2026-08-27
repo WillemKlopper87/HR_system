@@ -14,6 +14,7 @@ import os
 
 from django.http import FileResponse
 from django.utils import timezone
+from rbac_audit.aggregates import suppress_related_counts
 from rbac_audit.audit import log_access
 from rbac_audit.drf import get_request_employee, int_query_param, row_scoped_queryset
 from rbac_audit.models import AuditLogEntry
@@ -83,11 +84,6 @@ from .services import (
 )
 from .models.agreements import RATING_MAX, RATING_MIN
 from .services.agreements import may_sign_as_head
-
-# Same threshold/gate as ee_reporting's equity dashboard and core_hr's
-# headcount dashboard (RBAC-Roles.md standing rule 1 / gap C6).
-SMALL_CELL_THRESHOLD = 5
-
 
 def _error(exc: AgreementWorkflowError) -> Response:
     return Response({"detail": str(exc)}, status=409 if getattr(exc, "conflict", False) else 400)
@@ -218,10 +214,7 @@ class PerformancePeriodViewSet(viewsets.ModelViewSet):
             if can_see_unsuppressed:
                 return matrix
             return {
-                key: {
-                    rating: (f"<{SMALL_CELL_THRESHOLD}" if 0 < count < SMALL_CELL_THRESHOLD else count)
-                    for rating, count in row.items()
-                }
+                key: suppress_related_counts(row, suppress=True)[0]
                 for key, row in matrix.items()
             }
 

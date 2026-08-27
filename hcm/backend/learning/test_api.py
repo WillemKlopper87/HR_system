@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from rbac_audit.models import Role, RoleAssignment
+from rbac_audit.models import AuditLogEntry, Role, RoleAssignment
 from rest_framework.test import APIClient
 
 from .models import Certification, Course, CourseRequirement, EmployeeSkill, Skill, TrainingRecord
@@ -181,6 +181,12 @@ class TrainingRecordEvidenceTests(LearningApiTestCase):
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data["evidence_content_type"], "application/pdf")
         self.assertTrue(response.data["evidence_sha256"])
+        self.assertNotIn("evidence_file", response.data)
+        self.assertTrue(response.data["has_evidence_file"])
+        self.assertEqual(
+            response.data["evidence_download_url"],
+            f"/api/v1/training-records/{response.data['id']}/download_evidence/",
+        )
 
     def test_mislabelled_evidence_is_rejected(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -196,6 +202,40 @@ class TrainingRecordEvidenceTests(LearningApiTestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("evidence_file", response.data)
+
+    def test_evidence_download_is_authenticated_row_scoped_and_audited(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        record = TrainingRecord.objects.create(
+            employee=self.report, title="Evidence test", evidence_content_type="application/pdf",
+        )
+        record.evidence_file.save(
+            "invoice.pdf", SimpleUploadedFile("invoice.pdf", b"%PDF-1.7\nevidence"), save=True
+        )
+        self.addCleanup(record.evidence_file.delete, False)
+        url = f"/api/v1/training-records/{record.id}/download_evidence/"
+
+        for employee in (self.report, self.manager, self.hr_admin):
+            self.client.force_authenticate(user=employee.user)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response["Content-Type"], "application/pdf")
+            self.assertTrue(b"".join(response.streaming_content).startswith(b"%PDF-"))
+            response.close()
+
+        self.client.force_authenticate(user=self.outsider.user)
+        denied = self.client.get(url)
+        self.assertEqual(denied.status_code, 403)
+        self.assertTrue(AuditLogEntry.objects.filter(
+            entity_type="learning.TrainingRecord", entity_id=str(record.id),
+            action=AuditLogEntry.Action.EXPORT,
+        ).exists())
+
+    def test_download_returns_404_when_no_evidence_exists(self):
+        record = TrainingRecord.objects.create(employee=self.report, title="No evidence")
+        self.client.force_authenticate(user=self.report.user)
+        response = self.client.get(f"/api/v1/training-records/{record.id}/download_evidence/")
+        self.assertEqual(response.status_code, 404)
 
 
 class TrainingRecordEnrollmentRequestApiTests(LearningApiTestCase):

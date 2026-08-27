@@ -4,6 +4,7 @@ from django.db.models import Count
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
+from rbac_audit.aggregates import suppress_count, suppress_related_counts
 from rbac_audit.consent import record_consent
 from rbac_audit.drf import get_request_employee, int_query_param
 from rbac_audit.models import ConsentRecord
@@ -37,9 +38,6 @@ from .serializers import (
     RequisitionSerializer,
 )
 from .services import StageTransitionError, transition_applicant
-
-SMALL_CELL_THRESHOLD = 5
-
 
 class RequisitionViewSet(viewsets.ModelViewSet):
     queryset = Requisition.objects.select_related(
@@ -286,20 +284,20 @@ def recruitment_dashboard(request):
 
     def _breakdown(field: str, *, suppress: bool):
         rows = applicants.values(field).annotate(count=Count("id")).order_by(field)
-        result = []
-        for row in rows:
-            count = row["count"]
-            is_small = suppress and count < SMALL_CELL_THRESHOLD
-            result.append({
-                "key": row[field],
-                "count": f"<{SMALL_CELL_THRESHOLD}" if is_small else count,
-                "suppressed": is_small,
-            })
-        return result
+        counts = {row[field]: row["count"] for row in rows}
+        displayed, complementary = suppress_related_counts(counts, suppress=suppress)
+        return [
+            {
+                "key": key,
+                "count": displayed[key],
+                "suppressed": complementary and count > 0,
+            }
+            for key, count in counts.items()
+        ]
 
     data = {
         "open_requisitions": Requisition.objects.filter(status=Requisition.Status.OPEN).count(),
-        "total_applicants": applicants.count(),
+        "total_applicants": suppress_count(applicants.count(), suppress=not can_see_unsuppressed),
         "avg_time_to_fill_days": avg_time_to_fill_days,
         "small_cell_suppression_applied": not can_see_unsuppressed,
         "by_stage": [{"key": row["current_stage"], "count": row["count"]} for row in by_stage],
@@ -350,15 +348,17 @@ def _funnel_breakdown(applicants_qs, demographic_field: str, max_order: dict[int
             if order >= stage_order:
                 key = demographics.get(applicant_id)
                 counts[key] = counts.get(key, 0) + 1
-        breakdown = []
-        for key, count in sorted(counts.items()):
-            is_small = suppress and count < SMALL_CELL_THRESHOLD
-            breakdown.append({
+        displayed, complementary = suppress_related_counts(counts, suppress=suppress)
+        breakdown = [
+            {
                 "key": key,
-                "count": f"<{SMALL_CELL_THRESHOLD}" if is_small else count,
-                "suppressed": is_small,
-            })
-        table.append({"stage": stage, "total": sum(counts.values()), "breakdown": breakdown})
+                "count": displayed[key],
+                "suppressed": complementary and count > 0,
+            }
+            for key, count in sorted(counts.items())
+        ]
+        total = sum(counts.values())
+        table.append({"stage": stage, "total": suppress_count(total, suppress=suppress), "breakdown": breakdown})
     return table
 
 
@@ -386,7 +386,7 @@ def recruitment_funnel_by_demographic(request):
     max_order = _funnel_max_stage_reached(list(applicants.values_list("id", flat=True)))
     data = {
         "small_cell_suppression_applied": suppress,
-        "total_applicants": applicants.count(),
+        "total_applicants": suppress_count(applicants.count(), suppress=suppress),
         "by_race": _funnel_breakdown(applicants, "race", max_order, suppress=suppress),
         "by_gender": _funnel_breakdown(applicants, "gender", max_order, suppress=suppress),
         "by_disability_status": _funnel_breakdown(applicants, "disability_status", max_order, suppress=suppress),

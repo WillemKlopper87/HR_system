@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
+from rbac_audit.aggregates import percentage, suppress_count, suppress_related_counts
 from rbac_audit.drf import get_request_employee
 from rbac_audit.permissions import can_see_unsuppressed_aggregates
 from rbac_audit.tiers import FieldTier
@@ -14,9 +15,6 @@ from . import aggregation
 from .constants import AGGREGATE_ROW_KEYS, DEMOGRAPHIC_COLUMNS, OCCUPATIONAL_LEVEL_CODES
 from .models import EEPlan
 
-SMALL_CELL_THRESHOLD = 5
-
-
 def _suppress_matrix(matrix: dict, *, suppress: bool) -> dict:
     """Same small-cell-suppression rule as core_hr's headcount dashboard
     (RBAC-Roles.md standing rule 1 / gap C6), applied per cell rather
@@ -24,16 +22,10 @@ def _suppress_matrix(matrix: dict, *, suppress: bool) -> dict:
     matrix, not a single-dimension list."""
     if not suppress:
         return matrix
-    return {
-        row: {
-            col: (f"<{SMALL_CELL_THRESHOLD}" if 0 < value < SMALL_CELL_THRESHOLD else value)
-            for col, value in cols.items()
-        }
-        for row, cols in matrix.items()
-    }
+    return {row: suppress_related_counts(cols, suppress=True)[0] for row, cols in matrix.items()}
 
 
-def _target_gap(actual: dict, targets: dict) -> dict:
+def _target_gap(actual: dict, targets: dict, *, suppress: bool = False) -> dict:
     """Per level x column, actual minus target — target data is % of
     workforce (EEPlan.annual_targets), so this reports the gap in
     percentage points against the actual matrix's own row total, not a
@@ -43,11 +35,15 @@ def _target_gap(actual: dict, targets: dict) -> dict:
         row_actual = actual.get(row, {})
         row_target = targets.get(row, {})
         row_total = sum(v for v in row_actual.values() if isinstance(v, (int, float))) or None
+        _, row_suppressed = suppress_related_counts(row_actual, suppress=suppress)
         row_gap = {}
         for col in DEMOGRAPHIC_COLUMNS:
             if col not in row_target:
                 continue
             actual_value = row_actual.get(col, 0)
+            if row_suppressed and actual_value > 0:
+                row_gap[col] = "Suppressed"
+                continue
             actual_pct = round((actual_value / row_total) * 100, 1) if row_total else 0
             row_gap[col] = round(actual_pct - float(row_target[col]), 1)
         if row_gap:
@@ -95,9 +91,6 @@ def management_control_schedule(request):
     ).order_by("-plan_period_start").first()
     eap = plan.eap_profile if plan else {}
 
-    def _cell(value: int) -> int | str:
-        return f"<{SMALL_CELL_THRESHOLD}" if suppress and 0 < value < SMALL_CELL_THRESHOLD else value
-
     rows = []
     for level in OCCUPATIONAL_LEVEL_CODES:
         row = workforce.get(level, {})
@@ -105,6 +98,9 @@ def management_control_schedule(request):
         black = sum(row.get(c, 0) for c in _BLACK_COLUMNS)
         black_female = sum(row.get(c, 0) for c in _BLACK_FEMALE_COLUMNS)
         disabled = _row_total(disability.get(level, {}))
+        black_suppressed = isinstance(suppress_count(black, suppress=suppress), str)
+        black_female_suppressed = isinstance(suppress_count(black_female, suppress=suppress), str)
+        disability_suppressed = isinstance(suppress_count(disabled, suppress=suppress), str)
         eap_row = eap.get(level, {}) if isinstance(eap, dict) else {}
         eap_black_pct = round(sum(float(eap_row.get(c, 0)) for c in _BLACK_COLUMNS), 1) if eap_row else None
         eap_black_female_pct = (
@@ -112,15 +108,17 @@ def management_control_schedule(request):
         )
         rows.append({
             "level": level,
-            "headcount": total,
-            "black": _cell(black),
-            "black_pct": round(black / total * 100, 1) if total else None,
+            "headcount": suppress_count(total, suppress=suppress),
+            "black": suppress_count(black, suppress=suppress),
+            "black_pct": percentage(black, total, numerator_suppressed=black_suppressed),
             "eap_black_pct": eap_black_pct,
-            "black_female": _cell(black_female),
-            "black_female_pct": round(black_female / total * 100, 1) if total else None,
+            "black_female": suppress_count(black_female, suppress=suppress),
+            "black_female_pct": percentage(
+                black_female, total, numerator_suppressed=black_female_suppressed
+            ),
             "eap_black_female_pct": eap_black_female_pct,
-            "employees_with_disabilities": _cell(disabled),
-            "disability_pct": round(disabled / total * 100, 1) if total else None,
+            "employees_with_disabilities": suppress_count(disabled, suppress=suppress),
+            "disability_pct": percentage(disabled, total, numerator_suppressed=disability_suppressed),
         })
 
     return Response({
@@ -150,7 +148,10 @@ def equity_dashboard(request):
     disability = aggregation.disability_workforce_matrix(today)
 
     plan = EEPlan.objects.filter(plan_period_start__lte=today, plan_period_end__gte=today).order_by("-plan_period_start").first()
-    target_gap = _target_gap(workforce, plan.annual_targets) if plan and plan.annual_targets else {}
+    target_gap = (
+        _target_gap(workforce, plan.annual_targets, suppress=not can_see_unsuppressed)
+        if plan and plan.annual_targets else {}
+    )
 
     return Response({
         "as_of": today,

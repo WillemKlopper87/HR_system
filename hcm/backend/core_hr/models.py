@@ -550,6 +550,8 @@ class ProbationReview(TimestampedModel):
     recommendation = models.CharField(max_length=20, choices=Recommendation.choices)
     comments = models.TextField(blank=True)
     employee_signed_at = models.DateTimeField(null=True, blank=True)
+    # SHA-256 of the immutable review payload at countersignature time.
+    employee_signature_sha256 = models.CharField(max_length=64, blank=True)
 
     history = HistoricalRecords()
 

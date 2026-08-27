@@ -71,9 +71,9 @@ class ProbationReviewSerializer(serializers.ModelSerializer):
         model = ProbationReview
         fields = [
             "id", "probation_period", "review_date", "reviewed_by", "recommendation", "comments",
-            "employee_signed_at",
+            "employee_signed_at", "employee_signature_sha256",
         ]
-        read_only_fields = ["reviewed_by"]
+        read_only_fields = ["reviewed_by", "employee_signed_at", "employee_signature_sha256"]
 
 
 class ProbationPeriodSerializer(serializers.ModelSerializer):

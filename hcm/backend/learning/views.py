@@ -1,18 +1,23 @@
 from __future__ import annotations
 
 import csv
+import os
 from collections import defaultdict
 
 from core_hr.models import Employee
 from core_hr.permissions import IsHRAdmin, IsHRAdminOrReadOnly
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
+from rbac_audit.audit import log_access
 from rbac_audit.drf import RowScopePermission, get_request_employee, int_query_param, row_scoped_queryset
+from rbac_audit.models import AuditLogEntry
+from rbac_audit.permissions import can_access_tier_for_target
+from rbac_audit.tiers import FieldTier
 from rest_framework import permissions, serializers, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
 from .compliance import compliance_matrix
@@ -112,6 +117,25 @@ class TrainingRecordViewSet(_RowScopedLearningViewSet):
 
     def perform_update(self, serializer):
         serializer.save(**self._validate_evidence(serializer))
+
+    @action(detail=True, methods=["get"])
+    def download_evidence(self, request, pk=None):
+        record = self.get_object()
+        actor = get_request_employee(request)
+        if not can_access_tier_for_target(actor, record.employee, FieldTier.INTERNAL, mode="read"):
+            return Response({"detail": "You don't have access to this training evidence."}, status=403)
+        if not record.evidence_file:
+            return Response({"detail": "This training record has no uploaded evidence."}, status=404)
+        log_access(
+            actor=actor, action=AuditLogEntry.Action.EXPORT,
+            entity_type="learning.TrainingRecord", entity_id=record.pk,
+            field_tier=FieldTier.INTERNAL, fields_touched="downloaded evidence_file",
+        )
+        filename = os.path.basename(record.evidence_file.name)
+        return FileResponse(
+            record.evidence_file.open("rb"), as_attachment=True, filename=filename,
+            content_type=record.evidence_content_type or "application/octet-stream",
+        )
 
 
 @extend_schema(responses=OpenApiTypes.OBJECT)

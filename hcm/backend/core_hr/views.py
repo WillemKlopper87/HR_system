@@ -1,21 +1,25 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from types import SimpleNamespace
 
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
+from rbac_audit.aggregates import SMALL_CELL_THRESHOLD, percentage, suppress_count, suppress_related_counts
 from rbac_audit.audit import log_access
 from rbac_audit.consent import has_active_consent, record_consent
 from rbac_audit.drf import RowScopePermission, get_request_employee, int_query_param, row_scoped_queryset
 from rbac_audit.models import AuditLogEntry, ConsentRecord
-from rbac_audit.permissions import can_see_unsuppressed_aggregates, has_role, is_in_reporting_chain
+from rbac_audit.permissions import can_see_unsuppressed_aggregates, has_role, has_row_access, is_in_reporting_chain
 from rbac_audit.tiers import FieldTier
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from .contracts import ContractDecisionError, decide_contract_action, recommend_contract_action
@@ -246,7 +250,48 @@ class ProbationReviewViewSet(viewsets.ModelViewSet):
         actor = get_request_employee(self.request)
         if not (has_role(actor, "hr_admin") or has_role(actor, "line_manager")):
             raise ValidationError("Only hr_admin or a line manager can record a probation review.")
+        period = serializer.validated_data["probation_period"]
+        if not has_row_access(actor, period.employee):
+            raise PermissionDenied("You can only review probation for an employee in your reporting scope.")
         serializer.save(reviewed_by=actor)
+
+    @action(detail=True, methods=["post"])
+    def sign(self, request, pk=None):
+        """Employee-only countersignature bound to the exact review payload."""
+        requested_review = self.get_object()
+        actor = get_request_employee(request)
+        if actor is None or actor.pk != requested_review.probation_period.employee_id:
+            return Response({"detail": "Only the employee can countersign this probation review."}, status=403)
+        password = request.data.get("password")
+        if not password or not request.user.check_password(password):
+            return Response({"detail": "Your current password is required to countersign the review."}, status=400)
+
+        with transaction.atomic():
+            review = ProbationReview.objects.select_for_update().select_related(
+                "probation_period__employee", "reviewed_by"
+            ).get(pk=requested_review.pk)
+            if review.employee_signed_at is not None:
+                return Response({"detail": "This review has already been countersigned."}, status=409)
+            payload = {
+                "id": review.pk,
+                "probation_period": review.probation_period_id,
+                "review_date": review.review_date.isoformat(),
+                "reviewed_by": review.reviewed_by_id,
+                "recommendation": review.recommendation,
+                "comments": review.comments,
+            }
+            review.employee_signature_sha256 = hashlib.sha256(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            review.employee_signed_at = timezone.now()
+            review.save(update_fields=["employee_signed_at", "employee_signature_sha256"])
+            log_access(
+                actor=actor, action=AuditLogEntry.Action.UPDATE,
+                entity_type="core_hr.ProbationReview", entity_id=review.pk,
+                field_tier=FieldTier.INTERNAL,
+                fields_touched=f"employee countersignature sha256={review.employee_signature_sha256[:12]}…",
+            )
+        return Response(self.get_serializer(review).data)
 
 
 class ExitInterviewViewSet(viewsets.ModelViewSet):
@@ -607,9 +652,6 @@ class DataQualityExceptionViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(result)
 
 
-SMALL_CELL_THRESHOLD = 5
-
-
 @extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
@@ -634,10 +676,10 @@ def headcount_dashboard(request):
             if key is None:
                 continue
             count = row["count"]
-            is_small = suppress and count < SMALL_CELL_THRESHOLD
+            is_small = suppress and 0 < count < SMALL_CELL_THRESHOLD
             result.append({
                 "key": key,
-                "count": f"<{SMALL_CELL_THRESHOLD}" if is_small else count,
+                "count": suppress_count(count, suppress=suppress),
                 "suppressed": is_small,
             })
         return result
@@ -689,13 +731,17 @@ def probation_completion_dashboard(request):
         result = []
         for key, counts in sorted(buckets.items()):
             total = counts["confirmed"] + counts["terminated"]
-            suppress = not can_see_unsuppressed and total < SMALL_CELL_THRESHOLD
+            displayed, complementary = suppress_related_counts(
+                counts, suppress=not can_see_unsuppressed
+            )
             result.append({
                 "key": key,
-                "confirmed": f"<{SMALL_CELL_THRESHOLD}" if suppress else counts["confirmed"],
-                "terminated": f"<{SMALL_CELL_THRESHOLD}" if suppress else counts["terminated"],
-                "completion_pct": round(counts["confirmed"] / total * 100, 1) if total else None,
-                "suppressed": suppress,
+                "confirmed": displayed["confirmed"],
+                "terminated": displayed["terminated"],
+                "completion_pct": percentage(
+                    counts["confirmed"], total, numerator_suppressed=complementary
+                ),
+                "suppressed": complementary,
             })
         return result
 
@@ -747,12 +793,14 @@ def exit_interview_dashboard(request):
         result = []
         for key, reasons in sorted(buckets.items()):
             total = sum(reasons.values())
-            suppress = not can_see_unsuppressed and total < SMALL_CELL_THRESHOLD
+            displayed, complementary = suppress_related_counts(
+                reasons, suppress=not can_see_unsuppressed
+            )
             result.append({
                 "key": key,
-                "total": f"<{SMALL_CELL_THRESHOLD}" if suppress else total,
-                "by_reason": {} if suppress else reasons,
-                "suppressed": suppress,
+                "total": suppress_count(total, suppress=not can_see_unsuppressed),
+                "by_reason": displayed,
+                "suppressed": complementary,
             })
         return result
 
