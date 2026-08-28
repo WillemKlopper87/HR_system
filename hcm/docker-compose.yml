@@ -29,10 +29,34 @@ services:
       timeout: 3s
       retries: 10
 
+  # Runs migrate exactly once, before backend/worker/beat start, instead of
+  # baked into every one of their own startup commands (HR_Code_report.md
+  # H3: "separate migration execution from every web replica's startup --
+  # run one controlled migration job before traffic switching"). At
+  # replica-count 1 this mostly buys determinism (one clear place to look
+  # if a migration fails, rather than racing whichever of three containers
+  # starts first); it becomes load-bearing the moment `backend` is ever
+  # scaled to more than one replica, since every replica running its own
+  # `migrate` concurrently is exactly the race this exists to remove.
+  migrate:
+    build: ./backend
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media:/app/media
+    command: python manage.py migrate
+    restart: "no"
+
   backend:
     build: ./backend
     env_file: .env   # includes COLLAB_ENABLED/COLLAB_BASE_URL/COLLAB_API_KEY/HCM_PUBLIC_URL (ADR-011)
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:
@@ -41,12 +65,14 @@ services:
       - "8000"
     volumes:
       - media:/app/media
-    command: sh -c "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
 
   worker:
     build: ./backend
     env_file: .env
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:
@@ -72,6 +98,8 @@ services:
     build: ./backend
     env_file: .env
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:
