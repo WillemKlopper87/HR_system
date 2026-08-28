@@ -25,6 +25,7 @@ const ASSESS = ['ee_manager', 'hr_admin'] as const
 const EE = ['hr_admin', 'ee_manager', 'accounting_officer', 'auditor'] as const
 const AUDIT_ROLES = ['hr_admin', 'auditor'] as const
 const CONTRACTS = ['hr_admin', 'line_manager', 'auditor'] as const
+const PROBATION = ['hr_admin', 'line_manager', 'auditor', 'employee'] as const
 // Narrower than CONTRACTS on purpose: line managers do not see or propose
 // exits (design spec §8) — those originate from a disciplinary process (C5).
 const EXITS = ['hr_admin', 'auditor'] as const
@@ -49,7 +50,7 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
       // audience (alongside Employees / Data Quality) better than
       // Recruitment does.
       { to: '/contract-renewals', label: 'Contract Renewals', roles: CONTRACTS },
-      { to: '/probation', label: 'Probation', roles: CONTRACTS },
+      { to: '/probation', label: 'Probation', roles: PROBATION },
       { to: '/employment-changes', label: 'Employment Changes', roles: EXITS },
       { to: '/exit-interviews', label: 'Exit Interviews', roles: HR },
       // Visibility is scoped server-side per employee/reporting-chain

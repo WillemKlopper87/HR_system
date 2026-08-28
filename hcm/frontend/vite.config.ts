@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const backendPort = process.env.HCM_E2E_BACKEND_PORT ?? '8000'
+const backendTarget = `http://127.0.0.1:${backendPort}`
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -10,8 +13,8 @@ export default defineConfig({
     // keeps the session cookie same-site, matching the single-host
     // reverse-proxy shape production uses (ADR-005).
     proxy: {
-      '/api': 'http://127.0.0.1:8000',
-      '/admin': 'http://127.0.0.1:8000',
+      '/api': backendTarget,
+      '/admin': backendTarget,
     },
   },
 })

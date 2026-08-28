@@ -18,6 +18,8 @@ Completed in the first P0 tranche:
 - Regenerated the OpenAPI TypeScript output and migrated those screens to a generated-contract facade.
 - Split the probation and exit-interview routes into lazy chunks and removed the two Fast Refresh lint warnings.
 - Added focused API permission/privacy tests and Playwright coverage for selector privacy and keyboard operation.
+- Added a full probation browser journey covering creation, date validation, manager scope and employee-only
+  countersignature; corrected the employee route/navigation entitlement that the journey exposed.
 
 Verification evidence:
 
@@ -79,12 +81,12 @@ known regulatory browser-coverage gaps while establishing patterns reusable acro
 
 ### P0.4 Browser coverage for the regulatory workflows
 
-- [ ] HR opens a valid probation period.
-- [ ] HR is refused invalid/overlapping probation dates.
-- [ ] Correct line manager creates a review.
-- [ ] Unrelated manager is refused the review.
-- [ ] Employee countersigns using their own password.
-- [ ] Manager and HR are refused employee countersignature.
+- [x] HR opens a valid probation period.
+- [x] HR is refused invalid/overlapping probation dates.
+- [x] Correct line manager creates a review.
+- [x] Unrelated manager is refused the review.
+- [x] Employee countersigns using their own password.
+- [x] Manager and HR are refused employee countersignature.
 - [ ] HR records an exit interview with a valid single trigger.
 - [ ] Mismatched or multiple exit triggers are refused.
 - [ ] Authorised user downloads protected training evidence.

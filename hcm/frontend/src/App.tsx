@@ -125,6 +125,8 @@ export default function App() {
             </Route>
             <Route element={<RequireRole roles={['hr_admin', 'line_manager', 'auditor']} />}>
               <Route path="/contract-renewals" element={<ContractRenewalsPage />} />
+            </Route>
+            <Route element={<RequireRole roles={['hr_admin', 'line_manager', 'auditor', 'employee']} />}>
               <Route path="/probation" element={<LazyPage><ProbationPage /></LazyPage>} />
             </Route>
             {/* Narrower than the contract-renewals set above: line managers

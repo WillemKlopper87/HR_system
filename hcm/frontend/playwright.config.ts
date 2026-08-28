@@ -7,6 +7,7 @@ import { defineConfig, devices } from '@playwright/test'
 //   2. the Vite dev server on 127.0.0.1:5173, which proxies /api to Django.
 // `npm test` runs it headless; `npm run test:headed` to watch.
 const CI = !!process.env.CI
+const backendPort = process.env.HCM_E2E_BACKEND_PORT ?? '8000'
 
 export default defineConfig({
   testDir: './e2e',
@@ -26,7 +27,7 @@ export default defineConfig({
   webServer: [
     {
       command: 'node e2e/backend-server.mjs',
-      url: 'http://127.0.0.1:8000/healthz',
+      url: `http://127.0.0.1:${backendPort}/healthz`,
       reuseExistingServer: false,
       timeout: 180_000,
       stdout: 'ignore',

@@ -13,6 +13,7 @@ import path from 'node:path'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const backendDir = path.resolve(here, '..', '..', 'backend')
 const dbPath = path.join(backendDir, 'e2e.sqlite3')
+const backendPort = process.env.HCM_E2E_BACKEND_PORT ?? '8000'
 
 function pickPython() {
   if (process.env.PYTHON) return process.env.PYTHON
@@ -58,7 +59,7 @@ console.log(`[e2e backend] python=${python} db=${dbPath}`)
 run(['migrate', '--noinput', '-v', '0'])
 run(['seed_demo_data'])
 
-const server = spawn(python, ['manage.py', 'runserver', '127.0.0.1:8000', '--noreload'], {
+const server = spawn(python, ['manage.py', 'runserver', `127.0.0.1:${backendPort}`, '--noreload'], {
   cwd: backendDir,
   env,
   stdio: 'inherit',
