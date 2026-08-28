@@ -1,0 +1,48 @@
+# Production override (ADR-012, proposed -- adr/ADR-012-deployment-rollback-versioning.md).
+# Pulls pre-built, CI-tested images pinned to one deploy's exact git SHA
+# instead of building from source on the host, so what runs in production
+# is provably the same artifact that passed hcm-ci.yml.
+#
+# Usage:
+#   export HCM_IMAGE_REGISTRY=ghcr.io/<org>   # set once per environment
+#   export IMAGE_TAG=<git-sha-that-passed-ci> # set explicitly per deploy, never "latest"
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Rollback is the same second command with IMAGE_TAG re-pinned to the
+# previous known-good SHA -- see docs/RUNBOOK.md's "Deploy & rollback"
+# section for the full procedure and its expand/contract-migration
+# precondition.
+#
+# `!reset null` (Compose Specification, not a Docker-specific extension)
+# removes each service's `build:` key entirely rather than merely adding
+# `image:` alongside it -- with both present, `docker compose up` still
+# builds from source and only tags the result, which defeats the point.
+# Confirmed by running `docker compose -f docker-compose.yml -f
+# docker-compose.prod.yml config` and checking the merged output has no
+# `build` key left on any of these five services.
+#
+# This file is independently valid Compose syntax today, but there is no
+# CI job yet that actually builds and pushes these images to a registry
+# (HR_Code_report.md H3) -- it's the target shape, not yet a working
+# deploy path end to end.
+services:
+  migrate:
+    build: !reset null
+    image: ${HCM_IMAGE_REGISTRY:?set to e.g. ghcr.io/<org>}/hcm-backend:${IMAGE_TAG:?set to a git SHA that passed CI, never "latest"}
+
+  backend:
+    build: !reset null
+    image: ${HCM_IMAGE_REGISTRY:?set to e.g. ghcr.io/<org>}/hcm-backend:${IMAGE_TAG:?set to a git SHA that passed CI, never "latest"}
+
+  worker:
+    build: !reset null
+    image: ${HCM_IMAGE_REGISTRY:?set to e.g. ghcr.io/<org>}/hcm-backend:${IMAGE_TAG:?set to a git SHA that passed CI, never "latest"}
+
+  beat:
+    build: !reset null
+    image: ${HCM_IMAGE_REGISTRY:?set to e.g. ghcr.io/<org>}/hcm-backend:${IMAGE_TAG:?set to a git SHA that passed CI, never "latest"}
+
+  frontend:
+    build: !reset null
+    image: ${HCM_IMAGE_REGISTRY:?set to e.g. ghcr.io/<org>}/hcm-frontend:${IMAGE_TAG:?set to a git SHA that passed CI, never "latest"}
