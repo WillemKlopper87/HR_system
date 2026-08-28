@@ -7,17 +7,22 @@ const backendTarget = `http://127.0.0.1:${backendPort}`
 // Recorded chunk-size budget (regulatory review P0.3: "record a chunk-size
 // budget and fail... when it regresses", not just suppress Vite's generic
 // 500 kB warning). Keyed by the chunk's stable `name` (Vite/rolldown's
-// pre-hash identifier, e.g. "index" or "MyIdentityVerificationPage" --
-// the hashed `fileName` like "assets/index-Ab12Cd34.js" is not stable
-// across builds). Both entries here are KNOWN, accepted-for-now exceptions
-// (main bundle: eager-loaded app shell; MyIdentityVerificationPage:
-// face-api.js/TensorFlow.js, only loaded once someone opens that one
-// workflow) -- the budget is a ceiling against further growth, not an
-// endorsement that these sizes are fine long-term. Shrinking them is
-// tracked in latest_todo.md P3.
+// pre-hash identifier -- the hashed `fileName` like
+// "assets/index-Ab12Cd34.js" is not stable across builds). Both entries
+// here are KNOWN, accepted-for-now exceptions -- the budget is a ceiling
+// against further growth, not an endorsement that these sizes are fine
+// long-term. Shrinking `index` further is tracked in latest_todo.md P3.
+//
+// `face-api.esm` (2026-08-28, HR_Code_report.md M4): face-api.js/
+// TensorFlow.js used to inflate MyIdentityVerificationPage's own chunk to
+// 1.31 MB purely from a static top-level import, downloaded and parsed the
+// moment someone opened that route. It's now a dynamic import() inside
+// faceApi.ts's loadModels(), only awaited once CameraCapture's own "Start
+// camera" button is clicked -- so it lands in its own vendor chunk here,
+// and MyIdentityVerificationPage's chunk dropped to ~6 kB.
 const CHUNK_SIZE_BUDGET_KB: Record<string, number> = {
   index: 650,
-  MyIdentityVerificationPage: 1400,
+  'face-api.esm': 1400,
 }
 
 function chunkSizeBudget(): Plugin {

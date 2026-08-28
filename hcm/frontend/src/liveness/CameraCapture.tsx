@@ -30,12 +30,17 @@ export function CameraCapture({
 }: { buttonLabel: string; onCapture: (result: CaptureResult) => void; busy?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  // Both start false and stay false until handleStart runs -- opening this
+  // route must not itself fetch camera permission or the face-api.js/
+  // TensorFlow.js bundle (HR_Code_report.md M4). Only a click does.
+  const [started, setStarted] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
   const [modelsReady, setModelsReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [capturing, setCapturing] = useState(false)
 
   useEffect(() => {
+    if (!started) return
     let cancelled = false
 
     loadModels()
@@ -65,7 +70,7 @@ export function CameraCapture({
       cancelled = true
       streamRef.current?.getTracks().forEach((t) => t.stop())
     }
-  }, [])
+  }, [started])
 
   async function handleCapture() {
     if (!videoRef.current) return
@@ -79,6 +84,18 @@ export function CameraCapture({
     } finally {
       setCapturing(false)
     }
+  }
+
+  if (!started) {
+    return (
+      <div className="camera-capture">
+        <div className="form-actions" style={{ marginTop: 8 }}>
+          <button type="button" className="btn-secondary" onClick={() => setStarted(true)}>
+            Start camera
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const label = capturing ? 'Capturing…' : !modelsReady ? 'Loading model…' : !cameraReady ? 'Waiting for camera…' : buttonLabel
