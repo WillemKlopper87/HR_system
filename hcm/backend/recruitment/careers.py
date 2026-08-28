@@ -144,4 +144,8 @@ def careers_apply(request):
     except ValueError as exc:
         return Response({"detail": str(exc)}, status=400)
 
-    return Response({"detail": "Application received.", "id": applicant.id}, status=201)
+    # No internal sequential ID in the response (HR_Code_report.md
+    # lower-priority note) -- nothing on the public side tracks an
+    # application by reference yet (no "track your status" feature exists),
+    # so there's nothing to justify exposing it for.
+    return Response({"detail": "Application received."}, status=201)

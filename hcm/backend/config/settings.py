@@ -10,6 +10,7 @@ Architecture baseline: modular monolith, one PostgreSQL database
 import os
 from pathlib import Path
 
+from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -303,36 +304,44 @@ CELERY_TASK_TIME_LIMIT = 15 * 60
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 # Scheduled jobs. Retention (rbac_audit.RetentionRule executor) is the first;
 # the performance-agreement reminder job (ADR-011) will be the second.
+#
+# Explicit crontab times (2026-08-28, HR_Code_report.md lower-priority note):
+# these were plain 24h intervals with a comment promising "crontab once beat
+# runs against a real broker" -- confirmed against an actual running stack
+# (docker compose up, beat's own persistent schedule store observed ticking)
+# that beat does now run against real Redis, so there's no reason left to
+# defer this. CELERY_TIMEZONE (above) is Africa/Johannesburg, so these hours
+# are already SAST, not UTC.
 CELERY_BEAT_SCHEDULE = {
     "run-retention-daily": {
         "task": "rbac_audit.tasks.run_retention_task",
-        "schedule": 24 * 60 * 60,  # daily; crontab(hour=2) once beat runs against a real broker
+        "schedule": crontab(hour=2, minute=0),
     },
     # Performance-contracting reminders (PC-1/ADR-011): works out which offset
     # falls today for the open phase and pushes to-dos/digests/announcements.
     # Idempotent (ReminderLog), so a double run is harmless.
     "run-performance-reminders-daily": {
         "task": "performance.tasks.run_performance_reminders_task",
-        "schedule": 24 * 60 * 60,  # daily 07:00 SAST once beat has a real broker (crontab)
+        "schedule": crontab(hour=7, minute=0),
     },
     # Fixed-term contract-expiry reminders (C1 part 2) -- notifies the line
     # manager as a contract's end date approaches, escalating to hr_admin.
     "run-contract-reminders-daily": {
         "task": "core_hr.tasks.run_contract_reminders_task",
-        "schedule": 24 * 60 * 60,  # daily; crontab(hour=7) once beat runs against a real broker
+        "schedule": crontab(hour=7, minute=0),
     },
     # Mandatory-training compliance reminders (C6) -- notifies an employee
     # ahead of their own due date, and their manager the day it lapses
     # into overdue.
     "run-mandatory-training-reminders-daily": {
         "task": "learning.tasks.run_mandatory_training_reminders_task",
-        "schedule": 24 * 60 * 60,  # daily; crontab(hour=7) once beat runs against a real broker
+        "schedule": crontab(hour=7, minute=0),
     },
     # EE statutory calendar -- online report window close (15 Jan) and the
     # EEA14 notice-of-inability deadline (last working day of Aug).
     "run-ee-statutory-reminders-daily": {
         "task": "ee_reporting.tasks.run_ee_statutory_reminders_task",
-        "schedule": 24 * 60 * 60,  # daily; crontab(hour=7) once beat runs against a real broker
+        "schedule": crontab(hour=7, minute=0),
     },
 }
 

@@ -3,7 +3,11 @@
 # plus Celery worker + beat on Redis (retention job, ADR-011 reminder job).
 services:
   db:
-    image: postgres:17
+    # Pinned by digest for reproducible/supply-chain-traceable deploys
+    # (HR_Code_report.md lower-priority note) -- re-pull deliberately
+    # (`docker pull postgres:17 && docker inspect
+    # --format='{{index .RepoDigests 0}}' postgres:17`) to take a new patch.
+    image: postgres:17@sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-hcm}
       POSTGRES_USER: ${POSTGRES_USER:-hcm}
@@ -17,7 +21,8 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    # Pinned by digest, same reasoning as db's above.
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
