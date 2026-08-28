@@ -167,6 +167,52 @@ jobs:
       - name: Typecheck + build
         run: npm run build
 
+  contract-drift:
+    name: Contract (OpenAPI schema + generated types stay in sync)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: hcm/backend/requirements.lock
+
+      - name: Install backend dependencies (pinned lock)
+        working-directory: hcm/backend
+        run: pip install -r requirements.lock
+
+      # M2 (HR_Code_report.md): "CI validates neither OpenAPI generation nor
+      # regeneration/diff of generated-types.ts. Backend serializer changes
+      # can therefore drift from the committed generated output ... without
+      # failing the build." --fail-on-warn also catches the schema-naming
+      # class of issue M3 fixed (ENUM_NAME_OVERRIDES) from ever silently
+      # coming back.
+      - name: Schema validates with zero warnings
+        working-directory: hcm/backend
+        run: python manage.py spectacular --validate --fail-on-warn --file /tmp/schema-check.yml
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "lts/*"
+          cache: "npm"
+          cache-dependency-path: |
+            hcm/frontend/package-lock.json
+            hcm/frontend/tools/api-codegen/package-lock.json
+
+      - name: Install frontend + codegen dependencies
+        run: |
+          npm ci --prefix hcm/frontend
+          npm ci --prefix hcm/frontend/tools/api-codegen
+
+      - name: Regenerate src/api/generated-types.ts and fail on drift
+        env:
+          PYTHON: python
+        run: |
+          npm run generate:api-types --prefix hcm/frontend
+          git diff --exit-code -- hcm/frontend/src/api/generated-types.ts
+
   e2e:
     name: E2E (Playwright — real browser against seeded Django + Vite)
     runs-on: ubuntu-latest
