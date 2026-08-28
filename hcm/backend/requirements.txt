@@ -7,7 +7,7 @@
 django>=5.2,<5.3
 djangorestframework>=3.18
 django-simple-history>=3.13
-openpyxl>=3.1                 # Excel (.xlsx) bulk import (Sprint 1); also EEA2/EEA4 export (Sprint 13-14)
+openpyxl>=3.1.5                 # Excel (.xlsx) bulk import (Sprint 1); also EEA2/EEA4 export (Sprint 13-14)
 reportlab>=5.0                 # PDF export for EEA2/EEA4 reports (Sprint 13-14)
 pypdf>=5.0                     # PDF text extraction for uploaded policy documents (Policy library)
 python-docx>=1.1                # DOCX text extraction for uploaded policy documents (Policy library)
