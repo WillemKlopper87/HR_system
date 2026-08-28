@@ -46,6 +46,56 @@ jobs:
       - name: Test suite
         run: python manage.py test --parallel auto
 
+  backend-production-config:
+    name: Backend (production secret fail-fast + check --deploy)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hcm/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: hcm/backend/requirements.lock
+
+      - name: Install dependencies (pinned lock)
+        run: pip install -r requirements.lock
+
+      # H2 (HR_Code_report.md): a weak/default/absent secret must refuse to
+      # start at all once DEBUG=0 -- config/settings.py's
+      # _require_production_secret raises ImproperlyConfigured at import
+      # time, so this can only be proven with a real subprocess, not
+      # override_settings() inside a normal test (see config/test_settings.py's
+      # own docstring for why that unit test stops short of this).
+      - name: A weak secret must refuse to start under DEBUG=0
+        run: |
+          set +e
+          DJANGO_DEBUG=0 DJANGO_SECRET_KEY=change-me python manage.py check
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "::error::manage.py check succeeded with a weak SECRET_KEY under DEBUG=0 -- the H2 fail-fast guard regressed."
+            exit 1
+          fi
+
+      - name: Production-style check --deploy with real secrets
+        run: |
+          export DJANGO_DEBUG=0
+          export DJANGO_SECRET_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(48))")
+          export ASSESSMENT_WEBHOOK_SECRET=$(python -c "import secrets; print(secrets.token_urlsafe(48))")
+          export DJANGO_ALLOWED_HOSTS=hcm-ci.example.com
+          # Simulates an operator who HAS made the HSTS subdomain/preload
+          # decision (config/settings.py leaves both off by default,
+          # deliberately -- see its own comment) so this job proves the
+          # rest of the deploy-check surface is clean rather than
+          # perpetually red on a decision CI can't make.
+          export DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=1
+          export DJANGO_SECURE_HSTS_PRELOAD=1
+          python manage.py check --deploy --fail-level WARNING
+
   backend-postgres:
     name: Backend (tests — PostgreSQL 17, the production engine)
     runs-on: ubuntu-latest

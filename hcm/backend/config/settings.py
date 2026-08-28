@@ -10,14 +10,30 @@ Architecture baseline: modular monolith, one PostgreSQL database
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "dev-only-insecure-key-change-me",  # overridden in staging/prod
-)
+_DEV_SECRET_KEY = "dev-only-insecure-key-change-me"
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", _DEV_SECRET_KEY)
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+
+
+def _require_production_secret(env_var_name: str, value: str, dev_default: str, min_length: int = 32) -> None:
+    """H2 (2026-08-28 fix): `manage.py check --deploy` only ever WARNS about
+    a weak SECRET_KEY, and nothing runs that command at container start --
+    so a `change-me` placeholder could previously reach a real deployment
+    with DEBUG=0 and still boot cleanly, silently weakening sessions,
+    password-reset tokens and (for the webhook secret) HMAC signature
+    verification. This is checked at import time, in every DEBUG=False
+    process (web, worker, beat, manage.py), so a misconfigured secret
+    can't start serving traffic at all rather than merely being logged."""
+    if not value or value == dev_default or len(value) < min_length:
+        raise ImproperlyConfigured(
+            f"{env_var_name} is missing, still set to its development default, or shorter than "
+            f"{min_length} characters. Set a real, unique value before running with DJANGO_DEBUG=0."
+        )
 
 ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 
@@ -325,22 +341,31 @@ CELERY_BEAT_SCHEDULE = {
 # protection"). A real provider integration would use a per-provider
 # secret issued by that vendor; kept here as one env-sourced value since
 # no real provider is under contract yet (Sprint-0-Decision-Log.md A4).
-ASSESSMENT_WEBHOOK_SECRET = os.environ.get(
-    "ASSESSMENT_WEBHOOK_SECRET",
-    "dev-only-insecure-webhook-secret-change-me",
-)
+_DEV_ASSESSMENT_WEBHOOK_SECRET = "dev-only-insecure-webhook-secret-change-me"
+ASSESSMENT_WEBHOOK_SECRET = os.environ.get("ASSESSMENT_WEBHOOK_SECRET", _DEV_ASSESSMENT_WEBHOOK_SECRET)
 
 # Security hardening applied whenever DEBUG is off. TLS terminates at the
 # edge (nginx / load balancer, ADR-005) and nginx forwards X-Forwarded-Proto —
 # without SECURE_PROXY_SSL_HEADER the SSL redirect below would loop forever
 # because gunicorn only ever sees plain http from the proxy.
 if not DEBUG:
+    _require_production_secret("DJANGO_SECRET_KEY", SECRET_KEY, _DEV_SECRET_KEY)
+    _require_production_secret("ASSESSMENT_WEBHOOK_SECRET", ASSESSMENT_WEBHOOK_SECRET, _DEV_ASSESSMENT_WEBHOOK_SECRET)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     USE_X_FORWARDED_HOST = True
     SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "1") == "1"
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
+    # Off by default (matches Django's own default): whether every
+    # subdomain of the production domain is also served exclusively over
+    # TLS, and whether to ask browsers to add this domain to their
+    # hardcoded HSTS preload list, are both real domain-topology decisions
+    # (HR_Code_report.md H2) -- there is no safe default to guess here, so
+    # this only turns on if an operator who has actually made that call
+    # sets the env var. Preload in particular is effectively one-way.
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", "0") == "1"
+    SECURE_HSTS_PRELOAD = os.environ.get("DJANGO_SECURE_HSTS_PRELOAD", "0") == "1"
 
 # --- Logging + error tracking (H3 ops/observability) -------------------------
 # Plain stdlib logging to stderr — every gunicorn/Celery deployment already
