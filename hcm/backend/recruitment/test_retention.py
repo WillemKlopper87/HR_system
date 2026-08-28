@@ -91,3 +91,45 @@ class ApplicantRetentionTests(TestCase):
         retention.run_retention(now=self.now)
         self.assertFalse(Applicant.objects.filter(pk=old.pk).exists())
         self.assertTrue(Applicant.objects.filter(pk=keep.pk).exists())
+
+    def test_anonymise_also_deletes_the_resume_file(self):
+        """M7 (HR_Code_report.md): an anonymised row that still points at
+        the original person's CV on disk isn't actually anonymised."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        old_rejected = self._applicant(Applicant.Stage.REJECTED, 14, email="old@example.com")
+        old_rejected.resume.save("cv.pdf", SimpleUploadedFile("cv.pdf", b"%PDF-1.7\ncv"), save=False)
+        old_rejected.resume_content_type = "application/pdf"
+        old_rejected.resume_size_bytes = 11
+        old_rejected.save(update_fields=["resume", "resume_content_type", "resume_size_bytes"])
+        stored_name = old_rejected.resume.name
+        self.assertTrue(old_rejected.resume.storage.exists(stored_name))
+
+        retention.run_retention(now=self.now)
+
+        old_rejected.refresh_from_db()
+        self.assertFalse(old_rejected.resume)
+        self.assertEqual(old_rejected.resume_content_type, "")
+        self.assertEqual(old_rejected.resume_size_bytes, 0)
+        self.assertFalse(old_rejected.resume.storage.exists(stored_name))
+
+    def test_delete_action_also_deletes_the_resume_file(self):
+        """A bulk qs.delete() never calls FileField.delete() on its own --
+        without the explicit per-row cleanup this would orphan the file."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        RetentionRule.objects.filter(entity_type="recruitment.Applicant").update(action=RetentionRule.Action.DELETE)
+        old = self._applicant(Applicant.Stage.REJECTED, 14, email="old@example.com")
+        # save=False + an update_fields-restricted save, not resume.save(save=True):
+        # the latter calls a full applicant.save() with no update_fields, which
+        # would reset updated_at (auto_now=True) and undo _applicant()'s backdating.
+        old.resume.save("cv.pdf", SimpleUploadedFile("cv.pdf", b"%PDF-1.7\ncv"), save=False)
+        old.save(update_fields=["resume"])
+        storage = old.resume.storage
+        stored_name = old.resume.name
+        self.assertTrue(storage.exists(stored_name))
+
+        retention.run_retention(now=self.now)
+
+        self.assertFalse(Applicant.objects.filter(pk=old.pk).exists())
+        self.assertFalse(storage.exists(stored_name))
