@@ -1,0 +1,32 @@
+version: 2
+
+# HR_Code_report.md: "establish a documented dependency update cadence."
+# Weekly, grouped minor/patch bumps; security patches immediate regardless
+# of schedule (Dependabot's own default). Every resulting PR runs the
+# existing hcm-ci.yml gate unchanged -- no special path, same bar as any
+# other PR. GitHub Actions is billing-blocked for this repo (see
+# docs/SESSION-STATE.md) so these PRs won't get automated CI status until
+# that's resolved, but the version-currency signal is still worth having.
+updates:
+  - package-ecosystem: pip
+    directory: /hcm/backend
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /hcm/frontend
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # Keeps the commit-SHA pins in hcm-ci.yml current as each action ships a
+  # new release, updating both the SHA and its trailing "# vX" comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
