@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { ReferenceDataProvider } from '../api/ReferenceDataContext'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 import { NAV_CATEGORIES } from './navConfig'
 import { NotificationBell } from './NotificationBell'
 

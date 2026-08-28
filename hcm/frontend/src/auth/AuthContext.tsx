@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { api, setUnauthorizedHandler } from '../api/client'
 import type { MeResponse } from '../api/types'
+import { AuthContext } from './auth-context'
 
 interface AuthContextValue {
   user: MeResponse | null
@@ -17,8 +18,6 @@ interface AuthContextValue {
   logout: () => Promise<void>
   hasRole: (role: string) => boolean
 }
-
-const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<MeResponse | null>(null)
@@ -68,11 +67,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return user?.roles.includes(role) ?? false
   }
 
-  return <AuthContext.Provider value={{ user, loading, sessionExpired, explicitLogout, login, logout, hasRole }}>{children}</AuthContext.Provider>
-}
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
-  return ctx
+  const value: AuthContextValue = { user, loading, sessionExpired, explicitLogout, login, logout, hasRole }
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

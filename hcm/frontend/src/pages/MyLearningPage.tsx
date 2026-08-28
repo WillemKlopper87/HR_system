@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useAllPages } from '../api/hooks'
 import { TRAINING_STATUS_LABELS, type Course, type TrainingRecord } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 
 export function MyLearningPage() {
   const { user } = useAuth()

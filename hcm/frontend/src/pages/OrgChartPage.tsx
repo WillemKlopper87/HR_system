@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
-import { useReferenceData } from '../api/ReferenceDataContext'
+import { useReferenceData } from '../api/useReferenceData'
 import type { Employee, EmployeeVersion } from '../api/types'
 
 interface OrgNode {

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 import { RequirePayrollStepUp } from '../auth/RequirePayrollStepUp'
 import type {
   EEPlan, EEPlanMeasure, EEPlanMeasureStatus, EEPlanProgressSnapshot, EEQuestionnaire, EESector, Employee, EmployerConfig, RemunerationRecord,

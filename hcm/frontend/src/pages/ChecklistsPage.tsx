@@ -9,7 +9,7 @@ import {
   type ChecklistInstanceItem,
   type Employee,
 } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 
 const DIRECTIONS: ChecklistDirection[] = ['onboarding', 'offboarding']
 

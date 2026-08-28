@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { formatZAR } from '../lib/format'
 import { api, ApiError } from '../api/client'
 import { useAllPages } from '../api/hooks'
-import { useReferenceData } from '../api/ReferenceDataContext'
+import { useReferenceData } from '../api/useReferenceData'
 import type { PayBand } from '../api/types'
 
 function isCurrent(band: PayBand): boolean {

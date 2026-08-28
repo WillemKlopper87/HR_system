@@ -8,7 +8,7 @@ import {
   type ChecklistOwnerRole,
   type ChecklistTemplate,
 } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 
 const DIRECTIONS: ChecklistDirection[] = ['onboarding', 'offboarding']
 const OWNER_ROLES: ChecklistOwnerRole[] = ['hr', 'it', 'line_manager', 'employee', 'other']

@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import type { ProbationPeriod, ProbationRecommendation } from '../api/contracts'
 import { useApiQuery } from '../api/hooks'
-import { useAuth } from '../auth/AuthContext'
-import type {
-  Employee, ProbationCompletionDashboard, ProbationPeriod, ProbationRecommendation,
-} from '../api/types'
+import { useAuth } from '../auth/useAuth'
+import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
+import type { ProbationCompletionDashboard } from '../api/types'
 import { PROBATION_RECOMMENDATION_LABELS, PROBATION_STATUS_LABELS } from '../api/types'
 
 export function ProbationPage() {
@@ -13,9 +13,6 @@ export function ProbationPage() {
   const isLineManager = hasRole('line_manager')
   const periods = useApiQuery(() => fetchAllPages<ProbationPeriod>('/probation-periods/'), [], {
     errorMessage: 'Failed to load probation periods.',
-  })
-  const employees = useApiQuery(() => fetchAllPages<Employee>('/employees/'), [], {
-    errorMessage: 'Failed to load employees.', enabled: isHrAdmin,
   })
   const dashboard = useApiQuery(() => api.get<ProbationCompletionDashboard>('/dashboards/probation/'), [], {
     errorMessage: 'Failed to load the completion dashboard.', enabled: isHrAdmin,
@@ -54,7 +51,7 @@ export function ProbationPage() {
       {isHrAdmin && (
         <section className="detail-card">
           <h2>Open a probation period</h2>
-          <OpenPeriodForm employees={employees.data ?? []} onSaved={periods.reload} />
+          <OpenPeriodForm onSaved={periods.reload} />
         </section>
       )}
 
@@ -79,8 +76,8 @@ export function ProbationPage() {
   )
 }
 
-function OpenPeriodForm({ employees, onSaved }: { employees: Employee[]; onSaved: () => void }) {
-  const [employeeId, setEmployeeId] = useState('')
+function OpenPeriodForm({ onSaved }: { onSaved: () => void }) {
+  const [employeeId, setEmployeeId] = useState<number | null>(null)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -92,9 +89,9 @@ function OpenPeriodForm({ employees, onSaved }: { employees: Employee[]; onSaved
     setSaving(true)
     try {
       await api.post('/probation-periods/', {
-        employee: Number(employeeId), start_date: startDate, end_date: endDate,
+        employee: employeeId, start_date: startDate, end_date: endDate,
       })
-      setEmployeeId('')
+      setEmployeeId(null)
       setStartDate('')
       setEndDate('')
       onSaved()
@@ -107,15 +104,7 @@ function OpenPeriodForm({ employees, onSaved }: { employees: Employee[]; onSaved
 
   return (
     <form className="inline-form" onSubmit={handleSubmit}>
-      <label>
-        Employee
-        <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required>
-          <option value="">— Select —</option>
-          {employees.map((emp) => (
-            <option key={emp.id} value={emp.id}>{emp.employee_number} — {emp.first_name} {emp.last_name}</option>
-          ))}
-        </select>
-      </label>
+      <EmployeeAsyncSelect value={employeeId} onChange={setEmployeeId} required />
       <label>
         Start date
         <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />

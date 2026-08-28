@@ -3,7 +3,7 @@ import { api } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import { formatZAR } from '../lib/format'
 import { BENEFIT_CATEGORY_LABELS, BENEFITS_ELECTION_STATUS_LABELS, type TotalRewardsStatement } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 
 /** Design spec 2026-08-26 §3 -- a genuinely self-scoped, narrow statement:
  * your OWN current salary (from the SAP-sourced RemunerationRecord, never

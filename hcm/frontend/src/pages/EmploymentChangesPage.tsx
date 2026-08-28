@@ -9,7 +9,7 @@ import {
   type EmploymentChange,
   type EmploymentChangeType,
 } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 
 const OPEN_STATES = ['proposed', 'confirmed'] as const
 

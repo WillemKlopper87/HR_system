@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import { BENEFIT_CATEGORY_LABELS, BENEFITS_ELECTION_STATUS_LABELS, type Benefit, type BenefitsElection } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 
 export function MyBenefitsPage() {
   const { user } = useAuth()

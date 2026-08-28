@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 import {
   INTERVIEW_RECOMMENDATION_LABELS,
   INTERVIEW_SESSION_STATUS_LABELS,

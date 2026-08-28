@@ -6,7 +6,7 @@ import {
   DATA_SUBJECT_REQUEST_TYPE_LABELS,
   type DataSubjectRequest,
 } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 
 /** hr_admin's review queue for the C2 POPIA workflow (design spec §5.3,
  * §6.2): both export and erasure requests land here and are reviewed and

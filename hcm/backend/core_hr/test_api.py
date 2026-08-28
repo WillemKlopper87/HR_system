@@ -135,6 +135,26 @@ class EmployeeApiTests(TestCase):
         returned_ids = {row["id"] for row in response.data["results"]}
         self.assertEqual(returned_ids, {self.staff.id})
 
+    def test_search_summary_is_scoped_and_privacy_minimal(self):
+        self.client.force_authenticate(user=self.staff.user)
+        response = self.client.get("/api/v1/employees/search-summary/?q=Staff")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"], [{
+            "id": self.staff.id,
+            "employee_number": "E100",
+            "display_name": "Staff Member",
+        }])
+
+        response = self.client.get("/api/v1/employees/search-summary/?q=HR")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"], [])
+
+    def test_search_summary_requires_two_characters(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/employees/search-summary/?q=S")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"], [])
+
 
 class EmployeeSelfServiceApiTests(TestCase):
     """Sprint 15 (ESS): profile self-edit and consent-gated self-ID."""

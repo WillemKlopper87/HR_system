@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { formatZAR } from '../lib/format'
 import { api, ApiError } from '../api/client'
 import { useAllPages } from '../api/hooks'
-import { useReferenceData } from '../api/ReferenceDataContext'
+import { useReferenceData } from '../api/useReferenceData'
 import type { CompCycle } from '../api/types'
 
 export function CompCyclesPage() {

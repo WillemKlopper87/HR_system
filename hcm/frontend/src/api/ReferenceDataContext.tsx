@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { fetchAllPages } from './client'
 import type { Department, JobGrade, Location, OccupationalLevel } from './types'
+import { ReferenceDataContext } from './reference-data-context'
 
 interface ReferenceDataState {
   departments: Map<number, Department>
@@ -29,8 +30,6 @@ const empty: ReferenceDataState = {
   locationList: [],
   loading: true,
 }
-
-const ReferenceDataContext = createContext<ReferenceDataValue | null>(null)
 
 export function ReferenceDataProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ReferenceDataState>(empty)
@@ -63,15 +62,10 @@ export function ReferenceDataProvider({ children }: { children: ReactNode }) {
     }
   }, [version])
 
+  const value: ReferenceDataValue = { ...state, refresh: () => setVersion((v) => v + 1) }
   return (
-    <ReferenceDataContext.Provider value={{ ...state, refresh: () => setVersion((v) => v + 1) }}>
+    <ReferenceDataContext.Provider value={value}>
       {children}
     </ReferenceDataContext.Provider>
   )
-}
-
-export function useReferenceData(): ReferenceDataValue {
-  const ctx = useContext(ReferenceDataContext)
-  if (!ctx) throw new Error('useReferenceData must be used within ReferenceDataProvider')
-  return ctx
 }

@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Field } from '../components/Field'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError, fetchAllPages } from '../api/client'
-import { useReferenceData } from '../api/ReferenceDataContext'
+import { useReferenceData } from '../api/useReferenceData'
 import {
   ASSESSMENT_STATUS_LABELS,
   ASSESSMENT_TYPE_LABELS,

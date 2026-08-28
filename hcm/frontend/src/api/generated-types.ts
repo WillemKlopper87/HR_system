@@ -784,6 +784,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/background-checks/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Tracking only, no vendor integration (design spec §2.3) — reuses
+         *     IsRecruiterOrHRAdmin unchanged: the whole model is Sensitive-tier by
+         *     nature, and that permission class's audience is already the correct
+         *     one. No interviewer access at all, unlike InterviewSession/
+         *     InterviewScorecard above.
+         */
+        get: operations["v1_background_checks_list"];
+        put?: never;
+        /**
+         * @description Tracking only, no vendor integration (design spec §2.3) — reuses
+         *     IsRecruiterOrHRAdmin unchanged: the whole model is Sensitive-tier by
+         *     nature, and that permission class's audience is already the correct
+         *     one. No interviewer access at all, unlike InterviewSession/
+         *     InterviewScorecard above.
+         */
+        post: operations["v1_background_checks_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/background-checks/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Tracking only, no vendor integration (design spec §2.3) — reuses
+         *     IsRecruiterOrHRAdmin unchanged: the whole model is Sensitive-tier by
+         *     nature, and that permission class's audience is already the correct
+         *     one. No interviewer access at all, unlike InterviewSession/
+         *     InterviewScorecard above.
+         */
+        get: operations["v1_background_checks_retrieve"];
+        put?: never;
+        post?: never;
+        /**
+         * @description Tracking only, no vendor integration (design spec §2.3) — reuses
+         *     IsRecruiterOrHRAdmin unchanged: the whole model is Sensitive-tier by
+         *     nature, and that permission class's audience is already the correct
+         *     one. No interviewer access at all, unlike InterviewSession/
+         *     InterviewScorecard above.
+         */
+        delete: operations["v1_background_checks_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Tracking only, no vendor integration (design spec §2.3) — reuses
+         *     IsRecruiterOrHRAdmin unchanged: the whole model is Sensitive-tier by
+         *     nature, and that permission class's audience is already the correct
+         *     one. No interviewer access at all, unlike InterviewSession/
+         *     InterviewScorecard above.
+         */
+        patch: operations["v1_background_checks_partial_update"];
+        trace?: never;
+    };
     "/api/v1/benefits/": {
         parameters: {
             query?: never;
@@ -949,6 +1016,138 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calibration-sessions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_calibration_sessions_list"];
+        put?: never;
+        post: operations["v1_calibration_sessions_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calibration-sessions/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_calibration_sessions_retrieve"];
+        put: operations["v1_calibration_sessions_update"];
+        post?: never;
+        delete: operations["v1_calibration_sessions_destroy"];
+        options?: never;
+        head?: never;
+        patch: operations["v1_calibration_sessions_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/calibration-sessions/{id}/candidates/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Eligible cohort not yet recorded in this session — what the
+         *     hr_admin picks from when recording outcomes.
+         */
+        get: operations["v1_calibration_sessions_candidates_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calibration-sessions/{id}/close/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["v1_calibration_sessions_close_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calibration-sessions/{id}/record-outcome/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["v1_calibration_sessions_record_outcome_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/careers/apply/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["v1_careers_apply_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/careers/postings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_careers_postings_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/careers/postings/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_careers_postings_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/certifications/": {
         parameters: {
             query?: never;
@@ -1005,6 +1204,500 @@ export interface paths {
         patch: operations["v1_certifications_partial_update"];
         trace?: never;
     };
+    "/api/v1/checklist-instances/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The employee-facing side (design spec section 5, 7). No PATCH/PUT/
+         *     DELETE -- an instance only ever moves via task completion
+         *     (ChecklistInstanceItemViewSet, below) or the automatic hire/exit hooks;
+         *     the one write here is a manual hr_admin create (spec section 2.5's
+         *     backfill path).
+         *
+         *     Row visibility (get_queryset, not a blanket permission class -- same
+         *     split EmployeeVersion's nested contract_renewal_decision read gate
+         *     uses): hr_admin/auditor see everything; a line_manager sees their
+         *     reporting chain (RBAC-Roles.md's own_team scope, via
+         *     is_in_reporting_chain); anyone else sees only their own record.
+         */
+        get: operations["v1_checklist_instances_list"];
+        put?: never;
+        /**
+         * @description The employee-facing side (design spec section 5, 7). No PATCH/PUT/
+         *     DELETE -- an instance only ever moves via task completion
+         *     (ChecklistInstanceItemViewSet, below) or the automatic hire/exit hooks;
+         *     the one write here is a manual hr_admin create (spec section 2.5's
+         *     backfill path).
+         *
+         *     Row visibility (get_queryset, not a blanket permission class -- same
+         *     split EmployeeVersion's nested contract_renewal_decision read gate
+         *     uses): hr_admin/auditor see everything; a line_manager sees their
+         *     reporting chain (RBAC-Roles.md's own_team scope, via
+         *     is_in_reporting_chain); anyone else sees only their own record.
+         */
+        post: operations["v1_checklist_instances_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/checklist-instances/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The employee-facing side (design spec section 5, 7). No PATCH/PUT/
+         *     DELETE -- an instance only ever moves via task completion
+         *     (ChecklistInstanceItemViewSet, below) or the automatic hire/exit hooks;
+         *     the one write here is a manual hr_admin create (spec section 2.5's
+         *     backfill path).
+         *
+         *     Row visibility (get_queryset, not a blanket permission class -- same
+         *     split EmployeeVersion's nested contract_renewal_decision read gate
+         *     uses): hr_admin/auditor see everything; a line_manager sees their
+         *     reporting chain (RBAC-Roles.md's own_team scope, via
+         *     is_in_reporting_chain); anyone else sees only their own record.
+         */
+        get: operations["v1_checklist_instances_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/checklist-items/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Task completion (design spec section 5, 7 -- decision 1). Read-only
+         *     on the row itself (ChecklistInstanceItemSerializer's read_only_fields);
+         *     every state change goes through the complete/reopen actions, which are
+         *     where the owner_role + reporting-chain gate actually lives -- like
+         *     exits.py's tiered-confirm rule, that decision needs the specific row's
+         *     data, not just the actor's role, so it can't be a blanket permission
+         *     class.
+         */
+        get: operations["v1_checklist_items_list"];
+        put?: never;
+        /**
+         * @description Task completion (design spec section 5, 7 -- decision 1). Read-only
+         *     on the row itself (ChecklistInstanceItemSerializer's read_only_fields);
+         *     every state change goes through the complete/reopen actions, which are
+         *     where the owner_role + reporting-chain gate actually lives -- like
+         *     exits.py's tiered-confirm rule, that decision needs the specific row's
+         *     data, not just the actor's role, so it can't be a blanket permission
+         *     class.
+         */
+        post: operations["v1_checklist_items_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/checklist-items/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Task completion (design spec section 5, 7 -- decision 1). Read-only
+         *     on the row itself (ChecklistInstanceItemSerializer's read_only_fields);
+         *     every state change goes through the complete/reopen actions, which are
+         *     where the owner_role + reporting-chain gate actually lives -- like
+         *     exits.py's tiered-confirm rule, that decision needs the specific row's
+         *     data, not just the actor's role, so it can't be a blanket permission
+         *     class.
+         */
+        get: operations["v1_checklist_items_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/checklist-items/{id}/complete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Task completion (design spec section 5, 7 -- decision 1). Read-only
+         *     on the row itself (ChecklistInstanceItemSerializer's read_only_fields);
+         *     every state change goes through the complete/reopen actions, which are
+         *     where the owner_role + reporting-chain gate actually lives -- like
+         *     exits.py's tiered-confirm rule, that decision needs the specific row's
+         *     data, not just the actor's role, so it can't be a blanket permission
+         *     class.
+         */
+        post: operations["v1_checklist_items_complete_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/checklist-items/{id}/reopen/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Task completion (design spec section 5, 7 -- decision 1). Read-only
+         *     on the row itself (ChecklistInstanceItemSerializer's read_only_fields);
+         *     every state change goes through the complete/reopen actions, which are
+         *     where the owner_role + reporting-chain gate actually lives -- like
+         *     exits.py's tiered-confirm rule, that decision needs the specific row's
+         *     data, not just the actor's role, so it can't be a blanket permission
+         *     class.
+         */
+        post: operations["v1_checklist_items_reopen_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/checklist-template-items/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Flat ordered task list per template (design spec section 2.3 -- no
+         *     section grouping, deliberately simpler than performance's
+         *     TemplateElement/TemplateSection pair). Every write routes through
+         *     services.py so 'only a draft template's tasks can be edited' (spec
+         *     section 2.4) is enforced in one place rather than repeated per action.
+         */
+        get: operations["v1_checklist_template_items_list"];
+        put?: never;
+        /**
+         * @description Flat ordered task list per template (design spec section 2.3 -- no
+         *     section grouping, deliberately simpler than performance's
+         *     TemplateElement/TemplateSection pair). Every write routes through
+         *     services.py so 'only a draft template's tasks can be edited' (spec
+         *     section 2.4) is enforced in one place rather than repeated per action.
+         */
+        post: operations["v1_checklist_template_items_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/checklist-template-items/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Flat ordered task list per template (design spec section 2.3 -- no
+         *     section grouping, deliberately simpler than performance's
+         *     TemplateElement/TemplateSection pair). Every write routes through
+         *     services.py so 'only a draft template's tasks can be edited' (spec
+         *     section 2.4) is enforced in one place rather than repeated per action.
+         */
+        get: operations["v1_checklist_template_items_retrieve"];
+        /**
+         * @description Flat ordered task list per template (design spec section 2.3 -- no
+         *     section grouping, deliberately simpler than performance's
+         *     TemplateElement/TemplateSection pair). Every write routes through
+         *     services.py so 'only a draft template's tasks can be edited' (spec
+         *     section 2.4) is enforced in one place rather than repeated per action.
+         */
+        put: operations["v1_checklist_template_items_update"];
+        post?: never;
+        /**
+         * @description Flat ordered task list per template (design spec section 2.3 -- no
+         *     section grouping, deliberately simpler than performance's
+         *     TemplateElement/TemplateSection pair). Every write routes through
+         *     services.py so 'only a draft template's tasks can be edited' (spec
+         *     section 2.4) is enforced in one place rather than repeated per action.
+         */
+        delete: operations["v1_checklist_template_items_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Flat ordered task list per template (design spec section 2.3 -- no
+         *     section grouping, deliberately simpler than performance's
+         *     TemplateElement/TemplateSection pair). Every write routes through
+         *     services.py so 'only a draft template's tasks can be edited' (spec
+         *     section 2.4) is enforced in one place rather than repeated per action.
+         */
+        patch: operations["v1_checklist_template_items_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/checklist-templates/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Template CRUD + publish/retire (design spec section 5, 7). No
+         *     PATCH/PUT on the template row itself beyond what ModelViewSet gives for
+         *     free -- name/direction rarely change after creation, and version/status
+         *     are always service-driven (ChecklistTemplateSerializer's read-only
+         *     fields).
+         */
+        get: operations["v1_checklist_templates_list"];
+        put?: never;
+        /**
+         * @description Template CRUD + publish/retire (design spec section 5, 7). No
+         *     PATCH/PUT on the template row itself beyond what ModelViewSet gives for
+         *     free -- name/direction rarely change after creation, and version/status
+         *     are always service-driven (ChecklistTemplateSerializer's read-only
+         *     fields).
+         */
+        post: operations["v1_checklist_templates_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/checklist-templates/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Template CRUD + publish/retire (design spec section 5, 7). No
+         *     PATCH/PUT on the template row itself beyond what ModelViewSet gives for
+         *     free -- name/direction rarely change after creation, and version/status
+         *     are always service-driven (ChecklistTemplateSerializer's read-only
+         *     fields).
+         */
+        get: operations["v1_checklist_templates_retrieve"];
+        /**
+         * @description Template CRUD + publish/retire (design spec section 5, 7). No
+         *     PATCH/PUT on the template row itself beyond what ModelViewSet gives for
+         *     free -- name/direction rarely change after creation, and version/status
+         *     are always service-driven (ChecklistTemplateSerializer's read-only
+         *     fields).
+         */
+        put: operations["v1_checklist_templates_update"];
+        post?: never;
+        /**
+         * @description Template CRUD + publish/retire (design spec section 5, 7). No
+         *     PATCH/PUT on the template row itself beyond what ModelViewSet gives for
+         *     free -- name/direction rarely change after creation, and version/status
+         *     are always service-driven (ChecklistTemplateSerializer's read-only
+         *     fields).
+         */
+        delete: operations["v1_checklist_templates_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Template CRUD + publish/retire (design spec section 5, 7). No
+         *     PATCH/PUT on the template row itself beyond what ModelViewSet gives for
+         *     free -- name/direction rarely change after creation, and version/status
+         *     are always service-driven (ChecklistTemplateSerializer's read-only
+         *     fields).
+         */
+        patch: operations["v1_checklist_templates_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/checklist-templates/{id}/publish/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Template CRUD + publish/retire (design spec section 5, 7). No
+         *     PATCH/PUT on the template row itself beyond what ModelViewSet gives for
+         *     free -- name/direction rarely change after creation, and version/status
+         *     are always service-driven (ChecklistTemplateSerializer's read-only
+         *     fields).
+         */
+        post: operations["v1_checklist_templates_publish_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/checklist-templates/{id}/retire/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Template CRUD + publish/retire (design spec section 5, 7). No
+         *     PATCH/PUT on the template row itself beyond what ModelViewSet gives for
+         *     free -- name/direction rarely change after creation, and version/status
+         *     are always service-driven (ChecklistTemplateSerializer's read-only
+         *     fields).
+         */
+        post: operations["v1_checklist_templates_retire_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/comp-cycles/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description A cycle row itself carries no individual's pay figure (name, dates,
+         *     a budget total, a department, a status) — deliberately NOT
+         *     RequiresPayrollStepUp, unlike PayBand/CompProposal (design spec §6):
+         *     step-up exists for privileged access to someone else's Restricted-tier
+         *     pay data, and a planning envelope isn't that.
+         */
+        get: operations["v1_comp_cycles_list"];
+        put?: never;
+        /**
+         * @description A cycle row itself carries no individual's pay figure (name, dates,
+         *     a budget total, a department, a status) — deliberately NOT
+         *     RequiresPayrollStepUp, unlike PayBand/CompProposal (design spec §6):
+         *     step-up exists for privileged access to someone else's Restricted-tier
+         *     pay data, and a planning envelope isn't that.
+         */
+        post: operations["v1_comp_cycles_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/comp-cycles/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description A cycle row itself carries no individual's pay figure (name, dates,
+         *     a budget total, a department, a status) — deliberately NOT
+         *     RequiresPayrollStepUp, unlike PayBand/CompProposal (design spec §6):
+         *     step-up exists for privileged access to someone else's Restricted-tier
+         *     pay data, and a planning envelope isn't that.
+         */
+        get: operations["v1_comp_cycles_retrieve"];
+        /**
+         * @description A cycle row itself carries no individual's pay figure (name, dates,
+         *     a budget total, a department, a status) — deliberately NOT
+         *     RequiresPayrollStepUp, unlike PayBand/CompProposal (design spec §6):
+         *     step-up exists for privileged access to someone else's Restricted-tier
+         *     pay data, and a planning envelope isn't that.
+         */
+        put: operations["v1_comp_cycles_update"];
+        post?: never;
+        /**
+         * @description A cycle row itself carries no individual's pay figure (name, dates,
+         *     a budget total, a department, a status) — deliberately NOT
+         *     RequiresPayrollStepUp, unlike PayBand/CompProposal (design spec §6):
+         *     step-up exists for privileged access to someone else's Restricted-tier
+         *     pay data, and a planning envelope isn't that.
+         */
+        delete: operations["v1_comp_cycles_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description A cycle row itself carries no individual's pay figure (name, dates,
+         *     a budget total, a department, a status) — deliberately NOT
+         *     RequiresPayrollStepUp, unlike PayBand/CompProposal (design spec §6):
+         *     step-up exists for privileged access to someone else's Restricted-tier
+         *     pay data, and a planning envelope isn't that.
+         */
+        patch: operations["v1_comp_cycles_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/comp-cycles/{id}/close/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description A cycle row itself carries no individual's pay figure (name, dates,
+         *     a budget total, a department, a status) — deliberately NOT
+         *     RequiresPayrollStepUp, unlike PayBand/CompProposal (design spec §6):
+         *     step-up exists for privileged access to someone else's Restricted-tier
+         *     pay data, and a planning envelope isn't that.
+         */
+        post: operations["v1_comp_cycles_close_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/comp-cycles/{id}/open/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description A cycle row itself carries no individual's pay figure (name, dates,
+         *     a budget total, a department, a status) — deliberately NOT
+         *     RequiresPayrollStepUp, unlike PayBand/CompProposal (design spec §6):
+         *     step-up exists for privileged access to someone else's Restricted-tier
+         *     pay data, and a planning envelope isn't that.
+         */
+        post: operations["v1_comp_cycles_open_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/comp-proposals/": {
         parameters: {
             query?: never;
@@ -1017,6 +1710,7 @@ export interface paths {
          *     semantics (see perform_create) and thereafter only moves through the
          *     approve/reject actions, never edited in place. RequiresPayrollStepUp:
          *     see PayBandViewSet's docstring — comp_proposal is also "R"-tier.
+         *     Supports ?cycle=<id> filtering for a cycle's own proposal list.
          */
         get: operations["v1_comp_proposals_list"];
         put?: never;
@@ -1025,6 +1719,7 @@ export interface paths {
          *     semantics (see perform_create) and thereafter only moves through the
          *     approve/reject actions, never edited in place. RequiresPayrollStepUp:
          *     see PayBandViewSet's docstring — comp_proposal is also "R"-tier.
+         *     Supports ?cycle=<id> filtering for a cycle's own proposal list.
          */
         post: operations["v1_comp_proposals_create"];
         delete?: never;
@@ -1045,6 +1740,7 @@ export interface paths {
          *     semantics (see perform_create) and thereafter only moves through the
          *     approve/reject actions, never edited in place. RequiresPayrollStepUp:
          *     see PayBandViewSet's docstring — comp_proposal is also "R"-tier.
+         *     Supports ?cycle=<id> filtering for a cycle's own proposal list.
          */
         get: operations["v1_comp_proposals_retrieve"];
         put?: never;
@@ -1069,6 +1765,7 @@ export interface paths {
          *     semantics (see perform_create) and thereafter only moves through the
          *     approve/reject actions, never edited in place. RequiresPayrollStepUp:
          *     see PayBandViewSet's docstring — comp_proposal is also "R"-tier.
+         *     Supports ?cycle=<id> filtering for a cycle's own proposal list.
          */
         post: operations["v1_comp_proposals_approve_create"];
         delete?: never;
@@ -1091,12 +1788,205 @@ export interface paths {
          *     semantics (see perform_create) and thereafter only moves through the
          *     approve/reject actions, never edited in place. RequiresPayrollStepUp:
          *     see PayBandViewSet's docstring — comp_proposal is also "R"-tier.
+         *     Supports ?cycle=<id> filtering for a cycle's own proposal list.
          */
         post: operations["v1_comp_proposals_reject_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/course-requirements/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description 'Required for role' rules (design spec §2.3/§5.1) -- same
+         *     read-open/hr_admin-write shape as CourseViewSet; validation (a
+         *     requirement must target a mandatory course, no duplicate active
+         *     scope) lives in CourseRequirementSerializer.
+         */
+        get: operations["v1_course_requirements_list"];
+        put?: never;
+        /**
+         * @description 'Required for role' rules (design spec §2.3/§5.1) -- same
+         *     read-open/hr_admin-write shape as CourseViewSet; validation (a
+         *     requirement must target a mandatory course, no duplicate active
+         *     scope) lives in CourseRequirementSerializer.
+         */
+        post: operations["v1_course_requirements_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/course-requirements/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description 'Required for role' rules (design spec §2.3/§5.1) -- same
+         *     read-open/hr_admin-write shape as CourseViewSet; validation (a
+         *     requirement must target a mandatory course, no duplicate active
+         *     scope) lives in CourseRequirementSerializer.
+         */
+        get: operations["v1_course_requirements_retrieve"];
+        /**
+         * @description 'Required for role' rules (design spec §2.3/§5.1) -- same
+         *     read-open/hr_admin-write shape as CourseViewSet; validation (a
+         *     requirement must target a mandatory course, no duplicate active
+         *     scope) lives in CourseRequirementSerializer.
+         */
+        put: operations["v1_course_requirements_update"];
+        post?: never;
+        /**
+         * @description 'Required for role' rules (design spec §2.3/§5.1) -- same
+         *     read-open/hr_admin-write shape as CourseViewSet; validation (a
+         *     requirement must target a mandatory course, no duplicate active
+         *     scope) lives in CourseRequirementSerializer.
+         */
+        delete: operations["v1_course_requirements_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description 'Required for role' rules (design spec §2.3/§5.1) -- same
+         *     read-open/hr_admin-write shape as CourseViewSet; validation (a
+         *     requirement must target a mandatory course, no duplicate active
+         *     scope) lives in CourseRequirementSerializer.
+         */
+        patch: operations["v1_course_requirements_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/courses/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The course catalogue -- same shape/reasoning as SkillViewSet:
+         *     Public tier, read-open to everyone (dropdowns, and so a manager can
+         *     see what a report's overdue item actually is), hr_admin manages it.
+         */
+        get: operations["v1_courses_list"];
+        put?: never;
+        /**
+         * @description The course catalogue -- same shape/reasoning as SkillViewSet:
+         *     Public tier, read-open to everyone (dropdowns, and so a manager can
+         *     see what a report's overdue item actually is), hr_admin manages it.
+         */
+        post: operations["v1_courses_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courses/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The course catalogue -- same shape/reasoning as SkillViewSet:
+         *     Public tier, read-open to everyone (dropdowns, and so a manager can
+         *     see what a report's overdue item actually is), hr_admin manages it.
+         */
+        get: operations["v1_courses_retrieve"];
+        /**
+         * @description The course catalogue -- same shape/reasoning as SkillViewSet:
+         *     Public tier, read-open to everyone (dropdowns, and so a manager can
+         *     see what a report's overdue item actually is), hr_admin manages it.
+         */
+        put: operations["v1_courses_update"];
+        post?: never;
+        /**
+         * @description The course catalogue -- same shape/reasoning as SkillViewSet:
+         *     Public tier, read-open to everyone (dropdowns, and so a manager can
+         *     see what a report's overdue item actually is), hr_admin manages it.
+         */
+        delete: operations["v1_courses_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description The course catalogue -- same shape/reasoning as SkillViewSet:
+         *     Public tier, read-open to everyone (dropdowns, and so a manager can
+         *     see what a report's overdue item actually is), hr_admin manages it.
+         */
+        patch: operations["v1_courses_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/critical-posts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Which establishment.Position posts are succession-critical (spec
+         *     §5.1). Read is the same audience Position itself is readable to;
+         *     write is hr_admin only.
+         */
+        get: operations["v1_critical_posts_list"];
+        put?: never;
+        /**
+         * @description Which establishment.Position posts are succession-critical (spec
+         *     §5.1). Read is the same audience Position itself is readable to;
+         *     write is hr_admin only.
+         */
+        post: operations["v1_critical_posts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/critical-posts/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Which establishment.Position posts are succession-critical (spec
+         *     §5.1). Read is the same audience Position itself is readable to;
+         *     write is hr_admin only.
+         */
+        get: operations["v1_critical_posts_retrieve"];
+        /**
+         * @description Which establishment.Position posts are succession-critical (spec
+         *     §5.1). Read is the same audience Position itself is readable to;
+         *     write is hr_admin only.
+         */
+        put: operations["v1_critical_posts_update"];
+        post?: never;
+        /**
+         * @description Which establishment.Position posts are succession-critical (spec
+         *     §5.1). Read is the same audience Position itself is readable to;
+         *     write is hr_admin only.
+         */
+        delete: operations["v1_critical_posts_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Which establishment.Position posts are succession-critical (spec
+         *     §5.1). Read is the same audience Position itself is readable to;
+         *     write is hr_admin only.
+         */
+        patch: operations["v1_critical_posts_partial_update"];
         trace?: never;
     };
     "/api/v1/dashboards/attendance/": {
@@ -1138,6 +2028,32 @@ export interface paths {
          *     actual tracking (if in scope)").
          */
         get: operations["v1_dashboards_equity_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/exit-interviews/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Code on integrating EE into HR practice, termination/retention
+         *     section: exit reasons reviewed by designated group. Reuses the
+         *     current EmployeeVersion for each interviewed employee -- same
+         *     approach probation_completion_dashboard takes, and the same caveat:
+         *     an employee whose demographics are NOT_DISCLOSED on both race and
+         *     gender is invisible to the by_race/by_gender breakdowns (nothing to
+         *     group them under), same as every other workforce breakdown in this
+         *     app.
+         */
+        get: operations["v1_dashboards_exit_interviews_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1214,6 +2130,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboards/learning/training-compliance/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description C6 design spec §5.3: aggregate completion-rate rollup by mandatory
+         *     course, org-wide and by department/occupational level. hr_admin only
+         *     -- same gate and no-suppression reasoning as skills_inventory
+         *     (Internal-tier subject matter, already restricted to hr_admin, so
+         *     small-cell suppression -- which protects a *wider* audience from
+         *     demographic aggregates -- has no audience to protect against here).
+         *     The named overdue-individuals list is a separate, row-scoped endpoint
+         *     (training_compliance_overdue) -- this one never names anyone.
+         */
+        get: operations["v1_dashboards_learning_training_compliance_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/learning/training-compliance/overdue/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description C6 design spec §5.4: the named overdue-individuals list, row-scoped
+         *     exactly like `team_development` -- hr_admin/auditor/other all-scope
+         *     roles see everyone, line_manager sees only their own reporting chain,
+         *     a base employee sees only themselves. No new access-control mechanism
+         *     invented; small-cell suppression doesn't apply here (this list is
+         *     already scoped to people the requester has a legitimate operational
+         *     reason to see individually, not a demographic aggregate).
+         */
+        get: operations["v1_dashboards_learning_training_compliance_overdue_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboards/learning/wsp-atr-export/": {
         parameters: {
             query?: never;
@@ -1228,8 +2195,47 @@ export interface paths {
          *     will be rebuilt in spreadsheets." A CSV in the shape a WSP/ATR
          *     submission needs — training data joined to the EEA demographic/level
          *     fields SETA reporting requires alongside it.
+         *
+         *     C2 (docs/superpowers/specs/2026-08-25-employee-documents-popia-design.md
+         *     §2.4): also unions in Certification rows via a `record_type` column —
+         *     qualifications feed WSP/ATR too, and Certification wasn't in this
+         *     export at all before this. Purely additive within this app (it already
+         *     owns both models); no new peer-app coupling. Qualification rows carry
+         *     name/issuing_body in the training_title/provider columns (same shape,
+         *     different semantic label) with hours/cost/status/completion_date left
+         *     blank — concepts that don't apply to a qualification.
          */
         get: operations["v1_dashboards_learning_wsp_atr_export_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/management-control/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description B-BBEE ICT Sector Code's Management Control element: black and
+         *     black-female representation per management band, plus employees with
+         *     disabilities, benchmarked to the EAP the current EE plan was set
+         *     against -- exactly the evidence a verification agency asks for
+         *     (EEA2 workforce profile, occupational-level classification), assembled
+         *     here rather than re-derived by the agency from scratch. "Black" is the
+         *     EEA's own definition (African + Coloured + Indian) per the field
+         *     guide's B-BBEE section. Scorecard point weightings are NOT computed
+         *     here -- this is the evidence schedule an agency scores against, not the
+         *     score itself; the ICT scorecard weightings need confirming against the
+         *     gazetted Code before being relied on for a filing (same caveat the
+         *     regulatory field-guide review attached to its own B-BBEE figures).
+         */
+        get: operations["v1_dashboards_management_control_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1262,6 +2268,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboards/probation/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Code on integrating EE into HR practice, probation section:
+         *     "completion rates by designated group". Only CLOSED periods
+         *     (confirmed or terminated) count towards a rate -- one still
+         *     IN_PROGRESS/EXTENDED hasn't reached an outcome yet, so including it
+         *     would understate confirmation until every open case resolves.
+         *     hr_admin only, same reasoning training_compliance_dashboard uses:
+         *     this is a management rollup naming individuals' outcomes, not a
+         *     self-service view.
+         */
+        get: operations["v1_dashboards_probation_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboards/recruitment/": {
         parameters: {
             query?: never;
@@ -1279,6 +2311,30 @@ export interface paths {
          *     filtering is needed here to keep the aggregate consent-respecting.
          */
         get: operations["v1_dashboards_recruitment_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/recruitment/funnel/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Stage-by-stage conversion cross-tabbed by race/gender/disability
+         *     status — the Code on integrating EE into HR practice's recruitment
+         *     section calls for exactly this ('track applicant pool, short-list,
+         *     interviewed and offered by demographic'). `?department=<id>` or
+         *     `?requisition=<id>` narrows the applicant set; unfiltered is
+         *     org-wide.
+         */
+        get: operations["v1_dashboards_recruitment_funnel_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1375,6 +2431,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/data-subject-requests/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description No DELETE — a request is actioned (completed/declined), not
+         *     withdrawn from the record (design spec §5.3).
+         */
+        get: operations["v1_data_subject_requests_list"];
+        put?: never;
+        /**
+         * @description No DELETE — a request is actioned (completed/declined), not
+         *     withdrawn from the record (design spec §5.3).
+         */
+        post: operations["v1_data_subject_requests_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-subject-requests/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description No DELETE — a request is actioned (completed/declined), not
+         *     withdrawn from the record (design spec §5.3).
+         */
+        get: operations["v1_data_subject_requests_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-subject-requests/{id}/complete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description No DELETE — a request is actioned (completed/declined), not
+         *     withdrawn from the record (design spec §5.3).
+         */
+        post: operations["v1_data_subject_requests_complete_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-subject-requests/{id}/decline/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description No DELETE — a request is actioned (completed/declined), not
+         *     withdrawn from the record (design spec §5.3).
+         */
+        post: operations["v1_data_subject_requests_decline_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-subject-requests/{id}/download/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The completed EXPORT artifact — same authenticated FileResponse
+         *     pattern as policies.PolicyViewSet.download and
+         *     EmployeeDocumentViewSet.download above.
+         */
+        get: operations["v1_data_subject_requests_download_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/departments/": {
         parameters: {
             query?: never;
@@ -1437,6 +2598,343 @@ export interface paths {
         patch: operations["v1_departments_partial_update"];
         trace?: never;
     };
+    "/api/v1/dependants/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        get: operations["v1_dependants_list"];
+        put?: never;
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        post: operations["v1_dependants_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dependants/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        get: operations["v1_dependants_retrieve"];
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        put: operations["v1_dependants_update"];
+        post?: never;
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        delete: operations["v1_dependants_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        patch: operations["v1_dependants_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/ee-forum-meetings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_ee_forum_meetings_list"];
+        put?: never;
+        post: operations["v1_ee_forum_meetings_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ee-forum-meetings/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_ee_forum_meetings_retrieve"];
+        put: operations["v1_ee_forum_meetings_update"];
+        post?: never;
+        delete: operations["v1_ee_forum_meetings_destroy"];
+        options?: never;
+        head?: never;
+        patch: operations["v1_ee_forum_meetings_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/ee-forum-meetings/{id}/download_minutes/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Authenticated FileResponse — same shape as policies/performance
+         *     evidence; `get_object()` applies the attendee carve-out, so a member
+         *     can only pull minutes of meetings they attended.
+         */
+        get: operations["v1_ee_forum_meetings_download_minutes_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ee-forum-members/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description EEForumPermission lets any authenticated employee GET; the queryset
+         *     narrows to the requester's own seat(s) for non-EE roles (spec §5: a
+         *     member may see who they sit with — the list is the meeting-attendee
+         *     roster — but a non-member sees nothing). Writes are role-gated in the
+         *     permission class.
+         */
+        get: operations["v1_ee_forum_members_list"];
+        put?: never;
+        /**
+         * @description EEForumPermission lets any authenticated employee GET; the queryset
+         *     narrows to the requester's own seat(s) for non-EE roles (spec §5: a
+         *     member may see who they sit with — the list is the meeting-attendee
+         *     roster — but a non-member sees nothing). Writes are role-gated in the
+         *     permission class.
+         */
+        post: operations["v1_ee_forum_members_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ee-forum-members/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description EEForumPermission lets any authenticated employee GET; the queryset
+         *     narrows to the requester's own seat(s) for non-EE roles (spec §5: a
+         *     member may see who they sit with — the list is the meeting-attendee
+         *     roster — but a non-member sees nothing). Writes are role-gated in the
+         *     permission class.
+         */
+        get: operations["v1_ee_forum_members_retrieve"];
+        /**
+         * @description EEForumPermission lets any authenticated employee GET; the queryset
+         *     narrows to the requester's own seat(s) for non-EE roles (spec §5: a
+         *     member may see who they sit with — the list is the meeting-attendee
+         *     roster — but a non-member sees nothing). Writes are role-gated in the
+         *     permission class.
+         */
+        put: operations["v1_ee_forum_members_update"];
+        post?: never;
+        /**
+         * @description EEForumPermission lets any authenticated employee GET; the queryset
+         *     narrows to the requester's own seat(s) for non-EE roles (spec §5: a
+         *     member may see who they sit with — the list is the meeting-attendee
+         *     roster — but a non-member sees nothing). Writes are role-gated in the
+         *     permission class.
+         */
+        delete: operations["v1_ee_forum_members_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description EEForumPermission lets any authenticated employee GET; the queryset
+         *     narrows to the requester's own seat(s) for non-EE roles (spec §5: a
+         *     member may see who they sit with — the list is the meeting-attendee
+         *     roster — but a non-member sees nothing). Writes are role-gated in the
+         *     permission class.
+         */
+        patch: operations["v1_ee_forum_members_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/ee-forum-members/composition/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Derived s.16(2) adequacy check — EE read roles only (it
+         *     summarises the whole workforce's level/designated-group mix).
+         */
+        get: operations["v1_ee_forum_members_composition_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ee-plan-measures/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_ee_plan_measures_list"];
+        put?: never;
+        post: operations["v1_ee_plan_measures_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ee-plan-measures/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_ee_plan_measures_retrieve"];
+        put: operations["v1_ee_plan_measures_update"];
+        post?: never;
+        delete: operations["v1_ee_plan_measures_destroy"];
+        options?: never;
+        head?: never;
+        patch: operations["v1_ee_plan_measures_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/ee-plan-snapshots/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Create-only via `take/` (matrices are always server-computed); no
+         *     update/delete — a snapshot is evidence of what was tabled.
+         */
+        get: operations["v1_ee_plan_snapshots_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ee-plan-snapshots/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Create-only via `take/` (matrices are always server-computed); no
+         *     update/delete — a snapshot is evidence of what was tabled.
+         */
+        get: operations["v1_ee_plan_snapshots_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ee-plan-snapshots/take/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Create-only via `take/` (matrices are always server-computed); no
+         *     update/delete — a snapshot is evidence of what was tabled.
+         */
+        post: operations["v1_ee_plan_snapshots_take_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ee-plans/": {
         parameters: {
             query?: never;
@@ -1467,6 +2965,29 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["v1_ee_plans_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/ee-plans/sector_defaults/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description sector_targets/disability_5yr_target_pct pre-filled from a
+         *     gazetted EESector, for the plan form to offer before the user
+         *     types a single percentage by hand. `?sector=<id>` picks the
+         *     sector explicitly; otherwise falls back to the employer
+         *     configuration's own sector (reg. 9(7)).
+         */
+        get: operations["v1_ee_plans_sector_defaults_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/ee-questionnaires/": {
@@ -1639,6 +3160,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ee-reports/{id}/validate/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Cell-by-cell check of this generated snapshot against
+         *     EEA-Form-Spec-Notes.md's validation-engine rules — advisory, not a
+         *     state-machine gate (unlike validate_report_readiness, which blocks
+         *     generation itself): a reviewer decides what to do with what this
+         *     surfaces, the same way readiness issues are shown but not force-
+         *     fixed automatically.
+         */
+        get: operations["v1_ee_reports_validate_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ee-reports/generate/": {
         parameters: {
             query?: never;
@@ -1655,6 +3200,250 @@ export interface paths {
          *     raw PATCH that could bypass them.
          */
         post: operations["v1_ee_reports_generate_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ee-sectors/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The EEA17 sector table (Gazette 52514) — reference data, not
+         *     editable through the API; seeded by migration 0005.
+         */
+        get: operations["v1_ee_sectors_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ee-sectors/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The EEA17 sector table (Gazette 52514) — reference data, not
+         *     editable through the API; seeded by migration 0005.
+         */
+        get: operations["v1_ee_sectors_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emergency-contacts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        get: operations["v1_emergency_contacts_list"];
+        put?: never;
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        post: operations["v1_emergency_contacts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emergency-contacts/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        get: operations["v1_emergency_contacts_retrieve"];
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        put: operations["v1_emergency_contacts_update"];
+        post?: never;
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        delete: operations["v1_emergency_contacts_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Shared shape for DependantViewSet/EmergencyContactViewSet (C2 design
+         *     spec §2.8, §5.2): self-or-hr_admin only, narrower than
+         *     RowScopePermission's row-scope (a line_manager never manages a
+         *     report's dependants/emergency contacts). List is filtered to the
+         *     caller's own rows unless they hold hr_admin; detail lookups are left
+         *     unfiltered so a non-owner gets a 403 via IsSelfOrHRAdmin rather than a
+         *     queryset-driven 404 -- same shape as
+         *     policies.PolicyAcknowledgmentViewSet.get_queryset (no secrecy reason
+         *     to hide existence here, unlike Policy's draft-hiding).
+         */
+        patch: operations["v1_emergency_contacts_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/employee-documents/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description No PATCH of `file`/`document_type` — a re-upload is a new document,
+         *     not an edit of an existing one (design spec §9: "no versioning", a
+         *     deliberate simplification vs. policies.Policy). Only `title`/
+         *     `description` are patchable through the plain serializer path.
+         */
+        get: operations["v1_employee_documents_list"];
+        put?: never;
+        /**
+         * @description No PATCH of `file`/`document_type` — a re-upload is a new document,
+         *     not an edit of an existing one (design spec §9: "no versioning", a
+         *     deliberate simplification vs. policies.Policy). Only `title`/
+         *     `description` are patchable through the plain serializer path.
+         */
+        post: operations["v1_employee_documents_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/employee-documents/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description No PATCH of `file`/`document_type` — a re-upload is a new document,
+         *     not an edit of an existing one (design spec §9: "no versioning", a
+         *     deliberate simplification vs. policies.Policy). Only `title`/
+         *     `description` are patchable through the plain serializer path.
+         */
+        get: operations["v1_employee_documents_retrieve"];
+        put?: never;
+        post?: never;
+        /**
+         * @description No PATCH of `file`/`document_type` — a re-upload is a new document,
+         *     not an edit of an existing one (design spec §9: "no versioning", a
+         *     deliberate simplification vs. policies.Policy). Only `title`/
+         *     `description` are patchable through the plain serializer path.
+         */
+        delete: operations["v1_employee_documents_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description No PATCH of `file`/`document_type` — a re-upload is a new document,
+         *     not an edit of an existing one (design spec §9: "no versioning", a
+         *     deliberate simplification vs. policies.Policy). Only `title`/
+         *     `description` are patchable through the plain serializer path.
+         */
+        patch: operations["v1_employee_documents_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/employee-documents/{id}/download/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Authenticated download — reuses policies.PolicyViewSet.download's
+         *     exact pattern (design spec §5.1): self.get_object() already ran
+         *     EmployeeDocumentPermission's row-tier object check, so this is not
+         *     a raw MEDIA_URL link (config/urls.py mounts none).
+         */
+        get: operations["v1_employee_documents_download_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/employee-documents/consent/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Same shape as identity_verification.LivenessCheckViewSet.consent
+         *     — self or hr_admin captures EMPLOYEE_DOCUMENTS-purpose consent
+         *     before an id_copy/disability_verification upload can succeed
+         *     (design spec §2.7).
+         */
+        post: operations["v1_employee_documents_consent_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1757,6 +3546,68 @@ export interface paths {
         get: operations["v1_employee_versions_retrieve"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/employee-versions/{id}/decide_contract/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description hr_admin only -- same layering as recommend_contract above. */
+        post: operations["v1_employee_versions_decide_contract_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/employee-versions/{id}/recommend_contract/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Line manager of THIS employee only (RBAC-Roles.md; C1 part 2
+         *     design spec §6). get_object() above already ran
+         *     RowScopePermission.has_object_permission -- an hr_admin/auditor
+         *     (row_scope=ALL) or the target's own manager (row_scope=own_team,
+         *     via the reporting chain) reaches this body; anyone else already
+         *     got a RowScopePermission-driven 403.
+         *
+         *     The narrowing is deliberately `has_role(...) AND
+         *     is_in_reporting_chain(...)`, not has_role() alone: has_role() is
+         *     scope-blind, and RowScopePermission grants object access if ANY
+         *     active role covers the target, so an actor holding line_manager
+         *     *plus* any row_scope=all role could otherwise recommend for every
+         *     employee in the organisation. Not hypothetical -- RBAC-Roles.md
+         *     derives line_manager from having direct reports, so in production
+         *     an hr_head/ee_manager with reports holds both. This is the same
+         *     cross-role composition hazard
+         *     rbac_audit.permissions.can_access_tier_for_target exists to close,
+         *     and the same idiom serializers.py already uses for this feature's
+         *     subject-visibility gate.
+         *
+         *     is_in_reporting_chain is transitive (skip-level) rather than
+         *     direct-manager-only; that is the codebase-wide convention for "own
+         *     team" (it backs row_scope=own_team itself), and the spec's §6
+         *     wording was amended from "direct reports only" to "reporting
+         *     chain" to match. The frontend keeps a stricter direct-manager
+         *     check on the Recommend button -- a deliberate asymmetry noted
+         *     there.
+         */
+        post: operations["v1_employee_versions_recommend_contract_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1911,6 +3762,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/employees/search-summary/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Return only the identity fields needed by employee selectors.
+         *
+         *     The explicit row-scope call is important: collection actions do not
+         *     pass through the list-only scoping branch in ``get_queryset``.
+         */
+        get: operations["v1_employees_search_summary_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/employer-config/": {
         parameters: {
             query?: never;
@@ -1943,6 +3816,202 @@ export interface paths {
         patch: operations["v1_employer_config_partial_update"];
         trace?: never;
     };
+    "/api/v1/employment-changes/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The exit state machine's HTTP surface (C1 part 3, design spec
+         *     docs/superpowers/specs/2026-08-20-employment-exit-states-design.md).
+         *     exits.py's service layer already enforces every state rule; this
+         *     viewset's job is EmploymentChangePermission's role gate (spec §8) and
+         *     translating EmploymentChangeError -> 400, never re-implementing
+         *     domain logic (exits.py's own module docstring on the 403-vs-400
+         *     split, and contracts.py's decide_contract_action for the worked
+         *     example of NOT letting a bare `except ValueError` swallow it).
+         *
+         *     No PATCH/PUT/DELETE — a change only ever moves forward through
+         *     propose -> confirm(/cancel) -> execute (execute itself has no
+         *     endpoint: it happens inside confirm when due, or via the daily beat
+         *     job otherwise), the same shape as CompProposalViewSet/PositionViewSet.
+         */
+        get: operations["v1_employment_changes_list"];
+        put?: never;
+        /**
+         * @description The exit state machine's HTTP surface (C1 part 3, design spec
+         *     docs/superpowers/specs/2026-08-20-employment-exit-states-design.md).
+         *     exits.py's service layer already enforces every state rule; this
+         *     viewset's job is EmploymentChangePermission's role gate (spec §8) and
+         *     translating EmploymentChangeError -> 400, never re-implementing
+         *     domain logic (exits.py's own module docstring on the 403-vs-400
+         *     split, and contracts.py's decide_contract_action for the worked
+         *     example of NOT letting a bare `except ValueError` swallow it).
+         *
+         *     No PATCH/PUT/DELETE — a change only ever moves forward through
+         *     propose -> confirm(/cancel) -> execute (execute itself has no
+         *     endpoint: it happens inside confirm when due, or via the daily beat
+         *     job otherwise), the same shape as CompProposalViewSet/PositionViewSet.
+         */
+        post: operations["v1_employment_changes_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/employment-changes/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The exit state machine's HTTP surface (C1 part 3, design spec
+         *     docs/superpowers/specs/2026-08-20-employment-exit-states-design.md).
+         *     exits.py's service layer already enforces every state rule; this
+         *     viewset's job is EmploymentChangePermission's role gate (spec §8) and
+         *     translating EmploymentChangeError -> 400, never re-implementing
+         *     domain logic (exits.py's own module docstring on the 403-vs-400
+         *     split, and contracts.py's decide_contract_action for the worked
+         *     example of NOT letting a bare `except ValueError` swallow it).
+         *
+         *     No PATCH/PUT/DELETE — a change only ever moves forward through
+         *     propose -> confirm(/cancel) -> execute (execute itself has no
+         *     endpoint: it happens inside confirm when due, or via the daily beat
+         *     job otherwise), the same shape as CompProposalViewSet/PositionViewSet.
+         */
+        get: operations["v1_employment_changes_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/employment-changes/{id}/cancel/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Any hr_admin, not just the proposer (spec §8). */
+        post: operations["v1_employment_changes_cancel_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/employment-changes/{id}/confirm/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description hr_admin only (EmploymentChangePermission); the tiered-type
+         *     "must be a different person" rule (spec §4.2) is decided from
+         *     identity alone, not role, so it stays in exits.py and surfaces
+         *     here as the 400 branch, not a second 403 check.
+         */
+        post: operations["v1_employment_changes_confirm_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exit-interviews/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description hr_admin only -- same posture as training_compliance_dashboard:
+         *     a management record naming individuals' departure reasons, not a
+         *     self-service or line-manager view. Reusable across two triggers
+         *     (a genuine exit via employment_change, or a probation
+         *     non-confirmation via probation_period), per the Code on integrating
+         *     EE into HR practice's own cross-reference between the two.
+         */
+        get: operations["v1_exit_interviews_list"];
+        put?: never;
+        /**
+         * @description hr_admin only -- same posture as training_compliance_dashboard:
+         *     a management record naming individuals' departure reasons, not a
+         *     self-service or line-manager view. Reusable across two triggers
+         *     (a genuine exit via employment_change, or a probation
+         *     non-confirmation via probation_period), per the Code on integrating
+         *     EE into HR practice's own cross-reference between the two.
+         */
+        post: operations["v1_exit_interviews_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exit-interviews/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description hr_admin only -- same posture as training_compliance_dashboard:
+         *     a management record naming individuals' departure reasons, not a
+         *     self-service or line-manager view. Reusable across two triggers
+         *     (a genuine exit via employment_change, or a probation
+         *     non-confirmation via probation_period), per the Code on integrating
+         *     EE into HR practice's own cross-reference between the two.
+         */
+        get: operations["v1_exit_interviews_retrieve"];
+        /**
+         * @description hr_admin only -- same posture as training_compliance_dashboard:
+         *     a management record naming individuals' departure reasons, not a
+         *     self-service or line-manager view. Reusable across two triggers
+         *     (a genuine exit via employment_change, or a probation
+         *     non-confirmation via probation_period), per the Code on integrating
+         *     EE into HR practice's own cross-reference between the two.
+         */
+        put: operations["v1_exit_interviews_update"];
+        post?: never;
+        /**
+         * @description hr_admin only -- same posture as training_compliance_dashboard:
+         *     a management record naming individuals' departure reasons, not a
+         *     self-service or line-manager view. Reusable across two triggers
+         *     (a genuine exit via employment_change, or a probation
+         *     non-confirmation via probation_period), per the Code on integrating
+         *     EE into HR practice's own cross-reference between the two.
+         */
+        delete: operations["v1_exit_interviews_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description hr_admin only -- same posture as training_compliance_dashboard:
+         *     a management record naming individuals' departure reasons, not a
+         *     self-service or line-manager view. Reusable across two triggers
+         *     (a genuine exit via employment_change, or a probation
+         *     non-confirmation via probation_period), per the Code on integrating
+         *     EE into HR practice's own cross-reference between the two.
+         */
+        patch: operations["v1_exit_interviews_partial_update"];
+        trace?: never;
+    };
     "/api/v1/feedback/": {
         parameters: {
             query?: never;
@@ -1967,6 +4036,232 @@ export interface paths {
          *     subject (self / their manager's reporting chain / hr_admin).
          */
         post: operations["v1_feedback_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feedback-360-raters/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Rater slots: nomination, approval, response. See
+         *     `Feedback360RaterPermission` for the two-layer authority split.
+         */
+        get: operations["v1_feedback_360_raters_list"];
+        put?: never;
+        /**
+         * @description Rater slots: nomination, approval, response. See
+         *     `Feedback360RaterPermission` for the two-layer authority split.
+         */
+        post: operations["v1_feedback_360_raters_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feedback-360-raters/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Rater slots: nomination, approval, response. See
+         *     `Feedback360RaterPermission` for the two-layer authority split.
+         */
+        get: operations["v1_feedback_360_raters_retrieve"];
+        /**
+         * @description Rater slots: nomination, approval, response. See
+         *     `Feedback360RaterPermission` for the two-layer authority split.
+         */
+        put: operations["v1_feedback_360_raters_update"];
+        post?: never;
+        /**
+         * @description Rater slots: nomination, approval, response. See
+         *     `Feedback360RaterPermission` for the two-layer authority split.
+         */
+        delete: operations["v1_feedback_360_raters_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Rater slots: nomination, approval, response. See
+         *     `Feedback360RaterPermission` for the two-layer authority split.
+         */
+        patch: operations["v1_feedback_360_raters_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/feedback-360-raters/{id}/approve/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Rater slots: nomination, approval, response. See
+         *     `Feedback360RaterPermission` for the two-layer authority split.
+         */
+        post: operations["v1_feedback_360_raters_approve_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feedback-360-raters/{id}/decline/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Rater slots: nomination, approval, response. See
+         *     `Feedback360RaterPermission` for the two-layer authority split.
+         */
+        post: operations["v1_feedback_360_raters_decline_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feedback-360-raters/{id}/respond/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Rater slots: nomination, approval, response. See
+         *     `Feedback360RaterPermission` for the two-layer authority split.
+         */
+        post: operations["v1_feedback_360_raters_respond_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feedback-360-raters/{id}/withdraw/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Rater slots: nomination, approval, response. See
+         *     `Feedback360RaterPermission` for the two-layer authority split.
+         */
+        post: operations["v1_feedback_360_raters_withdraw_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feedback-360-requests/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description One 360 round per agreement. Read follows the agreement's own
+         *     audience (`can_view_agreement`); open/close is narrower (subject, Head,
+         *     or hr_admin — enforced explicitly below, same two-layer shape
+         *     `views_agreements.py`'s named actions use).
+         */
+        get: operations["v1_feedback_360_requests_list"];
+        put?: never;
+        /**
+         * @description One 360 round per agreement. Read follows the agreement's own
+         *     audience (`can_view_agreement`); open/close is narrower (subject, Head,
+         *     or hr_admin — enforced explicitly below, same two-layer shape
+         *     `views_agreements.py`'s named actions use).
+         */
+        post: operations["v1_feedback_360_requests_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feedback-360-requests/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description One 360 round per agreement. Read follows the agreement's own
+         *     audience (`can_view_agreement`); open/close is narrower (subject, Head,
+         *     or hr_admin — enforced explicitly below, same two-layer shape
+         *     `views_agreements.py`'s named actions use).
+         */
+        get: operations["v1_feedback_360_requests_retrieve"];
+        /**
+         * @description One 360 round per agreement. Read follows the agreement's own
+         *     audience (`can_view_agreement`); open/close is narrower (subject, Head,
+         *     or hr_admin — enforced explicitly below, same two-layer shape
+         *     `views_agreements.py`'s named actions use).
+         */
+        put: operations["v1_feedback_360_requests_update"];
+        post?: never;
+        /**
+         * @description One 360 round per agreement. Read follows the agreement's own
+         *     audience (`can_view_agreement`); open/close is narrower (subject, Head,
+         *     or hr_admin — enforced explicitly below, same two-layer shape
+         *     `views_agreements.py`'s named actions use).
+         */
+        delete: operations["v1_feedback_360_requests_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description One 360 round per agreement. Read follows the agreement's own
+         *     audience (`can_view_agreement`); open/close is narrower (subject, Head,
+         *     or hr_admin — enforced explicitly below, same two-layer shape
+         *     `views_agreements.py`'s named actions use).
+         */
+        patch: operations["v1_feedback_360_requests_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/feedback-360-requests/{id}/close/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description One 360 round per agreement. Read follows the agreement's own
+         *     audience (`can_view_agreement`); open/close is narrower (subject, Head,
+         *     or hr_admin — enforced explicitly below, same two-layer shape
+         *     `views_agreements.py`'s named actions use).
+         */
+        post: operations["v1_feedback_360_requests_close_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2094,6 +4389,100 @@ export interface paths {
          *     never the employee it's about.
          */
         patch: operations["v1_improvement_plans_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/interview-scorecards/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_interview_scorecards_list"];
+        put?: never;
+        post: operations["v1_interview_scorecards_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/interview-scorecards/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_interview_scorecards_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["v1_interview_scorecards_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/interview-sessions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Design spec §3.1: recruiter/hr_admin manage the whole pipeline; an
+         *     assigned interviewer gets read-only access to sessions they're on the
+         *     panel for, via get_queryset's row-filtering below plus
+         *     IsRecruiterOrHRAdminOrAssignedInterviewer's object-level check.
+         */
+        get: operations["v1_interview_sessions_list"];
+        put?: never;
+        /**
+         * @description Design spec §3.1: recruiter/hr_admin manage the whole pipeline; an
+         *     assigned interviewer gets read-only access to sessions they're on the
+         *     panel for, via get_queryset's row-filtering below plus
+         *     IsRecruiterOrHRAdminOrAssignedInterviewer's object-level check.
+         */
+        post: operations["v1_interview_sessions_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/interview-sessions/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Design spec §3.1: recruiter/hr_admin manage the whole pipeline; an
+         *     assigned interviewer gets read-only access to sessions they're on the
+         *     panel for, via get_queryset's row-filtering below plus
+         *     IsRecruiterOrHRAdminOrAssignedInterviewer's object-level check.
+         */
+        get: operations["v1_interview_sessions_retrieve"];
+        put?: never;
+        post?: never;
+        /**
+         * @description Design spec §3.1: recruiter/hr_admin manage the whole pipeline; an
+         *     assigned interviewer gets read-only access to sessions they're on the
+         *     panel for, via get_queryset's row-filtering below plus
+         *     IsRecruiterOrHRAdminOrAssignedInterviewer's object-level check.
+         */
+        delete: operations["v1_interview_sessions_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Design spec §3.1: recruiter/hr_admin manage the whole pipeline; an
+         *     assigned interviewer gets read-only access to sessions they're on the
+         *     panel for, via get_queryset's row-filtering below plus
+         *     IsRecruiterOrHRAdminOrAssignedInterviewer's object-level check.
+         */
+        patch: operations["v1_interview_sessions_partial_update"];
         trace?: never;
     };
     "/api/v1/job-grades/": {
@@ -2312,6 +4701,36 @@ export interface paths {
          *     a 400 with a clear message instead of DRF's default 500.
          */
         patch: operations["v1_locations_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/my-total-rewards/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description A genuinely new, narrow self-scope carve-out (design spec §3) — the
+         *     requester's OWN current salary (RemunerationRecord, the SAP-sourced
+         *     actual, never CompProposal — spec §4), their OWN pay-band position
+         *     (the one band for their OWN current job_grade, never any other
+         *     grade's), their OWN benefits elections (already self-visible via
+         *     MyBenefitsPage.tsx — folded in here for convenience only), and their
+         *     OWN latest performance final_score (already self-visible via
+         *     MyPerformancePage.tsx). No employee id is ever accepted here, for any
+         *     role — this is self-only, full stop, with no privileged "view
+         *     anyone's statement" mode (spec §3.4). No RequiresPayrollStepUp: that
+         *     control is for privileged access to someone ELSE's Restricted-tier
+         *     pay data, not self-view of your own (spec §3.2).
+         */
+        get: operations["v1_my_total_rewards_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/notifications/": {
@@ -2982,12 +5401,32 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Rating distribution by division for the hr_admin/auditor dashboard
-         *     (PC-3) -- crossing a rating with a small division can point back at
-         *     one individual, so this is small-cell suppressed exactly like
-         *     ee_reporting's equity dashboard (same SENSITIVE-tier gate, same
-         *     `f"<{THRESHOLD}"` replacement, just a division x rating matrix
-         *     instead of a level x demographic one).
+         * @description KPI-element rating distribution for the hr_admin/auditor
+         *     dashboard (PC-3) -- by division, and by race/gender/disability
+         *     status (the Code on integrating EE into HR practice's performance
+         *     section: "appraisal distributions reviewed across designated
+         *     groups with corrective action on significant variation" -- the
+         *     moderation-step lens the EE regulatory review flagged as missing).
+         *
+         *     Counts individual AgreementElement.final_rating values (one per
+         *     KPI, several per employee), NOT one final score per employee --
+         *     PerformanceAgreement.final_score is a decimal weighted average
+         *     with no natural 1-5 banding, and inventing a banding rule here
+         *     would be a policy call this endpoint has no business making.
+         *     `rating_unit` in the response says which it is, so a consumer
+         *     never has to guess (regulatory review P1: "define the
+         *     performance-distribution unit").
+         *
+         *     Demographics are resolved as-at the period's end_date, not
+         *     today's version -- a later transfer or demographic correction
+         *     must not silently rewrite an already-closed period's distribution
+         *     (same historical-accuracy reasoning as core_hr's probation/exit
+         *     dashboards).
+         *
+         *     Crossing a rating with a small division or demographic group can
+         *     point back at one individual, so every matrix is small-cell
+         *     suppressed exactly like ee_reporting's equity dashboard (same
+         *     SENSITIVE-tier gate, same complementary-suppression rule).
          */
         get: operations["v1_performance_periods_rating_distribution_retrieve"];
         put?: never;
@@ -3238,6 +5677,254 @@ export interface paths {
         get: operations["v1_policy_acknowledgments_retrieve"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/positions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description No direct create/update via a raw PATCH of status/current_step --
+         *     those are state-machine-managed (services.py); this viewset's create()
+         *     IS allowed (it's just propose_position with role validation), but
+         *     submit/decide/revise are separate named actions, matching
+         *     ee_reporting.views.EEReportViewSet's own reasoning.
+         */
+        get: operations["v1_positions_list"];
+        put?: never;
+        /**
+         * @description No direct create/update via a raw PATCH of status/current_step --
+         *     those are state-machine-managed (services.py); this viewset's create()
+         *     IS allowed (it's just propose_position with role validation), but
+         *     submit/decide/revise are separate named actions, matching
+         *     ee_reporting.views.EEReportViewSet's own reasoning.
+         */
+        post: operations["v1_positions_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/positions/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description No direct create/update via a raw PATCH of status/current_step --
+         *     those are state-machine-managed (services.py); this viewset's create()
+         *     IS allowed (it's just propose_position with role validation), but
+         *     submit/decide/revise are separate named actions, matching
+         *     ee_reporting.views.EEReportViewSet's own reasoning.
+         */
+        get: operations["v1_positions_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/positions/{id}/decide/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description No direct create/update via a raw PATCH of status/current_step --
+         *     those are state-machine-managed (services.py); this viewset's create()
+         *     IS allowed (it's just propose_position with role validation), but
+         *     submit/decide/revise are separate named actions, matching
+         *     ee_reporting.views.EEReportViewSet's own reasoning.
+         */
+        post: operations["v1_positions_decide_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/positions/{id}/revise/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description No direct create/update via a raw PATCH of status/current_step --
+         *     those are state-machine-managed (services.py); this viewset's create()
+         *     IS allowed (it's just propose_position with role validation), but
+         *     submit/decide/revise are separate named actions, matching
+         *     ee_reporting.views.EEReportViewSet's own reasoning.
+         */
+        post: operations["v1_positions_revise_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/positions/{id}/submit/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description No direct create/update via a raw PATCH of status/current_step --
+         *     those are state-machine-managed (services.py); this viewset's create()
+         *     IS allowed (it's just propose_position with role validation), but
+         *     submit/decide/revise are separate named actions, matching
+         *     ee_reporting.views.EEReportViewSet's own reasoning.
+         */
+        post: operations["v1_positions_submit_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/probation-periods/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Code on integrating EE into HR practice, probation section — a
+         *     probation window opened by hr_admin, reviewed by the line manager
+         *     (ProbationReviewViewSet below), decided by hr_admin. Same
+         *     RowScopePermission row-scoping learning's per-employee records use:
+         *     the employee sees their own, their manager sees their reports', hr_admin
+         *     sees all.
+         */
+        get: operations["v1_probation_periods_list"];
+        put?: never;
+        /**
+         * @description Code on integrating EE into HR practice, probation section — a
+         *     probation window opened by hr_admin, reviewed by the line manager
+         *     (ProbationReviewViewSet below), decided by hr_admin. Same
+         *     RowScopePermission row-scoping learning's per-employee records use:
+         *     the employee sees their own, their manager sees their reports', hr_admin
+         *     sees all.
+         */
+        post: operations["v1_probation_periods_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/probation-periods/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Code on integrating EE into HR practice, probation section — a
+         *     probation window opened by hr_admin, reviewed by the line manager
+         *     (ProbationReviewViewSet below), decided by hr_admin. Same
+         *     RowScopePermission row-scoping learning's per-employee records use:
+         *     the employee sees their own, their manager sees their reports', hr_admin
+         *     sees all.
+         */
+        get: operations["v1_probation_periods_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/probation-periods/{id}/record_outcome/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description hr_admin only. No workflow gate beyond "still open" — a
+         *     CONFIRMED/TERMINATED period is closed; EXTENDED can still receive
+         *     a later, final outcome.
+         */
+        post: operations["v1_probation_periods_record_outcome_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/probation-reviews/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_probation_reviews_list"];
+        put?: never;
+        post: operations["v1_probation_reviews_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/probation-reviews/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_probation_reviews_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/probation-reviews/{id}/sign/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Employee-only countersignature bound to the exact review payload. */
+        post: operations["v1_probation_reviews_sign_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3716,6 +6403,74 @@ export interface paths {
         patch: operations["v1_skills_partial_update"];
         trace?: never;
     };
+    "/api/v1/succession-candidates/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Successor nominations against a critical post (spec §5.2). hr_admin
+         *     only manages this; hr_admin and auditor may read it. No other role --
+         *     including the nominated employee themself and their line_manager --
+         *     may reach a read at all (spec §2.6).
+         */
+        get: operations["v1_succession_candidates_list"];
+        put?: never;
+        /**
+         * @description Successor nominations against a critical post (spec §5.2). hr_admin
+         *     only manages this; hr_admin and auditor may read it. No other role --
+         *     including the nominated employee themself and their line_manager --
+         *     may reach a read at all (spec §2.6).
+         */
+        post: operations["v1_succession_candidates_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/succession-candidates/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Successor nominations against a critical post (spec §5.2). hr_admin
+         *     only manages this; hr_admin and auditor may read it. No other role --
+         *     including the nominated employee themself and their line_manager --
+         *     may reach a read at all (spec §2.6).
+         */
+        get: operations["v1_succession_candidates_retrieve"];
+        /**
+         * @description Successor nominations against a critical post (spec §5.2). hr_admin
+         *     only manages this; hr_admin and auditor may read it. No other role --
+         *     including the nominated employee themself and their line_manager --
+         *     may reach a read at all (spec §2.6).
+         */
+        put: operations["v1_succession_candidates_update"];
+        post?: never;
+        /**
+         * @description Successor nominations against a critical post (spec §5.2). hr_admin
+         *     only manages this; hr_admin and auditor may read it. No other role --
+         *     including the nominated employee themself and their line_manager --
+         *     may reach a read at all (spec §2.6).
+         */
+        delete: operations["v1_succession_candidates_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description Successor nominations against a critical post (spec §5.2). hr_admin
+         *     only manages this; hr_admin and auditor may read it. No other role --
+         *     including the nominated employee themself and their line_manager --
+         *     may reach a read at all (spec §2.6).
+         */
+        patch: operations["v1_succession_candidates_partial_update"];
+        trace?: never;
+    };
     "/api/v1/training-records/": {
         parameters: {
             query?: never;
@@ -3770,6 +6525,26 @@ export interface paths {
          *     per-employee learning records — same pattern as performance.Goal.
          */
         patch: operations["v1_training_records_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/training-records/{id}/download_evidence/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Shared list/retrieve row-scoping + ?employee= filter for the three
+         *     per-employee learning records — same pattern as performance.Goal.
+         */
+        get: operations["v1_training_records_download_evidence_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -3831,7 +6606,7 @@ export interface components {
             stage: components["schemas"]["StageEnum"];
             /** Format: int64 */
             revision: number;
-            role: components["schemas"]["RoleEnum"];
+            role: components["schemas"]["AgreementSignatureRoleEnum"];
             readonly role_display: string;
             signer: number;
             readonly signer_name: string;
@@ -3844,6 +6619,12 @@ export interface components {
             document: number;
             document_sha256: string;
         };
+        /**
+         * @description * `employee` - Employee
+         *     * `head` - Head / executive
+         * @enum {string}
+         */
+        AgreementSignatureRoleEnum: "employee" | "head";
         AgreementTemplate: {
             readonly id: number;
             name: string;
@@ -3852,7 +6633,7 @@ export interface components {
              * @default 1
              */
             version: number;
-            readonly status: components["schemas"]["AgreementTemplateStatusEnum"];
+            readonly status: components["schemas"]["Status860Enum"];
             readonly status_display: string;
             /** @description Optional: pin to one period; blank = reusable across periods */
             period?: number | null;
@@ -3868,13 +6649,6 @@ export interface components {
             readonly published_at: string | null;
             readonly created_by: number | null;
         };
-        /**
-         * @description * `draft` - Draft
-         *     * `published` - Published
-         *     * `retired` - Retired
-         * @enum {string}
-         */
-        AgreementTemplateStatusEnum: "draft" | "published" | "retired";
         /**
          * @description Row-scope for Applicant is trivially "all" — only recruiter/hr_admin
          *     reach this endpoint (IsRecruiterOrHRAdmin) — so this composes rbac_audit's
@@ -3901,6 +6675,11 @@ export interface components {
             disability_status?: components["schemas"]["DisabilityStatusEnum"];
             readonly has_demographic_consent: boolean;
             readonly resulting_employee: number | null;
+            readonly source: components["schemas"]["SourceEnum"];
+            /** Format: uri */
+            resume?: string | null;
+            readonly resume_content_type: string;
+            readonly resume_size_bytes: number;
         };
         /**
          * @description Plain ModelSerializer, not TieredModelSerializer — see
@@ -3970,6 +6749,29 @@ export interface components {
             readonly request_id: string;
             readonly ip_address: string | null;
         };
+        BackgroundCheck: {
+            readonly id: number;
+            applicant: number;
+            check_type: components["schemas"]["CheckTypeEnum"];
+            status?: components["schemas"]["BackgroundCheckStatusEnum"];
+            readonly requested_by: number | null;
+            /** Format: date-time */
+            requested_at?: string | null;
+            /** Format: date-time */
+            completed_at?: string | null;
+            notes?: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /**
+         * @description * `not_started` - Not started
+         *     * `requested` - Requested
+         *     * `in_progress` - In progress
+         *     * `cleared` - Cleared
+         *     * `flagged` - Flagged
+         * @enum {string}
+         */
+        BackgroundCheckStatusEnum: "not_started" | "requested" | "in_progress" | "cleared" | "flagged";
         Benefit: {
             readonly id: number;
             name: string;
@@ -4028,6 +6830,50 @@ export interface components {
          * @enum {string}
          */
         BusinessTypeEnum: "private_sector" | "national_government" | "local_government" | "non_profit_organisation" | "state_owned_enterprise" | "provincial_government_educational_institution";
+        CalibrationAdjustment: {
+            readonly id: number;
+            readonly session: number;
+            readonly agreement: number;
+            readonly agreement_employee_name: string;
+            /** Format: decimal */
+            readonly previous_score: string | null;
+            /** Format: decimal */
+            readonly new_score: string | null;
+            readonly reason: string;
+            readonly adjusted_by: number | null;
+            readonly adjusted_by_name: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        CalibrationSession: {
+            readonly id: number;
+            period: number;
+            readonly period_name: string;
+            /** @description Blank = org-wide cohort */
+            department?: number | null;
+            readonly department_name: string;
+            readonly status: components["schemas"]["CalibrationSessionStatusEnum"];
+            readonly status_display: string;
+            /** Format: date */
+            meeting_date?: string | null;
+            /** @description Free text: who attended (Heads/managers) */
+            participants_note?: string;
+            /** @description Overall committee notes, e.g. 'distribution reviewed, no changes needed' */
+            summary?: string;
+            readonly convened_by: number | null;
+            readonly convened_by_name: string | null;
+            /** Format: date-time */
+            readonly completed_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            readonly adjustments: components["schemas"]["CalibrationAdjustment"][];
+        };
+        /**
+         * @description * `open` - Open
+         *     * `completed` - Completed
+         * @enum {string}
+         */
+        CalibrationSessionStatusEnum: "open" | "completed";
         /**
          * @description Shared validate() for EmployeeSkill/Certification/TrainingRecord:
          *     self, your manager (own_team), or hr_admin can create/edit an entry
@@ -4049,6 +6895,105 @@ export interface components {
             readonly is_expired: boolean;
         };
         /**
+         * @description * `suspension` - Suspension
+         *     * `lift_suspension` - Lift suspension
+         *     * `dismissal_summary` - Summary dismissal
+         *     * `dismissal_misconduct` - Dismissal — misconduct
+         *     * `dismissal_incapacity` - Dismissal — incapacity
+         *     * `operational_requirements` - Operational requirements
+         *     * `resignation` - Resignation
+         *     * `retirement` - Retirement
+         *     * `contract_end` - Contract end
+         *     * `death` - Death
+         * @enum {string}
+         */
+        ChangeTypeEnum: "suspension" | "lift_suspension" | "dismissal_summary" | "dismissal_misconduct" | "dismissal_incapacity" | "operational_requirements" | "resignation" | "retirement" | "contract_end" | "death";
+        /**
+         * @description * `reference` - Reference check
+         *     * `criminal_record` - Criminal record check
+         *     * `qualification_verification` - Qualification verification
+         *     * `credit_check` - Credit check
+         *     * `other` - Other
+         * @enum {string}
+         */
+        CheckTypeEnum: "reference" | "criminal_record" | "qualification_verification" | "credit_check" | "other";
+        /**
+         * @description employee/direction (and optionally template, to pick a specific
+         *     version) are the only client-writable fields on create ('manually
+         *     create' -- see ChecklistInstanceViewSet.perform_create); everything
+         *     else -- template_version, status, created_by, completed_at -- is
+         *     computed server-side by services.create_checklist_instance, never
+         *     trusted from client input (same shape as
+         *     core_hr.EmploymentChangeSerializer).
+         */
+        ChecklistInstance: {
+            readonly id: number;
+            employee: number;
+            readonly employee_display: string;
+            template?: number;
+            readonly template_version: number;
+            direction: components["schemas"]["DirectionEnum"];
+            /** @default active */
+            readonly status: components["schemas"]["ChecklistInstanceStatusEnum"];
+            readonly triggering_change: number | null;
+            readonly created_by: number | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly completed_at: string | null;
+            readonly items: components["schemas"]["ChecklistInstanceItem"][];
+        };
+        ChecklistInstanceItem: {
+            readonly id: number;
+            instance: number;
+            readonly label: string;
+            readonly description: string;
+            readonly owner_role: components["schemas"]["OwnerRoleEnum"];
+            readonly order: number;
+            readonly completed_by: number | null;
+            /** Format: date-time */
+            readonly completed_at: string | null;
+            readonly notes: string;
+            readonly is_complete: boolean;
+        };
+        /**
+         * @description * `active` - Active
+         *     * `completed` - Completed
+         *     * `cancelled` - Cancelled
+         * @enum {string}
+         */
+        ChecklistInstanceStatusEnum: "active" | "completed" | "cancelled";
+        /**
+         * @description version/status/published_at/created_by are all computed server-side
+         *     by services.py -- create_template auto-assigns version (spec section
+         *     4.1), publish_template/retire_template own the status transition. Only
+         *     name/direction are client-writable on create, same shape as
+         *     EmploymentChangeSerializer's read-only-trail pattern.
+         */
+        ChecklistTemplate: {
+            readonly id: number;
+            name: string;
+            direction: components["schemas"]["DirectionEnum"];
+            /** @default 1 */
+            readonly version: number;
+            readonly status: components["schemas"]["Status860Enum"];
+            readonly created_by: number | null;
+            /** Format: date-time */
+            readonly published_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            readonly items: components["schemas"]["ChecklistTemplateItem"][];
+        };
+        ChecklistTemplateItem: {
+            readonly id: number;
+            template: number;
+            label: string;
+            description?: string;
+            owner_role?: components["schemas"]["OwnerRoleEnum"];
+            /** Format: int64 */
+            order?: number;
+        };
+        /**
          * @description * `sa_citizen_birth_descent` - SA citizen (birth or descent)
          *     * `sa_naturalised_pre_1994` - SA naturalised before 27 Apr 1994
          *     * `sa_naturalised_post_1994` - SA naturalised after 26 Apr 1994
@@ -4057,28 +7002,77 @@ export interface components {
          */
         CitizenshipStatusEnum: "sa_citizen_birth_descent" | "sa_naturalised_pre_1994" | "sa_naturalised_post_1994" | "foreign_national";
         /**
-         * @description employee/proposed_annual_salary/justification/effective_date are
-         *     the only client-writable fields on create — current_job_grade,
-         *     status, and requires_override are computed server-side by
-         *     compensation/services.py::propose_compensation_change, not trusted
-         *     from client input.
+         * @description `utilization` is a live, computed rollup (compensation/services.py::
+         *     cycle_utilization) — never a stored field, so it can't drift out of
+         *     sync with the proposals it summarizes (design spec §2.5).
+         */
+        CompCycle: {
+            readonly id: number;
+            name: string;
+            /** Format: date */
+            period_start: string;
+            /** Format: date */
+            period_end: string;
+            /** Format: decimal */
+            budget_amount: string;
+            department?: number | null;
+            readonly status: components["schemas"]["CompCycleStatusEnum"];
+            readonly status_display: string;
+            readonly created_by: number | null;
+            readonly closed_by: number | null;
+            /** Format: date-time */
+            readonly closed_at: string | null;
+            readonly utilization: {
+                [key: string]: unknown;
+            };
+            readonly proposal_count: number;
+        };
+        /**
+         * @description * `draft` - Draft
+         *     * `open` - Open
+         *     * `closed` - Closed
+         * @enum {string}
+         */
+        CompCycleStatusEnum: "draft" | "open" | "closed";
+        /**
+         * @description employee/proposal_type/proposed_annual_salary/bonus_amount/cycle/
+         *     justification/effective_date are the client-writable fields on
+         *     create — current_job_grade, status, requires_override,
+         *     exceeds_cycle_budget, baseline_salary_at_proposal are computed
+         *     server-side by compensation/services.py::propose_compensation_change,
+         *     not trusted from client input. `performance_context` is read-only
+         *     informational context (design spec §2.8) from the pre-existing
+         *     performance/queries.py seam — never an input to any calculation
+         *     here.
          */
         CompProposal: {
             readonly id: number;
             employee: number;
             readonly current_job_grade: number;
+            proposal_type?: components["schemas"]["ProposalTypeEnum"];
             /** Format: decimal */
-            proposed_annual_salary: string;
+            proposed_annual_salary?: string | null;
+            /** Format: decimal */
+            bonus_amount?: string | null;
+            /** Format: decimal */
+            readonly baseline_salary_at_proposal: string | null;
+            /** Format: decimal */
+            readonly budget_impact: string;
             justification?: string;
             readonly status: components["schemas"]["CompProposalStatusEnum"];
             readonly requires_override: boolean;
+            readonly exceeds_cycle_budget: boolean;
             readonly override_reason: string;
             /** Format: date */
             effective_date?: string | null;
+            cycle?: number | null;
             readonly proposed_by: number | null;
             readonly approved_by: number | null;
             /** Format: date-time */
             readonly approved_at: string | null;
+            readonly performance_context: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * @description * `proposed` - Proposed
@@ -4087,6 +7081,40 @@ export interface components {
          * @enum {string}
          */
         CompProposalStatusEnum: "proposed" | "approved" | "rejected";
+        Course: {
+            readonly id: number;
+            name: string;
+            provider?: string;
+            description?: string;
+            /** Format: decimal */
+            hours?: string | null;
+            mandatory?: boolean;
+            /** Format: int64 */
+            validity_days?: number | null;
+            active?: boolean;
+        };
+        CourseRequirement: {
+            readonly id: number;
+            course: number;
+            department?: number | null;
+            occupational_level?: number | null;
+            /** Format: date */
+            effective_from: string;
+            /** Format: int64 */
+            due_within_days: number;
+            active?: boolean;
+        };
+        CriticalPost: {
+            readonly id: number;
+            position: number;
+            reason?: string;
+            active?: boolean;
+            readonly flagged_by: number | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
         /**
          * @description * `applied` - Applied
          *     * `screened` - Screened
@@ -4115,6 +7143,38 @@ export interface components {
             /** Format: date-time */
             resolved_at?: string | null;
         };
+        DataSubjectRequest: {
+            readonly id: number;
+            employee: number;
+            readonly employee_number: string;
+            request_type: components["schemas"]["RequestTypeEnum"];
+            /** @default submitted */
+            readonly status: components["schemas"]["DataSubjectRequestStatusEnum"];
+            readonly requested_by: number | null;
+            readonly requested_by_number: string;
+            /** Format: date-time */
+            readonly requested_at: string;
+            request_notes?: string;
+            readonly reviewed_by: number | null;
+            readonly reviewed_by_number: string;
+            /** Format: date-time */
+            readonly reviewed_at: string | null;
+            readonly resolution_notes: string;
+            readonly download_url: string | null;
+        };
+        /**
+         * @description * `submitted` - Submitted
+         *     * `completed` - Completed
+         *     * `declined` - Declined
+         * @enum {string}
+         */
+        DataSubjectRequestStatusEnum: "submitted" | "completed" | "declined";
+        /**
+         * @description * `approved` - Approved
+         *     * `rejected` - Rejected
+         * @enum {string}
+         */
+        DecisionEnum: "approved" | "rejected";
         Department: {
             readonly id: number;
             name: string;
@@ -4122,6 +7182,32 @@ export interface components {
             parent?: number | null;
             active?: boolean;
         };
+        /**
+         * @description Shared validate() for Dependant/EmergencyContact (C2 design spec
+         *     §2.8): narrower than learning.RowScopedLearningSerializer's
+         *     has_row_access -- self or hr_admin only, never a line_manager's
+         *     own_team scope, since managing a report's dependants/emergency
+         *     contacts is HR administration, not team management.
+         */
+        Dependant: {
+            readonly id: number;
+            employee: number;
+            first_name: string;
+            last_name: string;
+            relationship: components["schemas"]["DependantRelationshipEnum"];
+            /** Format: date */
+            date_of_birth?: string | null;
+            id_number?: string;
+            notes?: string;
+        };
+        /**
+         * @description * `spouse` - Spouse
+         *     * `child` - Child
+         *     * `parent` - Parent
+         *     * `other` - Other
+         * @enum {string}
+         */
+        DependantRelationshipEnum: "spouse" | "child" | "parent" | "other";
         /**
          * @description * `seniority_length_of_service` - Seniority/length of service
          *     * `qualifications` - Qualifications
@@ -4134,6 +7220,12 @@ export interface components {
          * @enum {string}
          */
         DifferentialReasonEnum: "seniority_length_of_service" | "qualifications" | "performance" | "demotion" | "experiential_training" | "shortage_of_skill" | "transfer_of_business" | "other";
+        /**
+         * @description * `onboarding` - Onboarding
+         *     * `offboarding` - Offboarding
+         * @enum {string}
+         */
+        DirectionEnum: "onboarding" | "offboarding";
         /**
          * @description * `self_identified` - Self-identified (ESS)
          *     * `hr_captured` - HR-captured
@@ -4148,6 +7240,56 @@ export interface components {
          * @enum {string}
          */
         DisabilityStatusEnum: "no" | "yes" | "not_disclosed";
+        /**
+         * @description * `id_copy` - ID copy
+         *     * `qualification` - Qualification / certificate
+         *     * `employment_contract` - Employment contract
+         *     * `disability_verification` - Disability verification
+         *     * `other` - Other
+         * @enum {string}
+         */
+        DocumentTypeEnum: "id_copy" | "qualification" | "employment_contract" | "disability_verification" | "other";
+        EEForumMeeting: {
+            readonly id: number;
+            /** Format: date */
+            meeting_date: string;
+            title: string;
+            /** Format: int64 */
+            report_year: number;
+            agenda?: string;
+            summary?: string;
+            resolutions?: string;
+            attendees?: number[];
+            readonly attendee_count: number;
+            /** Format: uri */
+            minutes_file?: string | null;
+            readonly has_minutes: boolean;
+            readonly minutes_content_type: string;
+            readonly minutes_sha256: string;
+            readonly minutes_download_url: string | null;
+            readonly recorded_by: number | null;
+        };
+        EEForumMember: {
+            readonly id: number;
+            employee: number;
+            readonly employee_number: string;
+            readonly employee_name: string;
+            representation: components["schemas"]["RepresentationEnum"];
+            role?: components["schemas"]["EEForumMemberRoleEnum"];
+            /** Format: date */
+            term_start: string;
+            /** Format: date */
+            term_end?: string | null;
+            notes?: string;
+            readonly is_active: boolean;
+        };
+        /**
+         * @description * `chair` - Chairperson
+         *     * `secretary` - Secretary
+         *     * `member` - Member
+         * @enum {string}
+         */
+        EEForumMemberRoleEnum: "chair" | "secretary" | "member";
         EEPlan: {
             readonly id: number;
             /** Format: date */
@@ -4163,7 +7305,85 @@ export interface components {
             annual_target_disability_value?: number | null;
             /** Format: decimal */
             annual_target_disability_pct?: string | null;
+            eap_profile?: unknown;
             readonly created_by: number | null;
+        };
+        EEPlanMeasure: {
+            readonly id: number;
+            plan: number;
+            category: components["schemas"]["EEPlanMeasureCategoryEnum"];
+            readonly category_label: string;
+            barrier_description?: string;
+            measure_description: string;
+            owner: number;
+            readonly owner_number: string;
+            readonly owner_name: string;
+            /** Format: date */
+            target_start: string;
+            /** Format: date */
+            target_end: string;
+            status?: components["schemas"]["EEPlanMeasureStatusEnum"];
+            progress_notes?: string;
+            readonly is_overdue: boolean;
+        };
+        /**
+         * @description * `recruitment` - Recruitment
+         *     * `advertisement_of_positions` - Advertisement of positions
+         *     * `selection_criteria` - Selection criteria
+         *     * `appointments` - Appointments
+         *     * `job_classification_and_grading` - Job classification and grading
+         *     * `remuneration_and_benefits` - Remuneration and benefits
+         *     * `terms_and_conditions_of_employment` - Terms & conditions of employment
+         *     * `job_assignments` - Job assignments
+         *     * `work_environment_and_facilities` - Work environment and facilities
+         *     * `training_and_development` - Training and development
+         *     * `performance_and_evaluation` - Performance and evaluation
+         *     * `promotions` - Promotions
+         *     * `transfers` - Transfers
+         *     * `succession_and_experience_planning` - Succession & experience planning
+         *     * `disciplinary_measures` - Disciplinary measures
+         *     * `dismissals` - Dismissals
+         *     * `retention_of_designated_groups` - Retention of designated groups
+         *     * `corporate_culture` - Corporate culture
+         *     * `reasonable_accommodation` - Reasonable accommodation
+         *     * `harassment` - Harassment
+         *     * `hiv_aids_prevention_and_wellness` - HIV&AIDS prevention and wellness programmes
+         *     * `assigned_senior_managers` - Assigned senior manager(s) to manage EE implementation
+         *     * `budget_allocation` - Budget allocation in support of employment equity goals
+         *     * `time_off_for_ee_committee` - Time off for employment equity consultative committee to meet
+         * @enum {string}
+         */
+        EEPlanMeasureCategoryEnum: "recruitment" | "advertisement_of_positions" | "selection_criteria" | "appointments" | "job_classification_and_grading" | "remuneration_and_benefits" | "terms_and_conditions_of_employment" | "job_assignments" | "work_environment_and_facilities" | "training_and_development" | "performance_and_evaluation" | "promotions" | "transfers" | "succession_and_experience_planning" | "disciplinary_measures" | "dismissals" | "retention_of_designated_groups" | "corporate_culture" | "reasonable_accommodation" | "harassment" | "hiv_aids_prevention_and_wellness" | "assigned_senior_managers" | "budget_allocation" | "time_off_for_ee_committee";
+        /**
+         * @description * `planned` - Planned
+         *     * `in_progress` - In progress
+         *     * `completed` - Completed
+         *     * `abandoned` - Abandoned
+         * @enum {string}
+         */
+        EEPlanMeasureStatusEnum: "planned" | "in_progress" | "completed" | "abandoned";
+        /**
+         * @description Read shape. Matrices are suppressed per requester in the view (never
+         *     here — the serializer doesn't know who's asking without a request).
+         */
+        EEPlanProgressSnapshot: {
+            readonly id: number;
+            readonly plan: number;
+            /** Format: date */
+            readonly as_of: string;
+            readonly workforce_profile: unknown;
+            readonly disability_workforce: unknown;
+            readonly annual_target_gap_pct: unknown;
+            readonly sector_target_gap_pct: unknown;
+            readonly eap_gap_pct: unknown;
+            readonly designated_group_pct: unknown;
+            /** Format: decimal */
+            readonly disability_pct: string | null;
+            readonly flags: unknown;
+            readonly note: string;
+            readonly taken_by: number | null;
+            /** Format: date-time */
+            readonly created_at: string;
         };
         EEQuestionnaire: {
             readonly id: number;
@@ -4221,6 +7441,31 @@ export interface components {
          * @enum {string}
          */
         EEReportStatusEnum: "draft" | "pending_ee_review" | "pending_signoff" | "signed_off" | "superseded";
+        EESector: {
+            readonly id: number;
+            code: string;
+            name: string;
+            targets?: unknown;
+            /** Format: decimal */
+            disability_target_pct?: string;
+        };
+        /**
+         * @description Shared validate() for Dependant/EmergencyContact (C2 design spec
+         *     §2.8): narrower than learning.RowScopedLearningSerializer's
+         *     has_row_access -- self or hr_admin only, never a line_manager's
+         *     own_team scope, since managing a report's dependants/emergency
+         *     contacts is HR administration, not team management.
+         */
+        EmergencyContact: {
+            readonly id: number;
+            employee: number;
+            name: string;
+            relationship?: string;
+            phone: string;
+            alternative_phone?: string;
+            email?: string;
+            is_primary?: boolean;
+        };
         /**
          * @description Identity fields only (Data-Dictionary.md core_hr.Employee) — current
          *     department/job title/status come from EmployeeVersion (?current=true),
@@ -4244,6 +7489,9 @@ export interface components {
             /** Format: date */
             hire_date: string;
             readonly has_demographic_consent: boolean;
+            readonly current_department: number | null;
+            readonly current_occupational_level: number | null;
+            readonly current_employment_status: string | null;
         };
         /**
          * @description * `1_to_49` - 1 to 49
@@ -4252,6 +7500,30 @@ export interface components {
          * @enum {string}
          */
         EmployeeCountBandEnum: "1_to_49" | "50_to_149" | "150_or_more";
+        EmployeeDocument: {
+            readonly id: number;
+            employee: number;
+            readonly employee_number: string;
+            document_type: components["schemas"]["DocumentTypeEnum"];
+            title: string;
+            description?: string;
+            /** Format: uri */
+            file: string;
+            readonly download_url: string;
+            readonly content_type: string;
+            readonly size_bytes: number;
+            readonly tier: string;
+            readonly uploaded_by: number | null;
+            readonly uploaded_by_number: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /** @description Privacy-minimal identity projection for scoped employee pickers. */
+        EmployeeSearchSummary: {
+            readonly id: number;
+            employee_number: string;
+            readonly display_name: string;
+        };
         /**
          * @description Shared validate() for EmployeeSkill/Certification/TrainingRecord:
          *     self, your manager (own_team), or hr_admin can create/edit an entry
@@ -4296,6 +7568,11 @@ export interface components {
             employment_status: components["schemas"]["EmploymentStatusEnum"];
             citizenship_status: components["schemas"]["CitizenshipStatusEnum"];
             location: number;
+            /** Format: date */
+            contract_end_date?: string | null;
+            readonly contract_renewal_decision: {
+                [key: string]: unknown;
+            } | null;
             race?: components["schemas"]["RaceEnum"];
             gender?: components["schemas"]["GenderEnum"];
             disability_status?: components["schemas"]["DisabilityStatusEnum"];
@@ -4305,6 +7582,7 @@ export interface components {
         };
         EmployerConfig: {
             readonly id: number;
+            readonly sector_detail: components["schemas"]["EESector"];
             /** Format: date-time */
             readonly created_at: string;
             /** Format: date-time */
@@ -4339,6 +7617,43 @@ export interface components {
             employee_count_band?: components["schemas"]["EmployeeCountBandEnum"] | components["schemas"]["BlankEnum"];
             is_group_or_holding?: boolean;
             group_name?: string;
+            sector?: number | null;
+        };
+        /**
+         * @description employee/change_type/effective_date/reason are the only
+         *     client-writable fields on create ('propose' — see
+         *     EmploymentChangeViewSet.perform_create) — state, the proposer/
+         *     confirmer/canceller trail, and the lift's link back to the suspension
+         *     it restores are all computed server-side by exits.py's service layer,
+         *     never trusted from client input (same shape as
+         *     compensation.CompProposalSerializer). effective_date is genuinely
+         *     client-writable for every OTHER change type, but for
+         *     DISMISSAL_SUMMARY the service layer overwrites whatever is submitted
+         *     with today's date regardless (spec §4.2) — nothing to enforce here,
+         *     that rule lives in exits.py alongside the rest of the state machine.
+         */
+        EmploymentChange: {
+            readonly id: number;
+            employee: number;
+            change_type: components["schemas"]["ChangeTypeEnum"];
+            readonly state: components["schemas"]["StateEnum"];
+            /** Format: date */
+            effective_date: string;
+            reason: string;
+            readonly proposed_by: number;
+            /** Format: date-time */
+            readonly proposed_at: string;
+            readonly confirmed_by: number | null;
+            /** Format: date-time */
+            readonly confirmed_at: string | null;
+            /** Format: date-time */
+            readonly executed_at: string | null;
+            readonly cancelled_by: number | null;
+            /** Format: date-time */
+            readonly cancelled_at: string | null;
+            readonly cancellation_reason: string;
+            readonly lifts_suspension: number | null;
+            readonly resulting_event: number | null;
         };
         /**
          * @description * `permanent` - Permanent
@@ -4380,9 +7695,29 @@ export interface components {
          * @description * `missing_grade` - Missing job grade
          *     * `missing_demographics` - Missing demographics
          *     * `orphan_record` - Orphan record (no version history)
+         *     * `missing_contract_end_date` - Fixed-term employee missing contract end date
+         *     * `performance_overdue` - Overdue performance stage
+         *     * `comp_proposal_stale` - Compensation proposal awaiting review too long
+         *     * `mandatory_training_overdue` - Overdue mandatory training
+         *     * `critical_post_no_successor` - Critical post without a ready successor
+         *     * `performance_no_calibration` - Final-signed agreement with no calibration session
+         *     * `comp_cycle_overdue` - Open compensation cycle past its period end with unresolved proposals
+         *     * `ee_measure_overdue` - EE plan affirmative-action measure past its target date
          * @enum {string}
          */
-        ExceptionTypeEnum: "missing_grade" | "missing_demographics" | "orphan_record";
+        ExceptionTypeEnum: "missing_grade" | "missing_demographics" | "orphan_record" | "missing_contract_end_date" | "performance_overdue" | "comp_proposal_stale" | "mandatory_training_overdue" | "critical_post_no_successor" | "performance_no_calibration" | "comp_cycle_overdue" | "ee_measure_overdue";
+        ExitInterview: {
+            readonly id: number;
+            employee: number;
+            employment_change?: number | null;
+            probation_period?: number | null;
+            /** Format: date */
+            interview_date: string;
+            readonly conducted_by: number;
+            primary_reason: components["schemas"]["PrimaryReasonEnum"];
+            would_recommend_employer?: boolean | null;
+            comments?: string;
+        };
         Feedback: {
             readonly id: number;
             employee: number;
@@ -4392,6 +7727,71 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
         };
+        Feedback360Rater: {
+            readonly id: number;
+            request: number;
+            rater: number;
+            readonly rater_name: string;
+            readonly relationship: components["schemas"]["Feedback360RaterRelationshipEnum"];
+            readonly relationship_display: string;
+            readonly status: components["schemas"]["Feedback360RaterStatusEnum"];
+            readonly status_display: string;
+            readonly nominated_by: number | null;
+            readonly approved_by: number | null;
+            /** Format: date-time */
+            readonly approved_at: string | null;
+            readonly has_submitted: boolean;
+            readonly response: {
+                [key: string]: unknown;
+            } | null;
+            readonly subject_name: string;
+            readonly period_name: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /**
+         * @description * `self` - Self
+         *     * `manager` - Manager / Head
+         *     * `peer` - Peer
+         *     * `direct_report` - Direct report
+         * @enum {string}
+         */
+        Feedback360RaterRelationshipEnum: "self" | "manager" | "peer" | "direct_report";
+        /**
+         * @description * `pending_approval` - Pending approval
+         *     * `approved` - Approved — invited
+         *     * `declined_nomination` - Nomination declined
+         *     * `withdrawn` - Withdrawn
+         * @enum {string}
+         */
+        Feedback360RaterStatusEnum: "pending_approval" | "approved" | "declined_nomination" | "withdrawn";
+        Feedback360Request: {
+            readonly id: number;
+            agreement: number;
+            readonly status: components["schemas"]["Feedback360RequestStatusEnum"];
+            readonly status_display: string;
+            readonly opened_by: number | null;
+            readonly opened_by_name: string | null;
+            /** Format: date */
+            due_date?: string | null;
+            /** Format: date-time */
+            readonly closed_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            readonly raters: components["schemas"]["Feedback360Rater"][];
+            readonly peer_aggregate: {
+                [key: string]: unknown;
+            } | null;
+            readonly direct_report_aggregate: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * @description * `open` - Open
+         *     * `closed` - Closed
+         * @enum {string}
+         */
+        Feedback360RequestStatusEnum: "open" | "closed";
         /**
          * @description * `manager` - Manager feedback
          *     * `peer` - Peer feedback
@@ -4469,6 +7869,77 @@ export interface components {
          * @enum {string}
          */
         ImprovementPlanOutcomeEnum: "open" | "resolved" | "escalated" | "cancelled";
+        /**
+         * @description Design spec §3.1: deliberately narrow, and — unlike ApplicantSerializer
+         *     above — the SAME shape for every caller including recruiter/hr_admin. No
+         *     demographics, no email/phone/date_of_birth, no rejected_reason, no prior
+         *     stage-event notes. This is what an assigned interviewer (who may hold no
+         *     recruitment-module role at all) is allowed to know about the applicant
+         *     they're interviewing.
+         */
+        InterviewApplicantSummary: {
+            readonly id: number;
+            readonly first_name: string;
+            readonly last_name: string;
+            readonly requisition: number;
+            readonly requisition_title: string;
+            readonly current_stage: components["schemas"]["CurrentStageEnum"];
+            /** Format: uri */
+            readonly resume: string | null;
+        };
+        /**
+         * @description Design spec §2.2, §3.2: `interviewer` is force-set server-side (see
+         *     create() below) to whoever is authenticated — never client-supplied, so
+         *     nobody can submit "on behalf of" someone else. Blind-review masking
+         *     (peer scorecards hidden until the viewer has submitted their own for the
+         *     same session) lives in to_representation, not in the permission class —
+         *     the permission class only decides whether the ROW is reachable at all.
+         */
+        InterviewScorecard: {
+            readonly id: number;
+            session: number;
+            readonly interviewer: number;
+            skill_rating: components["schemas"]["ManagerRatingEnum"];
+            communication_rating: components["schemas"]["ManagerRatingEnum"];
+            culture_fit_rating: components["schemas"]["ManagerRatingEnum"];
+            comments?: string;
+            recommendation: components["schemas"]["InterviewScorecardRecommendationEnum"];
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /**
+         * @description * `strong_hire` - Strong hire
+         *     * `hire` - Hire
+         *     * `no_hire` - No hire
+         *     * `strong_no_hire` - Strong no hire
+         * @enum {string}
+         */
+        InterviewScorecardRecommendationEnum: "strong_hire" | "hire" | "no_hire" | "strong_no_hire";
+        InterviewSession: {
+            readonly id: number;
+            applicant: number;
+            readonly applicant_summary: components["schemas"]["InterviewApplicantSummary"];
+            /** Format: int64 */
+            round_number?: number;
+            /** Format: date-time */
+            scheduled_at: string;
+            /** Format: int64 */
+            duration_minutes?: number;
+            location?: string;
+            status?: components["schemas"]["InterviewSessionStatusEnum"];
+            notes?: string;
+            interviewers: number[];
+            readonly created_by: number | null;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /**
+         * @description * `scheduled` - Scheduled
+         *     * `completed` - Completed
+         *     * `cancelled` - Cancelled
+         * @enum {string}
+         */
+        InterviewSessionStatusEnum: "scheduled" | "completed" | "cancelled";
         JobGrade: {
             readonly id: number;
             name: string;
@@ -4476,6 +7947,17 @@ export interface components {
             occupational_level: number;
             active?: boolean;
         };
+        /**
+         * @description * `A` - Category A
+         *     * `B` - Category B
+         *     * `C` - Category C
+         *     * `D` - Category D
+         *     * `E` - Category E
+         *     * `F` - Category F
+         *     * `G` - Category G
+         * @enum {string}
+         */
+        LearningProgrammeCategoryEnum: "A" | "B" | "C" | "D" | "E" | "F" | "G";
         LivenessCheck: {
             readonly id: number;
             employee: number;
@@ -4555,9 +8037,12 @@ export interface components {
          *     * `policy_publish` - Policy published
          *     * `liveness_flag` - Liveness review flagged
          *     * `ee_signoff` - Performance agreement signed
+         *     * `contract_reminder` - Contract expiry reminder
+         *     * `mandatory_training_reminder` - Mandatory training reminder
+         *     * `ee_statutory_reminder` - EE statutory deadline reminder
          * @enum {string}
          */
-        NotificationKindEnum: "pc_reminder" | "comp_approval" | "review_launch" | "policy_publish" | "liveness_flag" | "ee_signoff";
+        NotificationKindEnum: "pc_reminder" | "comp_approval" | "review_launch" | "policy_publish" | "liveness_flag" | "ee_signoff" | "contract_reminder" | "mandatory_training_reminder" | "ee_statutory_reminder";
         /** @enum {unknown} */
         NullEnum: null;
         OccupationalLevel: {
@@ -4591,6 +8076,15 @@ export interface components {
          * @enum {string}
          */
         OfferStatusEnum: "proposed" | "approved" | "accepted" | "declined" | "withdrawn";
+        /**
+         * @description * `hr` - HR
+         *     * `it` - IT
+         *     * `line_manager` - Line manager
+         *     * `employee` - Employee
+         *     * `other` - Other
+         * @enum {string}
+         */
+        OwnerRoleEnum: "hr" | "it" | "line_manager" | "employee" | "other";
         PDPItem: {
             readonly id: number;
             agreement: number;
@@ -4666,6 +8160,19 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["AuditLogEntry"][];
         };
+        PaginatedBackgroundCheckList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["BackgroundCheck"][];
+        };
         PaginatedBenefitList: {
             /**
              * Format: uri
@@ -4705,6 +8212,19 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["BiometricEnrollment"][];
         };
+        PaginatedCalibrationSessionList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["CalibrationSession"][];
+        };
         PaginatedCertificationList: {
             /**
              * Format: uri
@@ -4717,6 +8237,71 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["Certification"][];
+        };
+        PaginatedChecklistInstanceItemList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["ChecklistInstanceItem"][];
+        };
+        PaginatedChecklistInstanceList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["ChecklistInstance"][];
+        };
+        PaginatedChecklistTemplateItemList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["ChecklistTemplateItem"][];
+        };
+        PaginatedChecklistTemplateList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["ChecklistTemplate"][];
+        };
+        PaginatedCompCycleList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["CompCycle"][];
         };
         PaginatedCompProposalList: {
             /**
@@ -4731,6 +8316,45 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["CompProposal"][];
         };
+        PaginatedCourseList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["Course"][];
+        };
+        PaginatedCourseRequirementList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["CourseRequirement"][];
+        };
+        PaginatedCriticalPostList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["CriticalPost"][];
+        };
         PaginatedDataQualityExceptionList: {
             /**
              * Format: uri
@@ -4743,6 +8367,19 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["DataQualityException"][];
+        };
+        PaginatedDataSubjectRequestList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["DataSubjectRequest"][];
         };
         PaginatedDepartmentList: {
             /**
@@ -4757,6 +8394,45 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["Department"][];
         };
+        PaginatedDependantList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["Dependant"][];
+        };
+        PaginatedEEForumMeetingList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["EEForumMeeting"][];
+        };
+        PaginatedEEForumMemberList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["EEForumMember"][];
+        };
         PaginatedEEPlanList: {
             /**
              * Format: uri
@@ -4769,6 +8445,32 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["EEPlan"][];
+        };
+        PaginatedEEPlanMeasureList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["EEPlanMeasure"][];
+        };
+        PaginatedEEPlanProgressSnapshotList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["EEPlanProgressSnapshot"][];
         };
         PaginatedEEQuestionnaireList: {
             /**
@@ -4796,6 +8498,45 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["EEReport"][];
         };
+        PaginatedEESectorList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["EESector"][];
+        };
+        PaginatedEmergencyContactList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["EmergencyContact"][];
+        };
+        PaginatedEmployeeDocumentList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["EmployeeDocument"][];
+        };
         PaginatedEmployeeList: {
             /**
              * Format: uri
@@ -4808,6 +8549,19 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["Employee"][];
+        };
+        PaginatedEmployeeSearchSummaryList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["EmployeeSearchSummary"][];
         };
         PaginatedEmployeeSkillList: {
             /**
@@ -4848,6 +8602,19 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["EmployerConfig"][];
         };
+        PaginatedEmploymentChangeList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["EmploymentChange"][];
+        };
         PaginatedEvidenceItemList: {
             /**
              * Format: uri
@@ -4860,6 +8627,45 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["EvidenceItem"][];
+        };
+        PaginatedExitInterviewList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["ExitInterview"][];
+        };
+        PaginatedFeedback360RaterList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["Feedback360Rater"][];
+        };
+        PaginatedFeedback360RequestList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["Feedback360Request"][];
         };
         PaginatedFeedbackList: {
             /**
@@ -4899,6 +8705,32 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["ImprovementPlan"][];
+        };
+        PaginatedInterviewScorecardList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["InterviewScorecard"][];
+        };
+        PaginatedInterviewSessionList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["InterviewSession"][];
         };
         PaginatedJobGradeList: {
             /**
@@ -5069,6 +8901,45 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["Policy"][];
         };
+        PaginatedPositionList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["Position"][];
+        };
+        PaginatedProbationPeriodList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["ProbationPeriod"][];
+        };
+        PaginatedProbationReviewList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["ProbationReview"][];
+        };
         PaginatedProviderConfigList: {
             /**
              * Format: uri
@@ -5081,6 +8952,19 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["ProviderConfig"][];
+        };
+        PaginatedPublicPostingList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["PublicPosting"][];
         };
         PaginatedRemunerationRecordList: {
             /**
@@ -5160,6 +9044,19 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["Skill"][];
         };
+        PaginatedSuccessionCandidateList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["SuccessionCandidate"][];
+        };
         PaginatedTemplateElementList: {
             /**
              * Format: uri
@@ -5232,7 +9129,7 @@ export interface components {
              * @default 1
              */
             version: number;
-            readonly status?: components["schemas"]["AgreementTemplateStatusEnum"];
+            readonly status?: components["schemas"]["Status860Enum"];
             readonly status_display?: string;
             /** @description Optional: pin to one period; blank = reusable across periods */
             period?: number | null;
@@ -5274,6 +9171,25 @@ export interface components {
             disability_status?: components["schemas"]["DisabilityStatusEnum"];
             readonly has_demographic_consent?: boolean;
             readonly resulting_employee?: number | null;
+            readonly source?: components["schemas"]["SourceEnum"];
+            /** Format: uri */
+            resume?: string | null;
+            readonly resume_content_type?: string;
+            readonly resume_size_bytes?: number;
+        };
+        PatchedBackgroundCheck: {
+            readonly id?: number;
+            applicant?: number;
+            check_type?: components["schemas"]["CheckTypeEnum"];
+            status?: components["schemas"]["BackgroundCheckStatusEnum"];
+            readonly requested_by?: number | null;
+            /** Format: date-time */
+            requested_at?: string | null;
+            /** Format: date-time */
+            completed_at?: string | null;
+            notes?: string;
+            /** Format: date-time */
+            readonly created_at?: string;
         };
         PatchedBenefit: {
             readonly id?: number;
@@ -5290,6 +9206,29 @@ export interface components {
             /** Format: date */
             effective_date?: string | null;
             notes?: string;
+        };
+        PatchedCalibrationSession: {
+            readonly id?: number;
+            period?: number;
+            readonly period_name?: string;
+            /** @description Blank = org-wide cohort */
+            department?: number | null;
+            readonly department_name?: string;
+            readonly status?: components["schemas"]["CalibrationSessionStatusEnum"];
+            readonly status_display?: string;
+            /** Format: date */
+            meeting_date?: string | null;
+            /** @description Free text: who attended (Heads/managers) */
+            participants_note?: string;
+            /** @description Overall committee notes, e.g. 'distribution reviewed, no changes needed' */
+            summary?: string;
+            readonly convened_by?: number | null;
+            readonly convened_by_name?: string | null;
+            /** Format: date-time */
+            readonly completed_at?: string | null;
+            /** Format: date-time */
+            readonly created_at?: string;
+            readonly adjustments?: components["schemas"]["CalibrationAdjustment"][];
         };
         /**
          * @description Shared validate() for EmployeeSkill/Certification/TrainingRecord:
@@ -5311,12 +9250,154 @@ export interface components {
             expiry_date?: string | null;
             readonly is_expired?: boolean;
         };
+        /**
+         * @description version/status/published_at/created_by are all computed server-side
+         *     by services.py -- create_template auto-assigns version (spec section
+         *     4.1), publish_template/retire_template own the status transition. Only
+         *     name/direction are client-writable on create, same shape as
+         *     EmploymentChangeSerializer's read-only-trail pattern.
+         */
+        PatchedChecklistTemplate: {
+            readonly id?: number;
+            name?: string;
+            direction?: components["schemas"]["DirectionEnum"];
+            /** @default 1 */
+            readonly version: number;
+            readonly status?: components["schemas"]["Status860Enum"];
+            readonly created_by?: number | null;
+            /** Format: date-time */
+            readonly published_at?: string | null;
+            /** Format: date-time */
+            readonly created_at?: string;
+            readonly items?: components["schemas"]["ChecklistTemplateItem"][];
+        };
+        PatchedChecklistTemplateItem: {
+            readonly id?: number;
+            template?: number;
+            label?: string;
+            description?: string;
+            owner_role?: components["schemas"]["OwnerRoleEnum"];
+            /** Format: int64 */
+            order?: number;
+        };
+        /**
+         * @description `utilization` is a live, computed rollup (compensation/services.py::
+         *     cycle_utilization) — never a stored field, so it can't drift out of
+         *     sync with the proposals it summarizes (design spec §2.5).
+         */
+        PatchedCompCycle: {
+            readonly id?: number;
+            name?: string;
+            /** Format: date */
+            period_start?: string;
+            /** Format: date */
+            period_end?: string;
+            /** Format: decimal */
+            budget_amount?: string;
+            department?: number | null;
+            readonly status?: components["schemas"]["CompCycleStatusEnum"];
+            readonly status_display?: string;
+            readonly created_by?: number | null;
+            readonly closed_by?: number | null;
+            /** Format: date-time */
+            readonly closed_at?: string | null;
+            readonly utilization?: {
+                [key: string]: unknown;
+            };
+            readonly proposal_count?: number;
+        };
+        PatchedCourse: {
+            readonly id?: number;
+            name?: string;
+            provider?: string;
+            description?: string;
+            /** Format: decimal */
+            hours?: string | null;
+            mandatory?: boolean;
+            /** Format: int64 */
+            validity_days?: number | null;
+            active?: boolean;
+        };
+        PatchedCourseRequirement: {
+            readonly id?: number;
+            course?: number;
+            department?: number | null;
+            occupational_level?: number | null;
+            /** Format: date */
+            effective_from?: string;
+            /** Format: int64 */
+            due_within_days?: number;
+            active?: boolean;
+        };
+        PatchedCriticalPost: {
+            readonly id?: number;
+            position?: number;
+            reason?: string;
+            active?: boolean;
+            readonly flagged_by?: number | null;
+            /** Format: date-time */
+            readonly created_at?: string;
+            /** Format: date-time */
+            readonly updated_at?: string;
+        };
         PatchedDepartment: {
             readonly id?: number;
             name?: string;
             code?: string;
             parent?: number | null;
             active?: boolean;
+        };
+        /**
+         * @description Shared validate() for Dependant/EmergencyContact (C2 design spec
+         *     §2.8): narrower than learning.RowScopedLearningSerializer's
+         *     has_row_access -- self or hr_admin only, never a line_manager's
+         *     own_team scope, since managing a report's dependants/emergency
+         *     contacts is HR administration, not team management.
+         */
+        PatchedDependant: {
+            readonly id?: number;
+            employee?: number;
+            first_name?: string;
+            last_name?: string;
+            relationship?: components["schemas"]["DependantRelationshipEnum"];
+            /** Format: date */
+            date_of_birth?: string | null;
+            id_number?: string;
+            notes?: string;
+        };
+        PatchedEEForumMeeting: {
+            readonly id?: number;
+            /** Format: date */
+            meeting_date?: string;
+            title?: string;
+            /** Format: int64 */
+            report_year?: number;
+            agenda?: string;
+            summary?: string;
+            resolutions?: string;
+            attendees?: number[];
+            readonly attendee_count?: number;
+            /** Format: uri */
+            minutes_file?: string | null;
+            readonly has_minutes?: boolean;
+            readonly minutes_content_type?: string;
+            readonly minutes_sha256?: string;
+            readonly minutes_download_url?: string | null;
+            readonly recorded_by?: number | null;
+        };
+        PatchedEEForumMember: {
+            readonly id?: number;
+            employee?: number;
+            readonly employee_number?: string;
+            readonly employee_name?: string;
+            representation?: components["schemas"]["RepresentationEnum"];
+            role?: components["schemas"]["EEForumMemberRoleEnum"];
+            /** Format: date */
+            term_start?: string;
+            /** Format: date */
+            term_end?: string | null;
+            notes?: string;
+            readonly is_active?: boolean;
         };
         PatchedEEPlan: {
             readonly id?: number;
@@ -5333,7 +9414,26 @@ export interface components {
             annual_target_disability_value?: number | null;
             /** Format: decimal */
             annual_target_disability_pct?: string | null;
+            eap_profile?: unknown;
             readonly created_by?: number | null;
+        };
+        PatchedEEPlanMeasure: {
+            readonly id?: number;
+            plan?: number;
+            category?: components["schemas"]["EEPlanMeasureCategoryEnum"];
+            readonly category_label?: string;
+            barrier_description?: string;
+            measure_description?: string;
+            owner?: number;
+            readonly owner_number?: string;
+            readonly owner_name?: string;
+            /** Format: date */
+            target_start?: string;
+            /** Format: date */
+            target_end?: string;
+            status?: components["schemas"]["EEPlanMeasureStatusEnum"];
+            progress_notes?: string;
+            readonly is_overdue?: boolean;
         };
         PatchedEEQuestionnaire: {
             readonly id?: number;
@@ -5354,6 +9454,23 @@ export interface components {
             /** Format: decimal */
             vertical_gap_multiple?: string | null;
             readonly updated_by?: number | null;
+        };
+        /**
+         * @description Shared validate() for Dependant/EmergencyContact (C2 design spec
+         *     §2.8): narrower than learning.RowScopedLearningSerializer's
+         *     has_row_access -- self or hr_admin only, never a line_manager's
+         *     own_team scope, since managing a report's dependants/emergency
+         *     contacts is HR administration, not team management.
+         */
+        PatchedEmergencyContact: {
+            readonly id?: number;
+            employee?: number;
+            name?: string;
+            relationship?: string;
+            phone?: string;
+            alternative_phone?: string;
+            email?: string;
+            is_primary?: boolean;
         };
         /**
          * @description Identity fields only (Data-Dictionary.md core_hr.Employee) — current
@@ -5378,6 +9495,27 @@ export interface components {
             /** Format: date */
             hire_date?: string;
             readonly has_demographic_consent?: boolean;
+            readonly current_department?: number | null;
+            readonly current_occupational_level?: number | null;
+            readonly current_employment_status?: string | null;
+        };
+        PatchedEmployeeDocument: {
+            readonly id?: number;
+            employee?: number;
+            readonly employee_number?: string;
+            document_type?: components["schemas"]["DocumentTypeEnum"];
+            title?: string;
+            description?: string;
+            /** Format: uri */
+            file?: string;
+            readonly download_url?: string;
+            readonly content_type?: string;
+            readonly size_bytes?: number;
+            readonly tier?: string;
+            readonly uploaded_by?: number | null;
+            readonly uploaded_by_number?: string;
+            /** Format: date-time */
+            readonly created_at?: string;
         };
         /**
          * @description Shared validate() for EmployeeSkill/Certification/TrainingRecord:
@@ -5398,6 +9536,7 @@ export interface components {
         };
         PatchedEmployerConfig: {
             readonly id?: number;
+            readonly sector_detail?: components["schemas"]["EESector"];
             /** Format: date-time */
             readonly created_at?: string;
             /** Format: date-time */
@@ -5432,6 +9571,7 @@ export interface components {
             employee_count_band?: components["schemas"]["EmployeeCountBandEnum"] | components["schemas"]["BlankEnum"];
             is_group_or_holding?: boolean;
             group_name?: string;
+            sector?: number | null;
         };
         /**
          * @description `kind=file` accepts a multipart upload (`file`); `kind=link` accepts an
@@ -5454,6 +9594,61 @@ export interface components {
             /** Format: date-time */
             readonly created_at?: string;
             readonly download_url?: string | null;
+        };
+        PatchedExitInterview: {
+            readonly id?: number;
+            employee?: number;
+            employment_change?: number | null;
+            probation_period?: number | null;
+            /** Format: date */
+            interview_date?: string;
+            readonly conducted_by?: number;
+            primary_reason?: components["schemas"]["PrimaryReasonEnum"];
+            would_recommend_employer?: boolean | null;
+            comments?: string;
+        };
+        PatchedFeedback360Rater: {
+            readonly id?: number;
+            request?: number;
+            rater?: number;
+            readonly rater_name?: string;
+            readonly relationship?: components["schemas"]["Feedback360RaterRelationshipEnum"];
+            readonly relationship_display?: string;
+            readonly status?: components["schemas"]["Feedback360RaterStatusEnum"];
+            readonly status_display?: string;
+            readonly nominated_by?: number | null;
+            readonly approved_by?: number | null;
+            /** Format: date-time */
+            readonly approved_at?: string | null;
+            readonly has_submitted?: boolean;
+            readonly response?: {
+                [key: string]: unknown;
+            } | null;
+            readonly subject_name?: string;
+            readonly period_name?: string;
+            /** Format: date-time */
+            readonly created_at?: string;
+        };
+        PatchedFeedback360Request: {
+            readonly id?: number;
+            agreement?: number;
+            readonly status?: components["schemas"]["Feedback360RequestStatusEnum"];
+            readonly status_display?: string;
+            readonly opened_by?: number | null;
+            readonly opened_by_name?: string | null;
+            /** Format: date */
+            due_date?: string | null;
+            /** Format: date-time */
+            readonly closed_at?: string | null;
+            /** Format: date-time */
+            readonly created_at?: string;
+            readonly raters?: components["schemas"]["Feedback360Rater"][];
+            readonly peer_aggregate?: {
+                [key: string]: unknown;
+            } | null;
+            readonly direct_report_aggregate?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * @description Goal is Internal-tier (Data-Dictionary.md), which every row-scope-
@@ -5486,6 +9681,44 @@ export interface components {
             outcome_notes?: string;
             readonly created_by?: number | null;
             readonly created_by_name?: string | null;
+            /** Format: date-time */
+            readonly created_at?: string;
+        };
+        /**
+         * @description Design spec §2.2, §3.2: `interviewer` is force-set server-side (see
+         *     create() below) to whoever is authenticated — never client-supplied, so
+         *     nobody can submit "on behalf of" someone else. Blind-review masking
+         *     (peer scorecards hidden until the viewer has submitted their own for the
+         *     same session) lives in to_representation, not in the permission class —
+         *     the permission class only decides whether the ROW is reachable at all.
+         */
+        PatchedInterviewScorecard: {
+            readonly id?: number;
+            session?: number;
+            readonly interviewer?: number;
+            skill_rating?: components["schemas"]["ManagerRatingEnum"];
+            communication_rating?: components["schemas"]["ManagerRatingEnum"];
+            culture_fit_rating?: components["schemas"]["ManagerRatingEnum"];
+            comments?: string;
+            recommendation?: components["schemas"]["InterviewScorecardRecommendationEnum"];
+            /** Format: date-time */
+            readonly created_at?: string;
+        };
+        PatchedInterviewSession: {
+            readonly id?: number;
+            applicant?: number;
+            readonly applicant_summary?: components["schemas"]["InterviewApplicantSummary"];
+            /** Format: int64 */
+            round_number?: number;
+            /** Format: date-time */
+            scheduled_at?: string;
+            /** Format: int64 */
+            duration_minutes?: number;
+            location?: string;
+            status?: components["schemas"]["InterviewSessionStatusEnum"];
+            notes?: string;
+            interviewers?: number[];
+            readonly created_by?: number | null;
             /** Format: date-time */
             readonly created_at?: string;
         };
@@ -5611,12 +9844,15 @@ export interface components {
             status?: components["schemas"]["RequisitionStatusEnum"];
             hiring_manager?: number | null;
             readonly created_by?: number | null;
+            positions?: number[];
             /** Format: date */
             opened_at?: string | null;
             /** Format: date */
             target_fill_date?: string | null;
             /** Format: date */
             readonly closed_at?: string | null;
+            description?: string;
+            external_posting?: boolean;
         };
         /**
          * @description Plain ModelSerializer, not TieredModelSerializer — see models.py's
@@ -5629,7 +9865,7 @@ export interface components {
             readonly review_cycle?: number;
             readonly employee?: number;
             readonly manager?: number | null;
-            self_rating?: (components["schemas"]["SelfRatingEnum"] | components["schemas"]["NullEnum"]) | null;
+            self_rating?: (components["schemas"]["ManagerRatingEnum"] | components["schemas"]["NullEnum"]) | null;
             self_comments?: string;
             /** Format: date-time */
             readonly self_submitted_at?: string | null;
@@ -5677,6 +9913,29 @@ export interface components {
             description?: string;
             active?: boolean;
         };
+        /**
+         * @description `skill_names`/`latest_performance` are read-only cross-app context
+         *     (spec §2.7) -- informational only, never an input to `readiness`, which
+         *     is always the human judgement call HR records directly.
+         */
+        PatchedSuccessionCandidate: {
+            readonly id?: number;
+            critical_post?: number;
+            employee?: number;
+            readiness?: components["schemas"]["ReadinessEnum"];
+            notes?: string;
+            readonly nominated_by?: number | null;
+            /** @default true */
+            active: boolean;
+            readonly skill_names?: string[];
+            readonly latest_performance?: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            readonly created_at?: string;
+            /** Format: date-time */
+            readonly updated_at?: string;
+        };
         PatchedTemplateElement: {
             readonly id?: number;
             template?: number;
@@ -5714,6 +9973,7 @@ export interface components {
             employee?: number;
             title?: string;
             provider?: string;
+            course?: number | null;
             status?: components["schemas"]["TrainingRecordStatusEnum"];
             /** Format: date */
             start_date?: string | null;
@@ -5723,6 +9983,14 @@ export interface components {
             hours?: string | null;
             /** Format: decimal */
             cost?: string | null;
+            learning_programme_category?: components["schemas"]["LearningProgrammeCategoryEnum"] | components["schemas"]["BlankEnum"];
+            learner_agreement_signed?: boolean;
+            /** Format: uri */
+            evidence_file?: string | null;
+            readonly has_evidence_file?: boolean;
+            readonly evidence_download_url?: string | null;
+            readonly evidence_content_type?: string;
+            readonly evidence_sha256?: string;
         };
         PayBand: {
             readonly id: number;
@@ -5770,6 +10038,7 @@ export interface components {
             readonly improvement_plans: components["schemas"]["ImprovementPlan"][];
             readonly signatures: components["schemas"]["AgreementSignature"][];
             readonly documents: components["schemas"]["AgreementDocument"][];
+            readonly calibration_adjustments: components["schemas"]["CalibrationAdjustment"][];
         };
         /**
          * @description * `draft` - Draft
@@ -5878,6 +10147,102 @@ export interface components {
          * @enum {string}
          */
         PolicyStatusEnum: "draft" | "published" | "archived";
+        Position: {
+            readonly id: number;
+            readonly post_number: string;
+            title: string;
+            department: number;
+            occupational_level: number;
+            job_grade?: number | null;
+            location: number;
+            readonly status: components["schemas"]["PositionStatusEnum"];
+            readonly current_step: number;
+            readonly proposed_by: number | null;
+            readonly approval_steps: components["schemas"]["PositionApprovalStep"][];
+            readonly is_vacant: boolean;
+            readonly current_incumbent_number: string | null;
+            /**
+             * @description The role that must act next, mirroring views.PositionViewSet.
+             *     decide()'s own chain lookup -- the frontend reads this instead of
+             *     re-deriving it from a hardcoded copy of POSITION_APPROVAL_CHAIN,
+             *     which is deployment-configurable (settings.py).
+             */
+            readonly next_approver_role: string | null;
+        };
+        PositionApprovalStep: {
+            readonly id: number;
+            /** Format: int64 */
+            step_index: number;
+            role: string;
+            actor?: number | null;
+            decision: components["schemas"]["DecisionEnum"];
+            comment?: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /**
+         * @description * `draft` - Draft
+         *     * `in_review` - In review
+         *     * `approved` - Approved
+         *     * `rejected` - Rejected
+         * @enum {string}
+         */
+        PositionStatusEnum: "draft" | "in_review" | "approved" | "rejected";
+        /**
+         * @description * `compensation` - Compensation
+         *     * `career_growth` - Career growth
+         *     * `management` - Management or relationship with manager
+         *     * `work_life_balance` - Work-life balance
+         *     * `relocation` - Relocation
+         *     * `health` - Health or personal
+         *     * `role_fit` - Role fit
+         *     * `other` - Other
+         * @enum {string}
+         */
+        PrimaryReasonEnum: "compensation" | "career_growth" | "management" | "work_life_balance" | "relocation" | "health" | "role_fit" | "other";
+        ProbationPeriod: {
+            readonly id: number;
+            employee: number;
+            readonly employee_number: string;
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date: string;
+            readonly status: components["schemas"]["ProbationPeriodStatusEnum"];
+            /** Format: date-time */
+            readonly outcome_at: string | null;
+            readonly outcome_by: number | null;
+            outcome_notes?: string;
+            readonly reviews: components["schemas"]["ProbationReview"][];
+        };
+        /**
+         * @description * `in_progress` - In progress
+         *     * `confirmed` - Confirmed
+         *     * `extended` - Extended
+         *     * `terminated` - Terminated (not confirmed)
+         * @enum {string}
+         */
+        ProbationPeriodStatusEnum: "in_progress" | "confirmed" | "extended" | "terminated";
+        ProbationReview: {
+            readonly id: number;
+            probation_period: number;
+            /** Format: date */
+            review_date: string;
+            readonly reviewed_by: number;
+            recommendation: components["schemas"]["ProbationReviewRecommendationEnum"];
+            comments?: string;
+            /** Format: date-time */
+            readonly employee_signed_at: string | null;
+            readonly employee_signature_sha256: string;
+        };
+        /**
+         * @description * `continue` - Continue probation
+         *     * `extend` - Recommend extension
+         *     * `confirm` - Recommend confirmation
+         *     * `terminate` - Recommend termination
+         * @enum {string}
+         */
+        ProbationReviewRecommendationEnum: "continue" | "extend" | "confirm" | "terminate";
         /**
          * @description * `beginner` - Beginner
          *     * `intermediate` - Intermediate
@@ -5886,6 +10251,12 @@ export interface components {
          * @enum {string}
          */
         ProficiencyEnum: "beginner" | "intermediate" | "advanced" | "expert";
+        /**
+         * @description * `increase` - Salary increase
+         *     * `bonus` - Bonus
+         * @enum {string}
+         */
+        ProposalTypeEnum: "increase" | "bonus";
         ProviderConfig: {
             readonly id: number;
             provider_key: string;
@@ -5908,6 +10279,21 @@ export interface components {
          */
         ProvinceEnum: "EC" | "FS" | "GP" | "KZN" | "LP" | "MP" | "NC" | "NW" | "WC" | "OUT";
         /**
+         * @description Deliberately narrow — an anonymous visitor gets exactly enough to
+         *     decide whether to apply, nothing about internal pipeline shape
+         *     (headcount targets, hiring_manager, positions, created_by).
+         */
+        PublicPosting: {
+            readonly id: number;
+            title: string;
+            readonly department: string;
+            readonly occupational_level: string;
+            readonly location: string;
+            description?: string;
+            /** Format: date */
+            target_fill_date?: string | null;
+        };
+        /**
          * @description * `african` - African
          *     * `coloured` - Coloured
          *     * `indian` - Indian
@@ -5923,6 +10309,14 @@ export interface components {
          * @enum {string}
          */
         RaceSourceEnum: "self_identified" | "hr_captured" | "imported";
+        /**
+         * @description * `ready_now` - Ready now
+         *     * `ready_1_2_years` - Ready in 1–2 years
+         *     * `ready_3_plus_years` - Ready in 3+ years
+         *     * `development_needed` - Development needed
+         * @enum {string}
+         */
+        ReadinessEnum: "ready_now" | "ready_1_2_years" | "ready_3_plus_years" | "development_needed";
         RemunerationRecord: {
             readonly id: number;
             employee: number;
@@ -5938,6 +10332,19 @@ export interface components {
             readonly total_remuneration: number;
             readonly imported_by: number | null;
         };
+        /**
+         * @description * `union_nominated` - Nominated by a representative trade union
+         *     * `employee_nominated` - Nominated by employees
+         *     * `employer` - Employer / management representative
+         * @enum {string}
+         */
+        RepresentationEnum: "union_nominated" | "employee_nominated" | "employer";
+        /**
+         * @description * `export` - Export my data
+         *     * `erasure` - Erasure request
+         * @enum {string}
+         */
+        RequestTypeEnum: "export" | "erasure";
         Requisition: {
             readonly id: number;
             title: string;
@@ -5950,12 +10357,15 @@ export interface components {
             status?: components["schemas"]["RequisitionStatusEnum"];
             hiring_manager?: number | null;
             readonly created_by: number | null;
+            positions?: number[];
             /** Format: date */
             opened_at?: string | null;
             /** Format: date */
             target_fill_date?: string | null;
             /** Format: date */
             readonly closed_at: string | null;
+            description?: string;
+            external_posting?: boolean;
         };
         /**
          * @description * `draft` - Draft
@@ -5977,7 +10387,7 @@ export interface components {
             readonly review_cycle: number;
             readonly employee: number;
             readonly manager: number | null;
-            self_rating?: (components["schemas"]["SelfRatingEnum"] | components["schemas"]["NullEnum"]) | null;
+            self_rating?: (components["schemas"]["ManagerRatingEnum"] | components["schemas"]["NullEnum"]) | null;
             self_comments?: string;
             /** Format: date-time */
             readonly self_submitted_at: string | null;
@@ -6018,21 +10428,6 @@ export interface components {
          */
         ReviewStatusEnum: "not_required" | "pending" | "confirmed_match" | "confirmed_mismatch";
         /**
-         * @description * `employee` - Employee
-         *     * `head` - Head / executive
-         * @enum {string}
-         */
-        RoleEnum: "employee" | "head";
-        /**
-         * @description * `1` - 1
-         *     * `2` - 2
-         *     * `3` - 3
-         *     * `4` - 4
-         *     * `5` - 5
-         * @enum {integer}
-         */
-        SelfRatingEnum: 1 | 2 | 3 | 4 | 5;
-        /**
          * @description * `password_reauth` - Click-to-sign with password re-authentication
          *     * `totp_stepup` - Click-to-sign with authenticator (TOTP) step-up
          * @enum {string}
@@ -6071,12 +10466,56 @@ export interface components {
          */
         SkillCategoryEnum: "technical" | "soft" | "leadership" | "compliance" | "other";
         /**
+         * @description * `internal` - Internal
+         *     * `portal` - Careers portal
+         * @enum {string}
+         */
+        SourceEnum: "internal" | "portal";
+        /**
          * @description * `contracting` - Contracting
          *     * `midyear` - Mid-year review (Q2)
          *     * `final` - Final assessment (Q4)
          * @enum {string}
          */
         StageEnum: "contracting" | "midyear" | "final";
+        /**
+         * @description * `proposed` - Proposed
+         *     * `confirmed` - Confirmed
+         *     * `executed` - Executed
+         *     * `cancelled` - Cancelled
+         * @enum {string}
+         */
+        StateEnum: "proposed" | "confirmed" | "executed" | "cancelled";
+        /**
+         * @description * `draft` - Draft
+         *     * `published` - Published
+         *     * `retired` - Retired
+         * @enum {string}
+         */
+        Status860Enum: "draft" | "published" | "retired";
+        /**
+         * @description `skill_names`/`latest_performance` are read-only cross-app context
+         *     (spec §2.7) -- informational only, never an input to `readiness`, which
+         *     is always the human judgement call HR records directly.
+         */
+        SuccessionCandidate: {
+            readonly id: number;
+            critical_post: number;
+            employee: number;
+            readiness: components["schemas"]["ReadinessEnum"];
+            notes?: string;
+            readonly nominated_by: number | null;
+            /** @default true */
+            active: boolean;
+            readonly skill_names: string[];
+            readonly latest_performance: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
         TemplateElement: {
             readonly id: number;
             template: number;
@@ -6114,6 +10553,7 @@ export interface components {
             employee: number;
             title: string;
             provider?: string;
+            course?: number | null;
             status?: components["schemas"]["TrainingRecordStatusEnum"];
             /** Format: date */
             start_date?: string | null;
@@ -6123,6 +10563,14 @@ export interface components {
             hours?: string | null;
             /** Format: decimal */
             cost?: string | null;
+            learning_programme_category?: components["schemas"]["LearningProgrammeCategoryEnum"] | components["schemas"]["BlankEnum"];
+            learner_agreement_signed?: boolean;
+            /** Format: uri */
+            evidence_file?: string | null;
+            readonly has_evidence_file: boolean;
+            readonly evidence_download_url: string | null;
+            readonly evidence_content_type: string;
+            readonly evidence_sha256: string;
         };
         /**
          * @description * `requested` - Requested
@@ -7689,6 +12137,124 @@ export interface operations {
             };
         };
     };
+    v1_background_checks_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedBackgroundCheckList"];
+                };
+            };
+        };
+    };
+    v1_background_checks_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BackgroundCheck"];
+                "application/x-www-form-urlencoded": components["schemas"]["BackgroundCheck"];
+                "multipart/form-data": components["schemas"]["BackgroundCheck"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackgroundCheck"];
+                };
+            };
+        };
+    };
+    v1_background_checks_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this background check. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackgroundCheck"];
+                };
+            };
+        };
+    };
+    v1_background_checks_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this background check. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_background_checks_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this background check. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedBackgroundCheck"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedBackgroundCheck"];
+                "multipart/form-data": components["schemas"]["PatchedBackgroundCheck"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackgroundCheck"];
+                };
+            };
+        };
+    };
     v1_benefits_list: {
         parameters: {
             query?: {
@@ -8050,6 +12616,307 @@ export interface operations {
             };
         };
     };
+    v1_calibration_sessions_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedCalibrationSessionList"];
+                };
+            };
+        };
+    };
+    v1_calibration_sessions_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalibrationSession"];
+                "application/x-www-form-urlencoded": components["schemas"]["CalibrationSession"];
+                "multipart/form-data": components["schemas"]["CalibrationSession"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalibrationSession"];
+                };
+            };
+        };
+    };
+    v1_calibration_sessions_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this calibration session. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalibrationSession"];
+                };
+            };
+        };
+    };
+    v1_calibration_sessions_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this calibration session. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalibrationSession"];
+                "application/x-www-form-urlencoded": components["schemas"]["CalibrationSession"];
+                "multipart/form-data": components["schemas"]["CalibrationSession"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalibrationSession"];
+                };
+            };
+        };
+    };
+    v1_calibration_sessions_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this calibration session. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_calibration_sessions_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this calibration session. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedCalibrationSession"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedCalibrationSession"];
+                "multipart/form-data": components["schemas"]["PatchedCalibrationSession"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalibrationSession"];
+                };
+            };
+        };
+    };
+    v1_calibration_sessions_candidates_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this calibration session. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalibrationSession"];
+                };
+            };
+        };
+    };
+    v1_calibration_sessions_close_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this calibration session. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalibrationSession"];
+                "application/x-www-form-urlencoded": components["schemas"]["CalibrationSession"];
+                "multipart/form-data": components["schemas"]["CalibrationSession"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalibrationSession"];
+                };
+            };
+        };
+    };
+    v1_calibration_sessions_record_outcome_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this calibration session. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalibrationSession"];
+                "application/x-www-form-urlencoded": components["schemas"]["CalibrationSession"];
+                "multipart/form-data": components["schemas"]["CalibrationSession"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalibrationSession"];
+                };
+            };
+        };
+    };
+    v1_careers_apply_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+                "application/x-www-form-urlencoded": {
+                    [key: string]: unknown;
+                };
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    v1_careers_postings_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPublicPostingList"];
+                };
+            };
+        };
+    };
+    v1_careers_postings_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this requisition. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicPosting"];
+                };
+            };
+        };
+    };
     v1_certifications_list: {
         parameters: {
             query?: {
@@ -8196,6 +13063,750 @@ export interface operations {
             };
         };
     };
+    v1_checklist_instances_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedChecklistInstanceList"];
+                };
+            };
+        };
+    };
+    v1_checklist_instances_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecklistInstance"];
+                "application/x-www-form-urlencoded": components["schemas"]["ChecklistInstance"];
+                "multipart/form-data": components["schemas"]["ChecklistInstance"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistInstance"];
+                };
+            };
+        };
+    };
+    v1_checklist_instances_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist instance. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistInstance"];
+                };
+            };
+        };
+    };
+    v1_checklist_items_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedChecklistInstanceItemList"];
+                };
+            };
+        };
+    };
+    v1_checklist_items_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecklistInstanceItem"];
+                "application/x-www-form-urlencoded": components["schemas"]["ChecklistInstanceItem"];
+                "multipart/form-data": components["schemas"]["ChecklistInstanceItem"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistInstanceItem"];
+                };
+            };
+        };
+    };
+    v1_checklist_items_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist instance item. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistInstanceItem"];
+                };
+            };
+        };
+    };
+    v1_checklist_items_complete_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist instance item. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecklistInstanceItem"];
+                "application/x-www-form-urlencoded": components["schemas"]["ChecklistInstanceItem"];
+                "multipart/form-data": components["schemas"]["ChecklistInstanceItem"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistInstanceItem"];
+                };
+            };
+        };
+    };
+    v1_checklist_items_reopen_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist instance item. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecklistInstanceItem"];
+                "application/x-www-form-urlencoded": components["schemas"]["ChecklistInstanceItem"];
+                "multipart/form-data": components["schemas"]["ChecklistInstanceItem"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistInstanceItem"];
+                };
+            };
+        };
+    };
+    v1_checklist_template_items_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedChecklistTemplateItemList"];
+                };
+            };
+        };
+    };
+    v1_checklist_template_items_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecklistTemplateItem"];
+                "application/x-www-form-urlencoded": components["schemas"]["ChecklistTemplateItem"];
+                "multipart/form-data": components["schemas"]["ChecklistTemplateItem"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistTemplateItem"];
+                };
+            };
+        };
+    };
+    v1_checklist_template_items_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist template item. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistTemplateItem"];
+                };
+            };
+        };
+    };
+    v1_checklist_template_items_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist template item. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecklistTemplateItem"];
+                "application/x-www-form-urlencoded": components["schemas"]["ChecklistTemplateItem"];
+                "multipart/form-data": components["schemas"]["ChecklistTemplateItem"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistTemplateItem"];
+                };
+            };
+        };
+    };
+    v1_checklist_template_items_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist template item. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_checklist_template_items_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist template item. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedChecklistTemplateItem"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedChecklistTemplateItem"];
+                "multipart/form-data": components["schemas"]["PatchedChecklistTemplateItem"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistTemplateItem"];
+                };
+            };
+        };
+    };
+    v1_checklist_templates_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedChecklistTemplateList"];
+                };
+            };
+        };
+    };
+    v1_checklist_templates_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecklistTemplate"];
+                "application/x-www-form-urlencoded": components["schemas"]["ChecklistTemplate"];
+                "multipart/form-data": components["schemas"]["ChecklistTemplate"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistTemplate"];
+                };
+            };
+        };
+    };
+    v1_checklist_templates_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist template. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistTemplate"];
+                };
+            };
+        };
+    };
+    v1_checklist_templates_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist template. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecklistTemplate"];
+                "application/x-www-form-urlencoded": components["schemas"]["ChecklistTemplate"];
+                "multipart/form-data": components["schemas"]["ChecklistTemplate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistTemplate"];
+                };
+            };
+        };
+    };
+    v1_checklist_templates_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist template. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_checklist_templates_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist template. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedChecklistTemplate"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedChecklistTemplate"];
+                "multipart/form-data": components["schemas"]["PatchedChecklistTemplate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistTemplate"];
+                };
+            };
+        };
+    };
+    v1_checklist_templates_publish_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist template. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecklistTemplate"];
+                "application/x-www-form-urlencoded": components["schemas"]["ChecklistTemplate"];
+                "multipart/form-data": components["schemas"]["ChecklistTemplate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistTemplate"];
+                };
+            };
+        };
+    };
+    v1_checklist_templates_retire_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this checklist template. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChecklistTemplate"];
+                "application/x-www-form-urlencoded": components["schemas"]["ChecklistTemplate"];
+                "multipart/form-data": components["schemas"]["ChecklistTemplate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistTemplate"];
+                };
+            };
+        };
+    };
+    v1_comp_cycles_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedCompCycleList"];
+                };
+            };
+        };
+    };
+    v1_comp_cycles_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompCycle"];
+                "application/x-www-form-urlencoded": components["schemas"]["CompCycle"];
+                "multipart/form-data": components["schemas"]["CompCycle"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompCycle"];
+                };
+            };
+        };
+    };
+    v1_comp_cycles_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this comp cycle. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompCycle"];
+                };
+            };
+        };
+    };
+    v1_comp_cycles_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this comp cycle. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompCycle"];
+                "application/x-www-form-urlencoded": components["schemas"]["CompCycle"];
+                "multipart/form-data": components["schemas"]["CompCycle"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompCycle"];
+                };
+            };
+        };
+    };
+    v1_comp_cycles_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this comp cycle. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_comp_cycles_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this comp cycle. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedCompCycle"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedCompCycle"];
+                "multipart/form-data": components["schemas"]["PatchedCompCycle"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompCycle"];
+                };
+            };
+        };
+    };
+    v1_comp_cycles_close_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this comp cycle. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompCycle"];
+                "application/x-www-form-urlencoded": components["schemas"]["CompCycle"];
+                "multipart/form-data": components["schemas"]["CompCycle"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompCycle"];
+                };
+            };
+        };
+    };
+    v1_comp_cycles_open_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this comp cycle. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompCycle"];
+                "application/x-www-form-urlencoded": components["schemas"]["CompCycle"];
+                "multipart/form-data": components["schemas"]["CompCycle"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompCycle"];
+                };
+            };
+        };
+    };
     v1_comp_proposals_list: {
         parameters: {
             query?: {
@@ -8321,6 +13932,444 @@ export interface operations {
             };
         };
     };
+    v1_course_requirements_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedCourseRequirementList"];
+                };
+            };
+        };
+    };
+    v1_course_requirements_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CourseRequirement"];
+                "application/x-www-form-urlencoded": components["schemas"]["CourseRequirement"];
+                "multipart/form-data": components["schemas"]["CourseRequirement"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRequirement"];
+                };
+            };
+        };
+    };
+    v1_course_requirements_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course requirement. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRequirement"];
+                };
+            };
+        };
+    };
+    v1_course_requirements_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course requirement. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CourseRequirement"];
+                "application/x-www-form-urlencoded": components["schemas"]["CourseRequirement"];
+                "multipart/form-data": components["schemas"]["CourseRequirement"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRequirement"];
+                };
+            };
+        };
+    };
+    v1_course_requirements_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course requirement. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_course_requirements_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course requirement. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedCourseRequirement"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedCourseRequirement"];
+                "multipart/form-data": components["schemas"]["PatchedCourseRequirement"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRequirement"];
+                };
+            };
+        };
+    };
+    v1_courses_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedCourseList"];
+                };
+            };
+        };
+    };
+    v1_courses_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Course"];
+                "application/x-www-form-urlencoded": components["schemas"]["Course"];
+                "multipart/form-data": components["schemas"]["Course"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Course"];
+                };
+            };
+        };
+    };
+    v1_courses_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Course"];
+                };
+            };
+        };
+    };
+    v1_courses_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Course"];
+                "application/x-www-form-urlencoded": components["schemas"]["Course"];
+                "multipart/form-data": components["schemas"]["Course"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Course"];
+                };
+            };
+        };
+    };
+    v1_courses_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_courses_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this course. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedCourse"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedCourse"];
+                "multipart/form-data": components["schemas"]["PatchedCourse"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Course"];
+                };
+            };
+        };
+    };
+    v1_critical_posts_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedCriticalPostList"];
+                };
+            };
+        };
+    };
+    v1_critical_posts_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CriticalPost"];
+                "application/x-www-form-urlencoded": components["schemas"]["CriticalPost"];
+                "multipart/form-data": components["schemas"]["CriticalPost"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CriticalPost"];
+                };
+            };
+        };
+    };
+    v1_critical_posts_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this critical post. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CriticalPost"];
+                };
+            };
+        };
+    };
+    v1_critical_posts_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this critical post. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CriticalPost"];
+                "application/x-www-form-urlencoded": components["schemas"]["CriticalPost"];
+                "multipart/form-data": components["schemas"]["CriticalPost"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CriticalPost"];
+                };
+            };
+        };
+    };
+    v1_critical_posts_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this critical post. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_critical_posts_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this critical post. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedCriticalPost"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedCriticalPost"];
+                "multipart/form-data": components["schemas"]["PatchedCriticalPost"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CriticalPost"];
+                };
+            };
+        };
+    };
     v1_dashboards_attendance_retrieve: {
         parameters: {
             query?: never;
@@ -8343,6 +14392,27 @@ export interface operations {
         };
     };
     v1_dashboards_equity_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    v1_dashboards_exit_interviews_retrieve: {
         parameters: {
             query?: never;
             header?: never;
@@ -8426,6 +14496,48 @@ export interface operations {
             };
         };
     };
+    v1_dashboards_learning_training_compliance_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    v1_dashboards_learning_training_compliance_overdue_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     v1_dashboards_learning_wsp_atr_export_retrieve: {
         parameters: {
             query?: never;
@@ -8441,6 +14553,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": string;
+                };
+            };
+        };
+    };
+    v1_dashboards_management_control_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -8466,7 +14599,49 @@ export interface operations {
             };
         };
     };
+    v1_dashboards_probation_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     v1_dashboards_recruitment_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    v1_dashboards_recruitment_funnel_retrieve: {
         parameters: {
             query?: never;
             header?: never;
@@ -8580,6 +14755,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DataQualityException"];
+                };
+            };
+        };
+    };
+    v1_data_subject_requests_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedDataSubjectRequestList"];
+                };
+            };
+        };
+    };
+    v1_data_subject_requests_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DataSubjectRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["DataSubjectRequest"];
+                "multipart/form-data": components["schemas"]["DataSubjectRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequest"];
+                };
+            };
+        };
+    };
+    v1_data_subject_requests_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this data subject request. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequest"];
+                };
+            };
+        };
+    };
+    v1_data_subject_requests_complete_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this data subject request. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DataSubjectRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["DataSubjectRequest"];
+                "multipart/form-data": components["schemas"]["DataSubjectRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequest"];
+                };
+            };
+        };
+    };
+    v1_data_subject_requests_decline_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this data subject request. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DataSubjectRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["DataSubjectRequest"];
+                "multipart/form-data": components["schemas"]["DataSubjectRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequest"];
+                };
+            };
+        };
+    };
+    v1_data_subject_requests_download_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this data subject request. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequest"];
                 };
             };
         };
@@ -8730,6 +15052,700 @@ export interface operations {
             };
         };
     };
+    v1_dependants_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedDependantList"];
+                };
+            };
+        };
+    };
+    v1_dependants_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Dependant"];
+                "application/x-www-form-urlencoded": components["schemas"]["Dependant"];
+                "multipart/form-data": components["schemas"]["Dependant"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dependant"];
+                };
+            };
+        };
+    };
+    v1_dependants_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this dependant. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dependant"];
+                };
+            };
+        };
+    };
+    v1_dependants_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this dependant. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Dependant"];
+                "application/x-www-form-urlencoded": components["schemas"]["Dependant"];
+                "multipart/form-data": components["schemas"]["Dependant"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dependant"];
+                };
+            };
+        };
+    };
+    v1_dependants_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this dependant. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_dependants_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this dependant. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedDependant"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedDependant"];
+                "multipart/form-data": components["schemas"]["PatchedDependant"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dependant"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_meetings_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEEForumMeetingList"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_meetings_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["EEForumMeeting"];
+                "application/x-www-form-urlencoded": components["schemas"]["EEForumMeeting"];
+                "application/json": components["schemas"]["EEForumMeeting"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEForumMeeting"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_meetings_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee forum meeting. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEForumMeeting"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_meetings_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee forum meeting. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["EEForumMeeting"];
+                "application/x-www-form-urlencoded": components["schemas"]["EEForumMeeting"];
+                "application/json": components["schemas"]["EEForumMeeting"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEForumMeeting"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_meetings_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee forum meeting. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_ee_forum_meetings_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee forum meeting. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["PatchedEEForumMeeting"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedEEForumMeeting"];
+                "application/json": components["schemas"]["PatchedEEForumMeeting"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEForumMeeting"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_meetings_download_minutes_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee forum meeting. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEForumMeeting"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_members_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEEForumMemberList"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_members_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EEForumMember"];
+                "application/x-www-form-urlencoded": components["schemas"]["EEForumMember"];
+                "multipart/form-data": components["schemas"]["EEForumMember"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEForumMember"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_members_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee forum member. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEForumMember"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_members_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee forum member. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EEForumMember"];
+                "application/x-www-form-urlencoded": components["schemas"]["EEForumMember"];
+                "multipart/form-data": components["schemas"]["EEForumMember"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEForumMember"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_members_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee forum member. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_ee_forum_members_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee forum member. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedEEForumMember"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedEEForumMember"];
+                "multipart/form-data": components["schemas"]["PatchedEEForumMember"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEForumMember"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_members_composition_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEForumMember"];
+                };
+            };
+        };
+    };
+    v1_ee_plan_measures_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEEPlanMeasureList"];
+                };
+            };
+        };
+    };
+    v1_ee_plan_measures_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EEPlanMeasure"];
+                "application/x-www-form-urlencoded": components["schemas"]["EEPlanMeasure"];
+                "multipart/form-data": components["schemas"]["EEPlanMeasure"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEPlanMeasure"];
+                };
+            };
+        };
+    };
+    v1_ee_plan_measures_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee plan measure. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEPlanMeasure"];
+                };
+            };
+        };
+    };
+    v1_ee_plan_measures_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee plan measure. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EEPlanMeasure"];
+                "application/x-www-form-urlencoded": components["schemas"]["EEPlanMeasure"];
+                "multipart/form-data": components["schemas"]["EEPlanMeasure"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEPlanMeasure"];
+                };
+            };
+        };
+    };
+    v1_ee_plan_measures_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee plan measure. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_ee_plan_measures_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee plan measure. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedEEPlanMeasure"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedEEPlanMeasure"];
+                "multipart/form-data": components["schemas"]["PatchedEEPlanMeasure"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEPlanMeasure"];
+                };
+            };
+        };
+    };
+    v1_ee_plan_snapshots_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEEPlanProgressSnapshotList"];
+                };
+            };
+        };
+    };
+    v1_ee_plan_snapshots_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee plan progress snapshot. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEPlanProgressSnapshot"];
+                };
+            };
+        };
+    };
+    v1_ee_plan_snapshots_take_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["EEPlanProgressSnapshot"];
+                "application/x-www-form-urlencoded": components["schemas"]["EEPlanProgressSnapshot"];
+                "multipart/form-data": components["schemas"]["EEPlanProgressSnapshot"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEPlanProgressSnapshot"];
+                };
+            };
+        };
+    };
     v1_ee_plans_list: {
         parameters: {
             query?: {
@@ -8865,6 +15881,25 @@ export interface operations {
                 "multipart/form-data": components["schemas"]["PatchedEEPlan"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEPlan"];
+                };
+            };
+        };
+    };
+    v1_ee_plans_sector_defaults_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {
@@ -9197,6 +16232,28 @@ export interface operations {
             };
         };
     };
+    v1_ee_reports_validate_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee report. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EEReport"];
+                };
+            };
+        };
+    };
     v1_ee_reports_generate_create: {
         parameters: {
             query?: never;
@@ -9218,6 +16275,361 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EEReport"];
+                };
+            };
+        };
+    };
+    v1_ee_sectors_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEESectorList"];
+                };
+            };
+        };
+    };
+    v1_ee_sectors_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this ee sector. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EESector"];
+                };
+            };
+        };
+    };
+    v1_emergency_contacts_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEmergencyContactList"];
+                };
+            };
+        };
+    };
+    v1_emergency_contacts_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmergencyContact"];
+                "application/x-www-form-urlencoded": components["schemas"]["EmergencyContact"];
+                "multipart/form-data": components["schemas"]["EmergencyContact"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyContact"];
+                };
+            };
+        };
+    };
+    v1_emergency_contacts_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this emergency contact. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyContact"];
+                };
+            };
+        };
+    };
+    v1_emergency_contacts_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this emergency contact. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmergencyContact"];
+                "application/x-www-form-urlencoded": components["schemas"]["EmergencyContact"];
+                "multipart/form-data": components["schemas"]["EmergencyContact"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyContact"];
+                };
+            };
+        };
+    };
+    v1_emergency_contacts_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this emergency contact. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_emergency_contacts_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this emergency contact. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedEmergencyContact"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedEmergencyContact"];
+                "multipart/form-data": components["schemas"]["PatchedEmergencyContact"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyContact"];
+                };
+            };
+        };
+    };
+    v1_employee_documents_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEmployeeDocumentList"];
+                };
+            };
+        };
+    };
+    v1_employee_documents_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmployeeDocument"];
+                "application/x-www-form-urlencoded": components["schemas"]["EmployeeDocument"];
+                "multipart/form-data": components["schemas"]["EmployeeDocument"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeDocument"];
+                };
+            };
+        };
+    };
+    v1_employee_documents_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this employee document. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeDocument"];
+                };
+            };
+        };
+    };
+    v1_employee_documents_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this employee document. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_employee_documents_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this employee document. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedEmployeeDocument"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedEmployeeDocument"];
+                "multipart/form-data": components["schemas"]["PatchedEmployeeDocument"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeDocument"];
+                };
+            };
+        };
+    };
+    v1_employee_documents_download_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this employee document. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeDocument"];
+                };
+            };
+        };
+    };
+    v1_employee_documents_consent_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmployeeDocument"];
+                "application/x-www-form-urlencoded": components["schemas"]["EmployeeDocument"];
+                "multipart/form-data": components["schemas"]["EmployeeDocument"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeDocument"];
                 };
             };
         };
@@ -9412,6 +16824,62 @@ export interface operations {
             };
         };
     };
+    v1_employee_versions_decide_contract_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this employee version. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmployeeVersion"];
+                "application/x-www-form-urlencoded": components["schemas"]["EmployeeVersion"];
+                "multipart/form-data": components["schemas"]["EmployeeVersion"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeVersion"];
+                };
+            };
+        };
+    };
+    v1_employee_versions_recommend_contract_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this employee version. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmployeeVersion"];
+                "application/x-www-form-urlencoded": components["schemas"]["EmployeeVersion"];
+                "multipart/form-data": components["schemas"]["EmployeeVersion"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeVersion"];
+                };
+            };
+        };
+    };
     v1_employees_list: {
         parameters: {
             query?: {
@@ -9565,6 +17033,28 @@ export interface operations {
             };
         };
     };
+    v1_employees_search_summary_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEmployeeSearchSummaryList"];
+                };
+            };
+        };
+    };
     v1_employer_config_list: {
         parameters: {
             query?: {
@@ -9711,6 +17201,277 @@ export interface operations {
             };
         };
     };
+    v1_employment_changes_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEmploymentChangeList"];
+                };
+            };
+        };
+    };
+    v1_employment_changes_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmploymentChange"];
+                "application/x-www-form-urlencoded": components["schemas"]["EmploymentChange"];
+                "multipart/form-data": components["schemas"]["EmploymentChange"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmploymentChange"];
+                };
+            };
+        };
+    };
+    v1_employment_changes_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this employment change. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmploymentChange"];
+                };
+            };
+        };
+    };
+    v1_employment_changes_cancel_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this employment change. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmploymentChange"];
+                "application/x-www-form-urlencoded": components["schemas"]["EmploymentChange"];
+                "multipart/form-data": components["schemas"]["EmploymentChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmploymentChange"];
+                };
+            };
+        };
+    };
+    v1_employment_changes_confirm_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this employment change. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmploymentChange"];
+                "application/x-www-form-urlencoded": components["schemas"]["EmploymentChange"];
+                "multipart/form-data": components["schemas"]["EmploymentChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmploymentChange"];
+                };
+            };
+        };
+    };
+    v1_exit_interviews_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedExitInterviewList"];
+                };
+            };
+        };
+    };
+    v1_exit_interviews_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExitInterview"];
+                "application/x-www-form-urlencoded": components["schemas"]["ExitInterview"];
+                "multipart/form-data": components["schemas"]["ExitInterview"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitInterview"];
+                };
+            };
+        };
+    };
+    v1_exit_interviews_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this exit interview. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitInterview"];
+                };
+            };
+        };
+    };
+    v1_exit_interviews_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this exit interview. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExitInterview"];
+                "application/x-www-form-urlencoded": components["schemas"]["ExitInterview"];
+                "multipart/form-data": components["schemas"]["ExitInterview"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitInterview"];
+                };
+            };
+        };
+    };
+    v1_exit_interviews_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this exit interview. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_exit_interviews_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this exit interview. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedExitInterview"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedExitInterview"];
+                "multipart/form-data": components["schemas"]["PatchedExitInterview"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExitInterview"];
+                };
+            };
+        };
+    };
     v1_feedback_list: {
         parameters: {
             query?: {
@@ -9754,6 +17515,438 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Feedback"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_raters_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedFeedback360RaterList"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_raters_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Feedback360Rater"];
+                "application/x-www-form-urlencoded": components["schemas"]["Feedback360Rater"];
+                "multipart/form-data": components["schemas"]["Feedback360Rater"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Rater"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_raters_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 rater. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Rater"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_raters_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 rater. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Feedback360Rater"];
+                "application/x-www-form-urlencoded": components["schemas"]["Feedback360Rater"];
+                "multipart/form-data": components["schemas"]["Feedback360Rater"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Rater"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_raters_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 rater. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_feedback_360_raters_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 rater. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedFeedback360Rater"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedFeedback360Rater"];
+                "multipart/form-data": components["schemas"]["PatchedFeedback360Rater"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Rater"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_raters_approve_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 rater. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Feedback360Rater"];
+                "application/x-www-form-urlencoded": components["schemas"]["Feedback360Rater"];
+                "multipart/form-data": components["schemas"]["Feedback360Rater"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Rater"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_raters_decline_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 rater. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Feedback360Rater"];
+                "application/x-www-form-urlencoded": components["schemas"]["Feedback360Rater"];
+                "multipart/form-data": components["schemas"]["Feedback360Rater"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Rater"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_raters_respond_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 rater. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Feedback360Rater"];
+                "application/x-www-form-urlencoded": components["schemas"]["Feedback360Rater"];
+                "multipart/form-data": components["schemas"]["Feedback360Rater"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Rater"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_raters_withdraw_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 rater. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Feedback360Rater"];
+                "application/x-www-form-urlencoded": components["schemas"]["Feedback360Rater"];
+                "multipart/form-data": components["schemas"]["Feedback360Rater"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Rater"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_requests_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedFeedback360RequestList"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_requests_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Feedback360Request"];
+                "application/x-www-form-urlencoded": components["schemas"]["Feedback360Request"];
+                "multipart/form-data": components["schemas"]["Feedback360Request"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Request"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_requests_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 request. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Request"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_requests_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 request. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Feedback360Request"];
+                "application/x-www-form-urlencoded": components["schemas"]["Feedback360Request"];
+                "multipart/form-data": components["schemas"]["Feedback360Request"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Request"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_requests_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 request. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_feedback_360_requests_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 request. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedFeedback360Request"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedFeedback360Request"];
+                "multipart/form-data": components["schemas"]["PatchedFeedback360Request"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Request"];
+                };
+            };
+        };
+    };
+    v1_feedback_360_requests_close_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this feedback360 request. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Feedback360Request"];
+                "application/x-www-form-urlencoded": components["schemas"]["Feedback360Request"];
+                "multipart/form-data": components["schemas"]["Feedback360Request"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feedback360Request"];
                 };
             };
         };
@@ -10068,6 +18261,221 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImprovementPlan"];
+                };
+            };
+        };
+    };
+    v1_interview_scorecards_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedInterviewScorecardList"];
+                };
+            };
+        };
+    };
+    v1_interview_scorecards_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterviewScorecard"];
+                "application/x-www-form-urlencoded": components["schemas"]["InterviewScorecard"];
+                "multipart/form-data": components["schemas"]["InterviewScorecard"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewScorecard"];
+                };
+            };
+        };
+    };
+    v1_interview_scorecards_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this interview scorecard. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewScorecard"];
+                };
+            };
+        };
+    };
+    v1_interview_scorecards_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this interview scorecard. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedInterviewScorecard"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedInterviewScorecard"];
+                "multipart/form-data": components["schemas"]["PatchedInterviewScorecard"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewScorecard"];
+                };
+            };
+        };
+    };
+    v1_interview_sessions_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedInterviewSessionList"];
+                };
+            };
+        };
+    };
+    v1_interview_sessions_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterviewSession"];
+                "application/x-www-form-urlencoded": components["schemas"]["InterviewSession"];
+                "multipart/form-data": components["schemas"]["InterviewSession"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewSession"];
+                };
+            };
+        };
+    };
+    v1_interview_sessions_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this interview session. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewSession"];
+                };
+            };
+        };
+    };
+    v1_interview_sessions_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this interview session. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_interview_sessions_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this interview session. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedInterviewSession"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedInterviewSession"];
+                "multipart/form-data": components["schemas"]["PatchedInterviewSession"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewSession"];
                 };
             };
         };
@@ -10482,6 +18890,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Location"];
+                };
+            };
+        };
+    };
+    v1_my_total_rewards_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -11966,6 +20395,353 @@ export interface operations {
             };
         };
     };
+    v1_positions_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPositionList"];
+                };
+            };
+        };
+    };
+    v1_positions_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Position"];
+                "application/x-www-form-urlencoded": components["schemas"]["Position"];
+                "multipart/form-data": components["schemas"]["Position"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Position"];
+                };
+            };
+        };
+    };
+    v1_positions_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this position. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Position"];
+                };
+            };
+        };
+    };
+    v1_positions_decide_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this position. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Position"];
+                "application/x-www-form-urlencoded": components["schemas"]["Position"];
+                "multipart/form-data": components["schemas"]["Position"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Position"];
+                };
+            };
+        };
+    };
+    v1_positions_revise_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this position. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Position"];
+                "application/x-www-form-urlencoded": components["schemas"]["Position"];
+                "multipart/form-data": components["schemas"]["Position"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Position"];
+                };
+            };
+        };
+    };
+    v1_positions_submit_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this position. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Position"];
+                "application/x-www-form-urlencoded": components["schemas"]["Position"];
+                "multipart/form-data": components["schemas"]["Position"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Position"];
+                };
+            };
+        };
+    };
+    v1_probation_periods_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedProbationPeriodList"];
+                };
+            };
+        };
+    };
+    v1_probation_periods_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProbationPeriod"];
+                "application/x-www-form-urlencoded": components["schemas"]["ProbationPeriod"];
+                "multipart/form-data": components["schemas"]["ProbationPeriod"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProbationPeriod"];
+                };
+            };
+        };
+    };
+    v1_probation_periods_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this probation period. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProbationPeriod"];
+                };
+            };
+        };
+    };
+    v1_probation_periods_record_outcome_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this probation period. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProbationPeriod"];
+                "application/x-www-form-urlencoded": components["schemas"]["ProbationPeriod"];
+                "multipart/form-data": components["schemas"]["ProbationPeriod"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProbationPeriod"];
+                };
+            };
+        };
+    };
+    v1_probation_reviews_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedProbationReviewList"];
+                };
+            };
+        };
+    };
+    v1_probation_reviews_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProbationReview"];
+                "application/x-www-form-urlencoded": components["schemas"]["ProbationReview"];
+                "multipart/form-data": components["schemas"]["ProbationReview"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProbationReview"];
+                };
+            };
+        };
+    };
+    v1_probation_reviews_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this probation review. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProbationReview"];
+                };
+            };
+        };
+    };
+    v1_probation_reviews_sign_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this probation review. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProbationReview"];
+                "application/x-www-form-urlencoded": components["schemas"]["ProbationReview"];
+                "multipart/form-data": components["schemas"]["ProbationReview"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProbationReview"];
+                };
+            };
+        };
+    };
     v1_provider_configs_list: {
         parameters: {
             query?: {
@@ -13024,6 +21800,152 @@ export interface operations {
             };
         };
     };
+    v1_succession_candidates_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedSuccessionCandidateList"];
+                };
+            };
+        };
+    };
+    v1_succession_candidates_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuccessionCandidate"];
+                "application/x-www-form-urlencoded": components["schemas"]["SuccessionCandidate"];
+                "multipart/form-data": components["schemas"]["SuccessionCandidate"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessionCandidate"];
+                };
+            };
+        };
+    };
+    v1_succession_candidates_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this succession candidate. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessionCandidate"];
+                };
+            };
+        };
+    };
+    v1_succession_candidates_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this succession candidate. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuccessionCandidate"];
+                "application/x-www-form-urlencoded": components["schemas"]["SuccessionCandidate"];
+                "multipart/form-data": components["schemas"]["SuccessionCandidate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessionCandidate"];
+                };
+            };
+        };
+    };
+    v1_succession_candidates_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this succession candidate. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_succession_candidates_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this succession candidate. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedSuccessionCandidate"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedSuccessionCandidate"];
+                "multipart/form-data": components["schemas"]["PatchedSuccessionCandidate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessionCandidate"];
+                };
+            };
+        };
+    };
     v1_training_records_list: {
         parameters: {
             query?: {
@@ -13159,6 +22081,28 @@ export interface operations {
                 "multipart/form-data": components["schemas"]["PatchedTrainingRecord"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingRecord"];
+                };
+            };
+        };
+    };
+    v1_training_records_download_evidence_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this training record. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type Paginated } from '../api/client'
 import { useApiQuery } from '../api/hooks'
-import { useReferenceData } from '../api/ReferenceDataContext'
+import { useReferenceData } from '../api/useReferenceData'
 import type { Employee } from '../api/types'
 
 export function EmployeeListPage() {

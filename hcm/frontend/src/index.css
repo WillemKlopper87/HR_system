@@ -302,6 +302,46 @@ textarea:focus {
   min-width: 160px;
 }
 
+.employee-search {
+  position: relative;
+}
+
+.employee-search-results {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 14rem;
+  margin: 4px 0 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 16px rgb(15 23 42 / 12%);
+}
+
+.employee-search-results [role='option'],
+.employee-search-empty {
+  padding: 8px 10px;
+}
+
+.employee-search-results [role='option'] {
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.employee-search-results [role='option'].active {
+  background: var(--bg-subtle);
+}
+
+.field-status {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .form-actions {
   display: flex;
   gap: 8px;

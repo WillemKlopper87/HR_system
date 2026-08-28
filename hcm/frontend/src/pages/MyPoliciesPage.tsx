@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import { POLICY_CATEGORY_LABELS, type Policy, type PolicyAcknowledgment } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 
 export function MyPoliciesPage() {
   const { user } = useAuth()

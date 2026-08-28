@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api/client'
-import { useReferenceData } from '../api/ReferenceDataContext'
-import { useAuth } from '../auth/AuthContext'
+import { useReferenceData } from '../api/useReferenceData'
+import { useAuth } from '../auth/useAuth'
 import type { Department, JobGrade, Location } from '../api/types'
 
 const PROVINCES = [

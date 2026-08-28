@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import { useApiQuery, useMutation } from '../api/hooks'
-import { useReferenceData } from '../api/ReferenceDataContext'
+import { useReferenceData } from '../api/useReferenceData'
 import type { CalibrationCandidate, CalibrationSession, PerformancePeriod } from '../api/types'
 
 /** Calibration/moderation (C6, hr_admin-only route). Spec:

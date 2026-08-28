@@ -261,6 +261,20 @@ class EmployeeSerializer(TieredModelSerializer):
         return attrs
 
 
+class EmployeeSearchSummarySerializer(serializers.ModelSerializer):
+    """Privacy-minimal identity projection for scoped employee pickers."""
+
+    display_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Employee
+        fields = ["id", "employee_number", "display_name"]
+
+    def get_display_name(self, instance) -> str:
+        preferred = instance.preferred_name or instance.first_name
+        return f"{preferred} {instance.last_name}".strip()
+
+
 class _SelfOrHRAdminSerializer(TieredModelSerializer):
     """Shared validate() for Dependant/EmergencyContact (C2 design spec
     §2.8): narrower than learning.RowScopedLearningSerializer's

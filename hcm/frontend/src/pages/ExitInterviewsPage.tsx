@@ -1,15 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
+import type { ExitInterview, ExitInterviewReason } from '../api/contracts'
 import { useApiQuery } from '../api/hooks'
-import type { Employee, ExitInterview, ExitInterviewDashboard, ExitInterviewReason } from '../api/types'
+import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
+import type { ExitInterviewDashboard } from '../api/types'
 import { EXIT_INTERVIEW_REASON_LABELS } from '../api/types'
 
 export function ExitInterviewsPage() {
   const interviews = useApiQuery(() => fetchAllPages<ExitInterview>('/exit-interviews/'), [], {
     errorMessage: 'Failed to load exit interviews.',
-  })
-  const employees = useApiQuery(() => fetchAllPages<Employee>('/employees/'), [], {
-    errorMessage: 'Failed to load employees.',
   })
   const dashboard = useApiQuery(() => api.get<ExitInterviewDashboard>('/dashboards/exit-interviews/'), [], {
     errorMessage: 'Failed to load the exit-interview dashboard.',
@@ -51,7 +50,7 @@ export function ExitInterviewsPage() {
 
       <section className="detail-card">
         <h2>Record an interview</h2>
-        <RecordInterviewForm employees={employees.data ?? []} onSaved={() => { interviews.reload(); dashboard.reload() }} />
+        <RecordInterviewForm onSaved={() => { interviews.reload(); dashboard.reload() }} />
       </section>
 
       <section className="detail-card">
@@ -107,8 +106,8 @@ function GroupTable({
   )
 }
 
-function RecordInterviewForm({ employees, onSaved }: { employees: Employee[]; onSaved: () => void }) {
-  const [employeeId, setEmployeeId] = useState('')
+function RecordInterviewForm({ onSaved }: { onSaved: () => void }) {
+  const [employeeId, setEmployeeId] = useState<number | null>(null)
   const [interviewDate, setInterviewDate] = useState('')
   const [reason, setReason] = useState<ExitInterviewReason>('other')
   const [wouldRecommend, setWouldRecommend] = useState('')
@@ -122,11 +121,11 @@ function RecordInterviewForm({ employees, onSaved }: { employees: Employee[]; on
     setSaving(true)
     try {
       await api.post('/exit-interviews/', {
-        employee: Number(employeeId), interview_date: interviewDate, primary_reason: reason,
+        employee: employeeId, interview_date: interviewDate, primary_reason: reason,
         would_recommend_employer: wouldRecommend === '' ? null : wouldRecommend === 'true',
         comments,
       })
-      setEmployeeId('')
+      setEmployeeId(null)
       setInterviewDate('')
       setComments('')
       onSaved()
@@ -139,15 +138,7 @@ function RecordInterviewForm({ employees, onSaved }: { employees: Employee[]; on
 
   return (
     <form className="inline-form" onSubmit={handleSubmit}>
-      <label>
-        Employee
-        <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required>
-          <option value="">— Select —</option>
-          {employees.map((emp) => (
-            <option key={emp.id} value={emp.id}>{emp.employee_number} — {emp.first_name} {emp.last_name}</option>
-          ))}
-        </select>
-      </label>
+      <EmployeeAsyncSelect value={employeeId} onChange={setEmployeeId} required />
       <label>
         Interview date
         <input type="date" value={interviewDate} onChange={(e) => setInterviewDate(e.target.value)} required />

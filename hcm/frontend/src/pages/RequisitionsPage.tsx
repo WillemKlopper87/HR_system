@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api/client'
 import { useAllPages } from '../api/hooks'
-import { useReferenceData } from '../api/ReferenceDataContext'
+import { useReferenceData } from '../api/useReferenceData'
 import { REQUISITION_STATUS_LABELS, type Position, type Requisition, type RequisitionStatus } from '../api/types'
 
 const STATUS_OPTIONS = Object.entries(REQUISITION_STATUS_LABELS) as [RequisitionStatus, string][]

@@ -49,6 +49,7 @@ from .serializers import (
     DependantSerializer,
     DepartmentSerializer,
     EmergencyContactSerializer,
+    EmployeeSearchSummarySerializer,
     EmployeeSerializer,
     EmployeeVersionSerializer,
     EmploymentChangeSerializer,
@@ -374,6 +375,33 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     def get_target_employee(self, obj):
         return obj
+
+    @extend_schema(responses=EmployeeSearchSummarySerializer(many=True))
+    @action(detail=False, methods=["get"], url_path="search-summary")
+    def search_summary(self, request):
+        """Return only the identity fields needed by employee selectors.
+
+        The explicit row-scope call is important: collection actions do not
+        pass through the list-only scoping branch in ``get_queryset``.
+        """
+        query = request.query_params.get("q", "").strip()
+        queryset = row_scoped_queryset(
+            Employee.objects.all(),
+            get_request_employee(request),
+            employee_field=None,
+        )
+        if len(query) < 2:
+            queryset = queryset.none()
+        else:
+            queryset = queryset.filter(
+                Q(first_name__icontains=query)
+                | Q(last_name__icontains=query)
+                | Q(preferred_name__icontains=query)
+                | Q(employee_number__icontains=query)
+            )
+        page = self.paginate_queryset(queryset.order_by("-created_at", "-pk"))
+        serializer = EmployeeSearchSummarySerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
 
     @action(detail=True, methods=["post"])
     def consent(self, request, pk=None):

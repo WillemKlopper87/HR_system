@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import { useApiQuery, useMutation } from '../api/hooks'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 import type { PerformanceAgreement, PerformancePeriod, SigningDelegation } from '../api/types'
 import { AgreementCard } from './MyPerformancePage'
 

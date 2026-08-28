@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Field } from '../components/Field'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError, fetchAllPages } from '../api/client'
-import { useReferenceData } from '../api/ReferenceDataContext'
-import { useAuth } from '../auth/AuthContext'
+import { useReferenceData } from '../api/useReferenceData'
+import { useAuth } from '../auth/useAuth'
 import {
   DEPENDANT_RELATIONSHIP_LABELS,
   EMPLOYEE_DOCUMENT_CONSENT_REQUIRED_TYPES,

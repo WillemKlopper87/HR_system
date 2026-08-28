@@ -8,7 +8,7 @@ import {
   type EEReport,
   type WorkforceMatrix,
 } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 import { DEMOGRAPHIC_COLUMNS, SKILLS_DEMOGRAPHIC_COLUMNS } from '../ee-reporting/constants'
 import { MatrixTable } from '../ee-reporting/MatrixTable'
 

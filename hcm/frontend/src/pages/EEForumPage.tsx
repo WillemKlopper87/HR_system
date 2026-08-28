@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 import type { EEForumComposition, EEForumMeeting, EEForumMember, EEForumRepresentation, EEForumRole, Employee } from '../api/types'
 import { EE_FORUM_REPRESENTATION_LABELS, EE_FORUM_ROLE_LABELS } from '../api/types'
 import { OCCUPATIONAL_LEVEL_LABELS } from '../ee-reporting/constants'

@@ -7,7 +7,7 @@ import {
   type Employee,
   type EmployeeVersion,
 } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 
 // Mirrors config/settings.py's defaults — there is no API surface for
 // reading these settings client-side, and the design spec (§9) says to

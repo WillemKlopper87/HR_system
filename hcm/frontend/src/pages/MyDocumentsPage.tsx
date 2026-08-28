@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 import {
   DATA_SUBJECT_REQUEST_STATUS_LABELS,
   DATA_SUBJECT_REQUEST_TYPE_LABELS,

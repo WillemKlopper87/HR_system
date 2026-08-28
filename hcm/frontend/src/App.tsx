@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { LoginPage } from './auth/LoginPage'
@@ -17,10 +17,8 @@ import { ChecklistTemplatesPage } from './pages/ChecklistTemplatesPage'
 import { CompCyclesPage } from './pages/CompCyclesPage'
 import { CompProposalsPage } from './pages/CompProposalsPage'
 import { ContractRenewalsPage } from './pages/ContractRenewalsPage'
-import { ProbationPage } from './pages/ProbationPage'
 import { DataSubjectRequestsPage } from './pages/DataSubjectRequestsPage'
 import { EmploymentChangesPage } from './pages/EmploymentChangesPage'
-import { ExitInterviewsPage } from './pages/ExitInterviewsPage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { EEConfigurationPage } from './pages/EEConfigurationPage'
 import { EEForumPage } from './pages/EEForumPage'
@@ -66,6 +64,16 @@ import { WorkforceIntegrityPage } from './pages/WorkforceIntegrityPage'
 const MyIdentityVerificationPage = lazy(() =>
   import('./pages/MyIdentityVerificationPage').then((m) => ({ default: m.MyIdentityVerificationPage })),
 )
+const ProbationPage = lazy(() =>
+  import('./pages/ProbationPage').then((m) => ({ default: m.ProbationPage })),
+)
+const ExitInterviewsPage = lazy(() =>
+  import('./pages/ExitInterviewsPage').then((m) => ({ default: m.ExitInterviewsPage })),
+)
+
+function LazyPage({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<p className="empty-state">Loading…</p>}>{children}</Suspense>
+}
 
 export default function App() {
   return (
@@ -117,7 +125,7 @@ export default function App() {
             </Route>
             <Route element={<RequireRole roles={['hr_admin', 'line_manager', 'auditor']} />}>
               <Route path="/contract-renewals" element={<ContractRenewalsPage />} />
-              <Route path="/probation" element={<ProbationPage />} />
+              <Route path="/probation" element={<LazyPage><ProbationPage /></LazyPage>} />
             </Route>
             {/* Narrower than the contract-renewals set above: line managers
                 do not see or propose exits (design spec §8) — suspensions and
@@ -126,7 +134,7 @@ export default function App() {
               <Route path="/employment-changes" element={<EmploymentChangesPage />} />
             </Route>
             <Route element={<RequireRole roles={['hr_admin']} />}>
-              <Route path="/exit-interviews" element={<ExitInterviewsPage />} />
+              <Route path="/exit-interviews" element={<LazyPage><ExitInterviewsPage /></LazyPage>} />
             </Route>
             {/* Visibility is scoped server-side per employee/reporting-chain
                 (design spec §7) -- any authenticated employee may open this

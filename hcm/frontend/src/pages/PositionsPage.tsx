@@ -1,9 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api/client'
 import { useAllPages } from '../api/hooks'
-import { useReferenceData } from '../api/ReferenceDataContext'
+import { useReferenceData } from '../api/useReferenceData'
 import { POSITION_STATUS_LABELS, type CriticalPost, type Position } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 
 export function PositionsPage() {
   const { hasRole } = useAuth()

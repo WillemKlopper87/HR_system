@@ -7,7 +7,7 @@ import {
   type BiometricEnrollment,
   type LivenessCheck,
 } from '../api/types'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 import { CameraCapture, type CaptureResult } from '../liveness/CameraCapture'
 
 export function MyIdentityVerificationPage() {
