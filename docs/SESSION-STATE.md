@@ -1,3 +1,83 @@
+# Session state — 2026-08-28 (session 11)
+
+Written as a resume point. Driven by a third external review (`HR_Code_report.md`, root of the repo,
+reviewed HEAD `471a579` — the P0 tranche's close) — a fresh whole-codebase critique, not a continuation of
+`latest_critique.md`/`latest_todo.md`. The user's instruction was to attempt every item in it.
+
+## Shipped this session
+
+In commit order:
+
+- **`a8d1b62` (H1)** — closed the applicant résumé locator-disclosure defect: `resume` is now write-only on
+  `ApplicantSerializer`, removed entirely from `InterviewApplicantSummarySerializer` (its own "deliberately
+  narrow" docstring never actually meant to include it), a new authenticated/audited `download_resume`
+  action added, deliberately with no assigned-interviewer carve-out. 8 new tests.
+- **`cd69513` (M3)** — all 5 OpenAPI enum-naming warnings resolved via `ENUM_NAME_OVERRIDES`, each traced to
+  a real cause (two templates sharing a lifecycle, one shared `DemographicSource` class, one shared
+  `Province` class, a plain 1–5 rating scale reused across apps) rather than guessed.
+- **`3f52dab` (H2)** — production secrets now fail fast under `DEBUG=0` (`ImproperlyConfigured` at import
+  time) instead of silently booting weak; new `backend-production-config` CI job proves both directions.
+  Also added the previously-nonexistent env toggle for `SECURE_HSTS_INCLUDE_SUBDOMAINS`/`PRELOAD`.
+- **`906689c` (M4)** — face-api.js/TensorFlow.js now loads only when "Start camera" is clicked
+  (`CameraCapture.tsx`), not on route entry; `MyIdentityVerificationPage`'s own chunk dropped from 1.31 MB
+  to ~6 kB, `face-api.esm` becomes its own lazy chunk.
+- **`05cad27`** — found while verifying an earlier (wrong) claim that `backend` had no healthcheck: it does
+  (Dockerfile-level); the real gap was `worker`/`beat` inheriting that same HTTP healthcheck, which can
+  never pass for them. Real per-service overrides (`celery inspect ping`; a schedule-store freshness check),
+  verified against an actual running `docker compose up`, not just YAML — the first version of beat's check
+  was itself wrong (SQLite WAL mode means writes land in `-wal`/`-shm`, not the main file), caught only by
+  watching it report unhealthy for real.
+- **`18be520`** — five lower-priority items: `collectstatic`'s `|| true` removed, every base image
+  (python/node/nginx/postgres/redis) pinned by digest, `CELERY_BEAT_SCHEDULE` moved from 24h intervals to
+  the crontab times its own comments already promised, the public careers endpoint no longer returns the
+  applicant's raw sequential ID. One reported item (mojibake `â€”`/`Â§` artifacts) turned out to be a false
+  positive — verified at the byte level, the source is correctly UTF-8 throughout; likely a terminal-
+  rendering artifact in whoever wrote the report's own environment.
+- **`194da58`** — every `actions/*` reference in `hcm-ci.yml` pinned to its resolved commit SHA (fetched
+  live via `gh api`, not guessed), plus a new `.github/dependabot.yml` (weekly grouped pip/npm updates, plus
+  a `github-actions` feed to keep those SHA pins current).
+- **`ed1fb62` (M2)** — new `contract-drift` CI job: schema validates with `--fail-on-warn`, then regenerates
+  `generated-types.ts` and fails on any diff against what's committed. Verified locally against the current
+  tree before shipping (zero drift, zero warnings).
+- **`6e57af6` (M7)** — real finding, not just documentation: rejected-applicant anonymisation cleared every
+  PII field except the résumé file itself, leaving the original person's CV on disk indefinitely under an
+  "anonymised" row. Fixed for both the anonymise and delete code paths (`file.delete(save=False)`, same
+  shape `documents/services.py` already uses); two new tests prove the underlying storage object is actually
+  gone, not just the DB field.
+- **`2adbbb8` (M6, M7 docs)** — `docs/RELEASE-EVIDENCE.md` (what's CI-enforced vs. what needs a human and
+  hasn't happened) and `docs/RETENTION-MATRIX.md` (every model/file-field's actual retention status, built
+  by reading every seeded rule and registered handler rather than describing the mechanism abstractly).
+  Surfaced two more real gaps: `TrainingRecord`/`PerformanceEvidence`/`AgreementSignature`/`Policy` have no
+  retention rule recorded at all, and `Dependant`/`EmergencyContact`'s existing `delete after 1 month` rule
+  has never had a handler registered — deliberately, since a naive `updated_at`-based implementation would
+  delete current, legitimate records for still-active employees, not just the "detached" case the rule's own
+  migration docstring intends. Recorded as a real gap needing a product decision, not guessed at.
+- **`c3dd0d7` (H3, partial)** — migration execution split out of backend/worker/beat's own startup into a
+  one-shot `migrate` service they all depend on via `service_completed_successfully`. Verified against a
+  real `docker compose up`: migrate exits 0 after applying every migration, only then do the other three
+  start and reach healthy.
+- **`9917b38` (H3, partial)** — added `docker-compose.prod.yml` (the file ADR-012's own Consequences section
+  named as missing), replacing every build: line with a pinned `image:${REGISTRY}/...:${IMAGE_TAG}` using
+  the Compose Spec's `!reset null` so `build:` doesn't survive the merge (confirmed by actually merging the
+  two files and checking the output). Still not a working end-to-end deploy path — no CI job yet builds and
+  pushes these images to a real registry.
+
+**Deliberately not attempted this session** (recorded in `docs/RELEASE-EVIDENCE.md`, not silently dropped):
+a real GHCR-publish CI job and a protected GitHub `production` Environment (H3's remainder — pushing real
+images and changing real repo protection settings are more consequential than a code fix, paused for an
+explicit go-ahead); Entra/OIDC SSO and SAP payroll integration (H4 — need a real tenant/counterpart, not
+buildable in the abstract); M1 (finishing the `fetchAllPages` → server-side pagination migration) and M5
+(splitting the oversized modules) — both large, genuine refactors with real regression risk, intentionally
+left as their own separate slices rather than rushed. M8 was already accurate as written; no fix needed.
+
+**Concurrent-session note:** `adr/ADR-012-deployment-rollback-versioning.md` and a `docs/RUNBOOK.md` diff
+from a different session were still sitting uncommitted in the working tree throughout this session's work
+and were left untouched.
+
+Verification: every commit above was independently tested before being made — backend suites (recruitment
+100→102 tests, config, full-suite runs), frontend tsc/lint/build, and for the Docker-level changes, actual
+`docker compose up`/`config` runs against real containers, not just YAML review.
+
 # Session state — 2026-08-28 (session 10)
 
 Written as a resume point. Driven by a second external review (`latest_critique.md`/`latest_todo.md`, root of the
