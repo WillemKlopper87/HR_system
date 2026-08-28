@@ -1,3 +1,5 @@
+import type { ExitInterviewReason } from './contracts'
+
 export interface MeResponse {
   employee_id: number
   employee_number: string
@@ -80,46 +82,10 @@ export const CONTRACT_ACTION_LABELS: Record<ContractAction, string> = {
   let_lapse: 'Let lapse',
 }
 
-export type ProbationStatus = 'in_progress' | 'confirmed' | 'extended' | 'terminated'
-export type ProbationRecommendation = 'continue' | 'extend' | 'confirm' | 'terminate'
-
-export interface ProbationReview {
-  id: number
-  probation_period: number
-  review_date: string
-  reviewed_by: number | null
-  recommendation: ProbationRecommendation
-  comments: string
-  employee_signed_at: string | null
-  employee_signature_sha256: string
-}
-
-export interface ProbationPeriod {
-  id: number
-  employee: number
-  employee_number: string
-  start_date: string
-  end_date: string
-  status: ProbationStatus
-  outcome_at: string | null
-  outcome_by: number | null
-  outcome_notes: string
-  reviews: ProbationReview[]
-}
-
-export const PROBATION_STATUS_LABELS: Record<ProbationStatus, string> = {
-  in_progress: 'In progress',
-  confirmed: 'Confirmed',
-  extended: 'Extended',
-  terminated: 'Terminated',
-}
-
-export const PROBATION_RECOMMENDATION_LABELS: Record<ProbationRecommendation, string> = {
-  continue: 'Continue probation',
-  extend: 'Recommend extension',
-  confirm: 'Recommend confirmation',
-  terminate: 'Recommend termination',
-}
+// ProbationStatus/ProbationRecommendation/ProbationReview/ProbationPeriod and
+// their label maps were migrated to the generated-contract facade -- see
+// api/contracts.ts and api/contract-labels.ts, and
+// docs/frontend/generated-api-contracts.md for the migration pattern.
 
 export interface ProbationCompletionBreakdownRow {
   key: string
@@ -140,32 +106,8 @@ export interface ProbationCompletionDashboard {
   by_disability_status: ProbationCompletionBreakdownRow[]
 }
 
-export type ExitInterviewReason =
-  | 'compensation' | 'career_growth' | 'management' | 'work_life_balance'
-  | 'relocation' | 'health' | 'role_fit' | 'other'
-
-export interface ExitInterview {
-  id: number
-  employee: number
-  employment_change: number | null
-  probation_period: number | null
-  interview_date: string
-  conducted_by: number | null
-  primary_reason: ExitInterviewReason
-  would_recommend_employer: boolean | null
-  comments: string
-}
-
-export const EXIT_INTERVIEW_REASON_LABELS: Record<ExitInterviewReason, string> = {
-  compensation: 'Compensation',
-  career_growth: 'Career growth',
-  management: 'Management or relationship with manager',
-  work_life_balance: 'Work-life balance',
-  relocation: 'Relocation',
-  health: 'Health or personal',
-  role_fit: 'Role fit',
-  other: 'Other',
-}
+// ExitInterviewReason/ExitInterview and their label map were migrated to the
+// generated-contract facade -- see api/contracts.ts and api/contract-labels.ts.
 
 export interface ExitInterviewGroupBreakdownRow {
   key: string

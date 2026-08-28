@@ -33,6 +33,30 @@ Verification evidence:
 Items left unchecked below remain outstanding; in particular, the complete probation/exit workflow browser matrix,
 route-level error boundaries, contract-import enforcement, obsolete handwritten-type removal and chunk-budget policy.
 
+## P0 closed — 2026-08-28 (second slice)
+
+Closed the remaining P0.1/P0.2/P0.3 items:
+
+- Removed the superseded handwritten `Probation*`/`ExitInterview*` transport types and label maps from
+  `src/api/types.ts`; presentation labels now live in `src/api/contract-labels.ts`, typed against the generated
+  facade so a backend enum change fails the frontend build rather than drifting silently.
+- Added `scripts/check-contract-imports.mjs` (wired into `npm run lint`) to fail if a migrated page re-imports a
+  removed handwritten transport type; verified it both catches a regression and passes clean.
+- Documented the migration pattern in `docs/frontend/generated-api-contracts.md`.
+- Added `RouteErrorBoundary.tsx` around every lazy route (via the shared `LazyPage` helper) and a build-time
+  chunk-size budget in `vite.config.ts` that fails the build on regression; verified both directions.
+- Added empty-query, substring-match, and the remaining role/reporting-chain test coverage for
+  `/employees/search-summary/`.
+
+Verification: 14 focused employee-API tests, 109 tests across `core_hr.test_probation`/`test_exit_interviews`/
+`test_api`, `manage.py check`/`makemigrations --check` clean, frontend `tsc`/lint/build clean (chunk budget
+enforced), and 3 Playwright specs (full probation lifecycle, protected evidence download, equity-dashboard
+suppression) passed twice — once before and once after the contract-facade migration.
+
+**P0 is now fully closed.** Next up per this file's own ordering: P1 (pilot readiness/UAT is the highest-value
+gate but not engineering-only; the effort-buildable P1 items are identity/SSO, employee-relations case
+management, reasonable accommodation, and the statutory workflow foundation).
+
 ## Execution principles
 
 - Preserve effective dating, audit history, row scope, field tiers and protected-download controls.
@@ -54,9 +78,9 @@ known regulatory browser-coverage gaps while establishing patterns reusable acro
 - [x] Create a small generated-type facade for domain-friendly aliases; do not copy generated structures by hand.
 - [x] Move presentation-only labels/constants out of transport-type declarations.
 - [x] Migrate probation and exit-interview screens to the facade.
-- [ ] Remove the replaced handwritten declarations from `src/api/types.ts`.
-- [ ] Add a CI/source check preventing migrated modules from importing their removed handwritten transport types.
-- [ ] Document the migration pattern for later modules.
+- [x] Remove the replaced handwritten declarations from `src/api/types.ts`.
+- [x] Add a CI/source check preventing migrated modules from importing their removed handwritten transport types.
+- [x] Document the migration pattern for later modules.
 
 ### P0.2 Scalable employee selector
 
@@ -64,7 +88,7 @@ known regulatory browser-coverage gaps while establishing patterns reusable acro
       required by an authorised selector.
 - [x] Confirm each selector's role and row-scope requirements before sharing an endpoint.
 - [x] Add server-side search with cursor pagination and a bounded page size.
-- [ ] Add tests for empty query, partial match, pagination, role denial and reporting-chain scope.
+- [x] Add tests for empty query, partial match, pagination, role denial and reporting-chain scope.
 - [x] Add a debounced accessible async employee combobox.
 - [x] Replace `fetchAllPages<Employee>('/employees/')` in probation and exit-interview screens.
 - [x] Ensure stale searches are cancelled with `AbortController`.

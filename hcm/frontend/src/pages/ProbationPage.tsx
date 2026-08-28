@@ -5,7 +5,7 @@ import { useApiQuery } from '../api/hooks'
 import { useAuth } from '../auth/useAuth'
 import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
 import type { ProbationCompletionDashboard } from '../api/types'
-import { PROBATION_RECOMMENDATION_LABELS, PROBATION_STATUS_LABELS } from '../api/types'
+import { PROBATION_RECOMMENDATION_LABELS, PROBATION_STATUS_LABELS } from '../api/contract-labels'
 
 export function ProbationPage() {
   const { hasRole, user } = useAuth()

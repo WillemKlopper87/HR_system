@@ -155,6 +155,24 @@ class EmployeeApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["results"], [])
 
+    def test_search_summary_empty_or_missing_query_returns_empty(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/employees/search-summary/?q=")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"], [])
+
+        response = self.client.get("/api/v1/employees/search-summary/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"], [])
+
+    def test_search_summary_matches_a_substring_not_only_a_prefix(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        # "taff" is a mid-word substring of "Staff", not a prefix -- proves
+        # the query uses icontains rather than an accidental startswith.
+        response = self.client.get("/api/v1/employees/search-summary/?q=taff")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row["id"] for row in response.data["results"]], [self.staff.id])
+
     def test_search_summary_rejects_unauthenticated_requests(self):
         response = self.client.get("/api/v1/employees/search-summary/?q=Staff")
         self.assertEqual(response.status_code, 403)

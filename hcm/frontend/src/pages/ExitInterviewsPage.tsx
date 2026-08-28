@@ -4,7 +4,7 @@ import type { ExitInterview, ExitInterviewReason } from '../api/contracts'
 import { useApiQuery } from '../api/hooks'
 import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
 import type { ExitInterviewDashboard } from '../api/types'
-import { EXIT_INTERVIEW_REASON_LABELS } from '../api/types'
+import { EXIT_INTERVIEW_REASON_LABELS } from '../api/contract-labels'
 
 export function ExitInterviewsPage() {
   const interviews = useApiQuery(() => fetchAllPages<ExitInterview>('/exit-interviews/'), [], {
