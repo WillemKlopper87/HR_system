@@ -155,6 +155,87 @@ class EmployeeApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["results"], [])
 
+    def test_search_summary_rejects_unauthenticated_requests(self):
+        response = self.client.get("/api/v1/employees/search-summary/?q=Staff")
+        self.assertEqual(response.status_code, 403)
+
+
+class EmployeeSearchSummaryReportingChainTests(TestCase):
+    """P0.2's remaining coverage: reporting-chain row scope and pagination.
+    A separate fixture/class from EmployeeApiTests so this doesn't disturb
+    that suite's own fixed employee count/search assertions."""
+
+    def setUp(self):
+        self.client = APIClient()
+        dept, level, grade, location = _seed_reference_data()
+
+        self.manager = Employee.objects.hire(
+            employee_number="MGR1", first_name="Search", last_name="Manager", date_of_birth=date(1980, 1, 1),
+            work_email="searchmanager@example.com", hire_date=date(2015, 1, 1), department=dept,
+            occupational_level=level, job_grade=grade, location=location,
+            user=User.objects.create_user(username="searchmanager", password="x"),
+        )
+        RoleAssignment.objects.create(employee=self.manager, role=Role.objects.get(name="line_manager"))
+
+        self.report = Employee.objects.hire(
+            employee_number="RPT1", first_name="Direct", last_name="Report", date_of_birth=date(1993, 1, 1),
+            work_email="directreport@example.com", hire_date=date(2021, 1, 1), department=dept,
+            occupational_level=level, job_grade=grade, location=location, manager=self.manager,
+            user=User.objects.create_user(username="directreport", password="x"),
+        )
+        RoleAssignment.objects.create(employee=self.report, role=Role.objects.get(name="employee"))
+
+        self.stranger = Employee.objects.hire(
+            employee_number="STR1", first_name="Unrelated", last_name="Stranger", date_of_birth=date(1991, 1, 1),
+            work_email="strangerperson@example.com", hire_date=date(2020, 1, 1), department=dept,
+            occupational_level=level, job_grade=grade, location=location,
+            user=User.objects.create_user(username="strangerperson", password="x"),
+        )
+        RoleAssignment.objects.create(employee=self.stranger, role=Role.objects.get(name="employee"))
+
+    def test_line_manager_finds_a_direct_report_but_not_a_stranger(self):
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.get("/api/v1/employees/search-summary/?q=Report")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row["id"] for row in response.data["results"]], [self.report.id])
+
+        response = self.client.get("/api/v1/employees/search-summary/?q=Stranger")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"], [])
+
+    def test_matching_more_than_a_page_is_paginated(self):
+        for n in range(60):
+            Employee.objects.hire(
+                employee_number=f"BULK{n:03d}", first_name="Bulkmatch", last_name=f"Person{n}",
+                date_of_birth=date(1990, 1, 1), work_email=f"bulkmatch{n}@example.com",
+                hire_date=date(2022, 1, 1), department=Department.objects.get(code="ENG"),
+                occupational_level=OccupationalLevel.objects.get(code="TOP"),
+                job_grade=JobGrade.objects.get(code="G1"), location=Location.objects.get(code="HO"),
+            )
+        # line_manager's row scope is own-team only, so a 60-employee
+        # org-wide match is only visible to a row_scope=all role --
+        # hr_admin is who this pagination scenario actually applies to.
+        hr_admin = Employee.objects.hire(
+            employee_number="HRBULK", first_name="Bulk", last_name="Admin", date_of_birth=date(1980, 1, 1),
+            work_email="bulkadmin@example.com", hire_date=date(2015, 1, 1),
+            department=Department.objects.get(code="ENG"), occupational_level=OccupationalLevel.objects.get(code="TOP"),
+            job_grade=JobGrade.objects.get(code="G1"), location=Location.objects.get(code="HO"),
+            user=User.objects.create_user(username="bulkadmin", password="x"),
+        )
+        RoleAssignment.objects.create(employee=hr_admin, role=Role.objects.get(name="hr_admin"))
+        self.client.force_authenticate(user=hr_admin.user)
+        response = self.client.get("/api/v1/employees/search-summary/?q=Bulkmatch")
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(len(response.data["results"]), 60)
+        self.assertIsNotNone(response.data["next"])
+
+        second_page = self.client.get(response.data["next"])
+        self.assertEqual(second_page.status_code, 200)
+        self.assertGreater(len(second_page.data["results"]), 0)
+        first_ids = {row["id"] for row in response.data["results"]}
+        second_ids = {row["id"] for row in second_page.data["results"]}
+        self.assertEqual(first_ids & second_ids, set())
+
 
 class EmployeeSelfServiceApiTests(TestCase):
     """Sprint 15 (ESS): profile self-edit and consent-gated self-ID."""

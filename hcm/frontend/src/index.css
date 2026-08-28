@@ -398,6 +398,13 @@ textarea:focus {
   text-decoration: underline;
 }
 
+.evidence-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .btn-danger {
   color: var(--danger);
 }

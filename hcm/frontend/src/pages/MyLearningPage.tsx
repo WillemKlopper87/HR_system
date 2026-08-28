@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useAllPages } from '../api/hooks'
 import { TRAINING_STATUS_LABELS, type Course, type TrainingRecord } from '../api/types'
@@ -64,6 +64,7 @@ export function MyLearningPage() {
                 <th>Start date</th>
                 <th>Hours</th>
                 <th>Cost</th>
+                <th>Evidence</th>
               </tr>
             </thead>
             <tbody>
@@ -77,12 +78,53 @@ export function MyLearningPage() {
                   <td>{r.start_date ?? '—'}</td>
                   <td>{r.hours ?? '—'}</td>
                   <td>{r.cost ?? '—'}</td>
+                  <td>
+                    <EvidenceCell record={r} onUploaded={load} />
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+function EvidenceCell({ record, onUploaded }: { record: TrainingRecord; onUploaded: () => void }) {
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setError(null)
+    setUploading(true)
+    try {
+      const form = new FormData()
+      form.append('evidence_file', file)
+      await api.patchForm(`/training-records/${record.id}/`, form)
+      onUploaded()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Upload failed.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="evidence-cell">
+      {record.has_evidence_file && record.evidence_download_url && (
+        <a className="btn-link" href={record.evidence_download_url} target="_blank" rel="noreferrer">
+          Download
+        </a>
+      )}
+      <label className="btn-link" style={{ cursor: 'pointer' }}>
+        {uploading ? 'Uploading…' : record.has_evidence_file ? 'Replace' : 'Upload'}
+        <input type="file" onChange={handleFile} disabled={uploading} style={{ display: 'none' }} />
+      </label>
+      {error && <span className="form-error">{error}</span>}
     </div>
   )
 }

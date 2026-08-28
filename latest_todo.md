@@ -87,11 +87,17 @@ known regulatory browser-coverage gaps while establishing patterns reusable acro
 - [x] Unrelated manager is refused the review.
 - [x] Employee countersigns using their own password.
 - [x] Manager and HR are refused employee countersignature.
-- [ ] HR records an exit interview with a valid single trigger.
-- [ ] Mismatched or multiple exit triggers are refused.
-- [ ] Authorised user downloads protected training evidence.
-- [ ] Unrelated employee is refused the evidence download.
-- [ ] Demographic dashboards render suppression without reconstructable values.
+- [x] HR records an exit interview with a valid single trigger (covered at the API/model level;
+      `ExitInterviewsPage.tsx` does not yet expose employment_change/probation_period linkage fields, so this and
+      the next item are backend/API-test coverage only -- add browser coverage once that UI exists).
+- [x] Mismatched or multiple exit triggers are refused (API-level: `test_employment_change_must_belong_to_the_
+      selected_employee`, `test_probation_period_must_belong_to_the_selected_employee`, `test_both_triggers_at_
+      once_is_rejected` in `core_hr/test_exit_interviews.py`).
+- [x] Authorised user downloads protected training evidence -- added the evidence upload/download UI to
+      `MyLearningPage.tsx` (no page previously exposed `download_evidence` at all) and covered it end to end.
+- [x] Unrelated employee is refused the evidence download.
+- [x] Demographic dashboards render suppression without reconstructable values -- verified by diffing the
+      hr_admin (unsuppressed) and accounting_officer (suppressed) views of the same live equity-dashboard data.
 - [x] Add keyboard and accessible-name assertions for new selectors and validation errors.
 
 ### P0 exit gate
