@@ -179,6 +179,30 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Django + DRF backend for the Sentech HCM system. See hcm/README.md for module docs.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # Pin a stable name onto every choice set drf-spectacular otherwise has
+    # to guess a name for from more than one field, which is where the
+    # unstable/collision warnings come from (`manage.py spectacular
+    # --validate` — matched by value, not by which field/class is listed
+    # here, so this also covers every other current and future field
+    # sharing the same choices).
+    "ENUM_NAME_OVERRIDES": {
+        # onboarding.ChecklistTemplate.Status and
+        # performance.AgreementTemplate.Status independently defined the
+        # same draft/published/retired document lifecycle.
+        "TemplateLifecycleStatusEnum": "onboarding.models.ChecklistTemplate.Status",
+        # EmployeeVersion.race_source and .disability_source share one
+        # TextChoices class; the field-name-derived auto-naming produced
+        # two different enum names for it.
+        "DemographicSourceEnum": "core_hr.models.EmployeeVersion.DemographicSource",
+        # core_hr.Location.province and ee_reporting.EmployerConfig's
+        # postal_province/physical_province all use this same choice set.
+        "ProvinceEnum": "core_hr.models.Location.Province",
+        # Plain `[(i, str(i)) for i in range(1, 6)]` rating scales, reused
+        # across recruitment (skill/communication/culture-fit ratings) and
+        # performance (self/manager/360 ratings) -- not a real Choices
+        # class anywhere, so the raw value list is given directly.
+        "Rating1To5Enum": [(1, "1"), (2, "2"), (3, "3"), (4, "4"), (5, "5")],
+    },
 }
 
 LANGUAGE_CODE = "en-za"

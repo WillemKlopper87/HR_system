@@ -6659,7 +6659,7 @@ export interface components {
              * @default 1
              */
             version: number;
-            readonly status: components["schemas"]["Status860Enum"];
+            readonly status: components["schemas"]["TemplateLifecycleStatusEnum"];
             readonly status_display: string;
             /** @description Optional: pin to one period; blank = reusable across periods */
             period?: number | null;
@@ -7004,7 +7004,7 @@ export interface components {
             direction: components["schemas"]["DirectionEnum"];
             /** @default 1 */
             readonly version: number;
-            readonly status: components["schemas"]["Status860Enum"];
+            readonly status: components["schemas"]["TemplateLifecycleStatusEnum"];
             readonly created_by: number | null;
             /** Format: date-time */
             readonly published_at: string | null;
@@ -7203,6 +7203,13 @@ export interface components {
          * @enum {string}
          */
         DecisionEnum: "approved" | "rejected";
+        /**
+         * @description * `self_identified` - Self-identified (ESS)
+         *     * `hr_captured` - HR-captured
+         *     * `imported` - Imported
+         * @enum {string}
+         */
+        DemographicSourceEnum: "self_identified" | "hr_captured" | "imported";
         Department: {
             readonly id: number;
             name: string;
@@ -7254,13 +7261,6 @@ export interface components {
          * @enum {string}
          */
         DirectionEnum: "onboarding" | "offboarding";
-        /**
-         * @description * `self_identified` - Self-identified (ESS)
-         *     * `hr_captured` - HR-captured
-         *     * `imported` - Imported
-         * @enum {string}
-         */
-        DisabilitySourceEnum: "self_identified" | "hr_captured" | "imported";
         /**
          * @description * `no` - No disability
          *     * `yes` - Disability
@@ -7605,8 +7605,8 @@ export interface components {
             gender?: components["schemas"]["GenderEnum"];
             disability_status?: components["schemas"]["DisabilityStatusEnum"];
             disability_detail?: string;
-            race_source?: components["schemas"]["RaceSourceEnum"];
-            disability_source?: components["schemas"]["DisabilitySourceEnum"];
+            race_source?: components["schemas"]["DemographicSourceEnum"];
+            disability_source?: components["schemas"]["DemographicSourceEnum"];
         };
         EmployerConfig: {
             readonly id: number;
@@ -7929,9 +7929,9 @@ export interface components {
             readonly id: number;
             session: number;
             readonly interviewer: number;
-            skill_rating: components["schemas"]["ManagerRatingEnum"];
-            communication_rating: components["schemas"]["ManagerRatingEnum"];
-            culture_fit_rating: components["schemas"]["ManagerRatingEnum"];
+            skill_rating: components["schemas"]["Rating1To5Enum"];
+            communication_rating: components["schemas"]["Rating1To5Enum"];
+            culture_fit_rating: components["schemas"]["Rating1To5Enum"];
             comments?: string;
             recommendation: components["schemas"]["InterviewScorecardRecommendationEnum"];
             /** Format: date-time */
@@ -8025,15 +8025,6 @@ export interface components {
             province?: components["schemas"]["ProvinceEnum"] | components["schemas"]["BlankEnum"];
             active?: boolean;
         };
-        /**
-         * @description * `1` - 1
-         *     * `2` - 2
-         *     * `3` - 3
-         *     * `4` - 4
-         *     * `5` - 5
-         * @enum {integer}
-         */
-        ManagerRatingEnum: 1 | 2 | 3 | 4 | 5;
         /**
          * @description * `password_reauth` - Password re-authentication
          *     * `totp_stepup` - Authenticator (TOTP) step-up
@@ -9159,7 +9150,7 @@ export interface components {
              * @default 1
              */
             version: number;
-            readonly status?: components["schemas"]["Status860Enum"];
+            readonly status?: components["schemas"]["TemplateLifecycleStatusEnum"];
             readonly status_display?: string;
             /** @description Optional: pin to one period; blank = reusable across periods */
             period?: number | null;
@@ -9295,7 +9286,7 @@ export interface components {
             direction?: components["schemas"]["DirectionEnum"];
             /** @default 1 */
             readonly version: number;
-            readonly status?: components["schemas"]["Status860Enum"];
+            readonly status?: components["schemas"]["TemplateLifecycleStatusEnum"];
             readonly created_by?: number | null;
             /** Format: date-time */
             readonly published_at?: string | null;
@@ -9728,9 +9719,9 @@ export interface components {
             readonly id?: number;
             session?: number;
             readonly interviewer?: number;
-            skill_rating?: components["schemas"]["ManagerRatingEnum"];
-            communication_rating?: components["schemas"]["ManagerRatingEnum"];
-            culture_fit_rating?: components["schemas"]["ManagerRatingEnum"];
+            skill_rating?: components["schemas"]["Rating1To5Enum"];
+            communication_rating?: components["schemas"]["Rating1To5Enum"];
+            culture_fit_rating?: components["schemas"]["Rating1To5Enum"];
             comments?: string;
             recommendation?: components["schemas"]["InterviewScorecardRecommendationEnum"];
             /** Format: date-time */
@@ -9897,11 +9888,11 @@ export interface components {
             readonly review_cycle?: number;
             readonly employee?: number;
             readonly manager?: number | null;
-            self_rating?: (components["schemas"]["ManagerRatingEnum"] | components["schemas"]["NullEnum"]) | null;
+            self_rating?: (components["schemas"]["Rating1To5Enum"] | components["schemas"]["NullEnum"]) | null;
             self_comments?: string;
             /** Format: date-time */
             readonly self_submitted_at?: string | null;
-            manager_rating?: (components["schemas"]["ManagerRatingEnum"] | components["schemas"]["NullEnum"]) | null;
+            manager_rating?: (components["schemas"]["Rating1To5Enum"] | components["schemas"]["NullEnum"]) | null;
             manager_comments?: string;
             /** Format: date-time */
             readonly manager_submitted_at?: string | null;
@@ -10335,12 +10326,14 @@ export interface components {
          */
         RaceEnum: "african" | "coloured" | "indian" | "white" | "not_disclosed";
         /**
-         * @description * `self_identified` - Self-identified (ESS)
-         *     * `hr_captured` - HR-captured
-         *     * `imported` - Imported
-         * @enum {string}
+         * @description * `1` - 1
+         *     * `2` - 2
+         *     * `3` - 3
+         *     * `4` - 4
+         *     * `5` - 5
+         * @enum {integer}
          */
-        RaceSourceEnum: "self_identified" | "hr_captured" | "imported";
+        Rating1To5Enum: 1 | 2 | 3 | 4 | 5;
         /**
          * @description * `ready_now` - Ready now
          *     * `ready_1_2_years` - Ready in 1–2 years
@@ -10419,11 +10412,11 @@ export interface components {
             readonly review_cycle: number;
             readonly employee: number;
             readonly manager: number | null;
-            self_rating?: (components["schemas"]["ManagerRatingEnum"] | components["schemas"]["NullEnum"]) | null;
+            self_rating?: (components["schemas"]["Rating1To5Enum"] | components["schemas"]["NullEnum"]) | null;
             self_comments?: string;
             /** Format: date-time */
             readonly self_submitted_at: string | null;
-            manager_rating?: (components["schemas"]["ManagerRatingEnum"] | components["schemas"]["NullEnum"]) | null;
+            manager_rating?: (components["schemas"]["Rating1To5Enum"] | components["schemas"]["NullEnum"]) | null;
             manager_comments?: string;
             /** Format: date-time */
             readonly manager_submitted_at: string | null;
@@ -10519,13 +10512,6 @@ export interface components {
          */
         StateEnum: "proposed" | "confirmed" | "executed" | "cancelled";
         /**
-         * @description * `draft` - Draft
-         *     * `published` - Published
-         *     * `retired` - Retired
-         * @enum {string}
-         */
-        Status860Enum: "draft" | "published" | "retired";
-        /**
          * @description `skill_names`/`latest_performance` are read-only cross-app context
          *     (spec §2.7) -- informational only, never an input to `readiness`, which
          *     is always the human judgement call HR records directly.
@@ -10563,6 +10549,13 @@ export interface components {
             order?: number;
             locked?: boolean;
         };
+        /**
+         * @description * `draft` - Draft
+         *     * `published` - Published
+         *     * `retired` - Retired
+         * @enum {string}
+         */
+        TemplateLifecycleStatusEnum: "draft" | "published" | "retired";
         TemplateSection: {
             readonly id: number;
             template: number;
