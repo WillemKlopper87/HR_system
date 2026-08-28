@@ -1,3 +1,56 @@
+# Session state — 2026-08-28 (session 10)
+
+Written as a resume point. Driven by a second external review (`latest_critique.md`/`latest_todo.md`, root of the
+repo) rather than the regulatory field guide — `latest_todo.md` is the live checklist; this section is a narrative
+summary, not a duplicate of it.
+
+## Shipped this session
+
+P0 tranche of `latest_todo.md`, in commit order:
+
+- **`659bc4a`** — closed the 4 P0 gaps from the 2026-08-27 regulatory follow-up review (probation-review row
+  scope, genuine employee countersignature, protected training-evidence download, small-cell suppression via the
+  new shared `rbac_audit/aggregates.py`). `c62afb8` recorded the backlog and completion status.
+- **`0d27f04`** — regulatory event-reporting integrity (P1 in `docs/sprints/regulatory-review-backlog.md`,
+  folded into this critique's own P0/P1 split): probation/exit/performance dashboards resolve demographics via
+  `Employee.version_as_at(event_date)` instead of `.current()`, so a later profile edit can't rewrite a historical
+  compliance result; performance rating distribution declares `rating_unit: "kpi_element"` explicitly; probation
+  date/state-transition validation (`end_date >= start_date`, no overlapping open periods, review-window
+  enforcement); exit-interview trigger validation (`employment_change`/`probation_period` must belong to the
+  selected employee, at most one trigger).
+- **`dd74114`** (P0.2) — hardened employee workflow selectors against unscoped/unbounded employee lookups.
+- **`3f1abb8`** (P0.4) — full probation lifecycle Playwright journey (`probation-workflow.spec.ts`); also moved
+  `/probation` into its own `RequireRole` group so plain employees (not just hr_admin/line_manager/auditor) can
+  reach their own probation page — a route-gating bug the new e2e journey would otherwise have masked.
+- **`71ece8f`** (P0.2/P0.4) — training-evidence upload/download UI on `MyLearningPage.tsx`, an
+  `EmployeeSearchSummaryReportingChainTests` row-scope test, and `regulatory-workflows.spec.ts` (protected
+  evidence download row-scope, equity-dashboard suppression viewed as `accountingofficer` — chosen because it's
+  frontend-route-permitted for `/dashboards/equity` but holds no standing Sensitive-tier grant per
+  `RBAC-Roles.md`, so it proves suppression without a route-level 403 hiding the point).
+- **P0.3, this slice (uncommitted at time of writing)** — `RouteErrorBoundary.tsx`, a class component wrapping
+  every lazy route's `Suspense` (shared via the existing `LazyPage` helper in `App.tsx`) so a failed chunk load
+  (stale hash after a redeploy, network blip) shows a recoverable "Reload" message instead of a blank app.
+  Also a build-time chunk-size budget in `vite.config.ts` (`CHUNK_SIZE_BUDGET_KB`, keyed by rolldown's stable
+  pre-hash chunk `name` — its hashed `fileName` isn't stable across builds) that fails the build via `this.error()`
+  in a `generateBundle` hook when a budgeted chunk regresses, rather than relying on Vite's generic 500 kB
+  warning. Verified both directions: an artificially low budget genuinely fails the build (exit 1, real
+  `RolldownError`), and the real budgets (`index`: 650 kB, `MyIdentityVerificationPage`: 1400 kB — both current
+  sizes rounded up, a ceiling against further growth, not an endorsement) pass cleanly.
+
+**Verification for this slice:** `tsc --noEmit`, `oxlint`, full production build all clean; `manage.py check`
+and `makemigrations --check --dry-run` clean; `probation-workflow.spec.ts` + `regulatory-workflows.spec.ts`
+(3 tests) pass. Full backend suite (1184 tests, plus a separate 416-test run) passed OK in the background
+earlier in the session, before this slice's changes — not re-run after (frontend-only diff).
+
+**Still open in `latest_todo.md`'s P0 tranche:** P0.1's generated-API-type-facade cleanup (remove replaced
+handwritten declarations from `api/types.ts`, add a CI/source check preventing migrated modules from importing
+removed handwritten transport types, document the migration pattern) and the P0 exit gate's own last line
+(this entry + backlog doc are that update). P1/P2/P3 in `latest_todo.md` are unstarted.
+
+**Concurrent-session note:** this repo had other uncommitted changes in flight from a different session during
+this work (`docs/RUNBOOK.md` modified, `adr/ADR-012-deployment-rollback-versioning.md` untracked) — left
+untouched and unstaged; not part of this commit.
+
 # Session state — 2026-08-27 (session 9)
 
 Written as a resume point. The original 2026-08-27 session material below was committed and pushed as recorded.

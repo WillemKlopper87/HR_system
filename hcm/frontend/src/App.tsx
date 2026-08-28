@@ -5,6 +5,7 @@ import { LoginPage } from './auth/LoginPage'
 import { RequireAuth, RequireRole } from './auth/RequireAuth'
 import { RequirePayrollStepUp } from './auth/RequirePayrollStepUp'
 import { AppShell } from './layout/AppShell'
+import { RouteErrorBoundary } from './components/RouteErrorBoundary'
 import { ApplicantDetailPage } from './pages/ApplicantDetailPage'
 import { ApplicantsPage } from './pages/ApplicantsPage'
 import { AssessmentsPage } from './pages/AssessmentsPage'
@@ -72,7 +73,11 @@ const ExitInterviewsPage = lazy(() =>
 )
 
 function LazyPage({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<p className="empty-state">Loading…</p>}>{children}</Suspense>
+  return (
+    <RouteErrorBoundary>
+      <Suspense fallback={<p className="empty-state">Loading…</p>}>{children}</Suspense>
+    </RouteErrorBoundary>
+  )
 }
 
 export default function App() {
@@ -170,9 +175,9 @@ export default function App() {
             <Route
               path="/my-verification"
               element={
-                <Suspense fallback={<p className="empty-state">Loading…</p>}>
+                <LazyPage>
                   <MyIdentityVerificationPage />
-                </Suspense>
+                </LazyPage>
               }
             />
             <Route path="/my-profile" element={<MyProfilePage />} />

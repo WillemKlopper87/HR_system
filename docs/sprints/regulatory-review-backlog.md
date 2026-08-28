@@ -50,11 +50,16 @@ does not replace legal, EE-manager, verification-agency or SETA review of the re
       reviews outside the probation window unless an explicit override reason is captured.
 - [x] **Validate exit-interview relationships.** When supplied, `employment_change` and `probation_period` must
       belong to the selected employee; define whether zero, one or both triggers are permitted and enforce it.
-- [ ] **Add browser coverage for new workflows.** Cover HR opening/deciding probation, the correct manager
+- [x] **Add browser coverage for new workflows.** Cover HR opening/deciding probation, the correct manager
       reviewing, the employee countersigning, HR capturing an exit interview, demographic dashboards, and a
-      protected training-evidence download.
-- [ ] **Resolve frontend maintenance warnings.** Split non-component exports out of the two React context files,
-      and introduce route-level code splitting for the oversized main and identity-verification bundles.
+      protected training-evidence download. Covered via `probation-workflow.spec.ts` (full probation lifecycle)
+      and `regulatory-workflows.spec.ts` (protected evidence download row-scope, equity-dashboard suppression).
+      HR capturing an exit interview has model/API-level coverage only, not a browser journey: `ExitInterviewsPage.tsx`
+      does not yet expose the `employment_change`/`probation_period` trigger fields for a UI test to drive.
+- [x] **Resolve frontend maintenance warnings.** Split non-component exports out of the two React context files,
+      and introduce route-level code splitting for the oversized main and identity-verification bundles. Also
+      added a shared `RouteErrorBoundary` around every lazy route and a build-time chunk-size budget
+      (`vite.config.ts`) that fails the build on regression instead of relying on Vite's generic 500 kB warning.
 
 ## P1 — Statutory workflow foundation
 

@@ -75,9 +75,9 @@ known regulatory browser-coverage gaps while establishing patterns reusable acro
 - [x] Move non-component exports out of `AuthContext.tsx`.
 - [x] Move non-component exports out of `ReferenceDataContext.tsx`.
 - [x] Lazy-load the probation and exit-interview routes.
-- [ ] Add a shared route loading state and route-level error boundary.
+- [x] Add a shared route loading state and route-level error boundary.
 - [x] Measure main and relevant route chunks before and after the change.
-- [ ] Record a chunk-size budget and fail or warn consistently when it regresses.
+- [x] Record a chunk-size budget and fail or warn consistently when it regresses.
 
 ### P0.4 Browser coverage for the regulatory workflows
 
@@ -111,7 +111,9 @@ known regulatory browser-coverage gaps while establishing patterns reusable acro
 - [x] Frontend TypeScript and production build pass.
 - [x] Focused Playwright journeys pass without retries hiding deterministic failures.
 - [x] `git diff --check` passes.
-- [ ] Update backlog, session state, API/data dictionary and RBAC documentation where applicable.
+- [x] Update backlog, session state, API/data dictionary and RBAC documentation where applicable. (No new API
+      surface or RBAC tier in this tranche's final slice, so `RBAC-Roles.md`/`Data-Dictionary.md` are unaffected;
+      `docs/sprints/regulatory-review-backlog.md` and `docs/SESSION-STATE.md` updated.)
 
 ## P1 — Pilot readiness and accountable UAT
 
