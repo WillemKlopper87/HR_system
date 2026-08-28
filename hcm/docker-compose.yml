@@ -49,6 +49,19 @@ services:
     volumes:
       - media:/app/media
     command: celery -A config worker --loglevel=info
+    # Overrides the backend image's baked-in HEALTHCHECK (curls
+    # localhost:8000/readyz, gunicorn's port -- nothing listens on it in
+    # this container, so without this override `docker ps` would show
+    # worker permanently "unhealthy" regardless of whether it's actually
+    # fine). `inspect ping` proves both broker connectivity and that a
+    # worker process is actually responsive, not just that the process
+    # exists (HR_Code_report.md lower-priority note).
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   beat:
     build: ./backend
@@ -61,6 +74,27 @@ services:
     # CELERY_BEAT_SCHEDULE lives in config/settings.py (retention daily; the
     # performance-agreement reminder job joins it in PC-1).
     command: celery -A config beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    # Same override reasoning as worker's above. Beat has no remote-control
+    # command to ping (it schedules, it doesn't consume a queue), so this
+    # checks its own persistent schedule store was written to recently --
+    # proof beat's tick loop is actually running, not just that the
+    # process hasn't crashed. Checks every /tmp/celerybeat-schedule*
+    # file, not just the bare name: this store is SQLite (WAL mode) under
+    # this Celery/Python version, so ongoing writes land in
+    # -wal/-shm and the main file's own mtime only moves on a checkpoint,
+    # confirmed by actually running this stack (the bare-filename version
+    # of this check first shipped here was reliably ~30 min stale and
+    # wrongly reported unhealthy forever). 900s threshold sits safely
+    # above the observed ~250-260s tick cadence with real margin; this is
+    # a known-imperfect proxy, not a guarantee every scheduled job
+    # actually fired -- see the report's own suggestion to also monitor
+    # task freshness externally.
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import glob,os,sys,time; files=glob.glob('/tmp/celerybeat-schedule*'); sys.exit(0 if files and time.time()-max(os.path.getmtime(f) for f in files)<900 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   frontend:
     build: ./frontend
