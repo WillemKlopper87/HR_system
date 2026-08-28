@@ -453,6 +453,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/applicants/{id}/download_resume/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The only way to obtain the CV's bytes — ApplicantSerializer's
+         *     `resume` field is write-only (2026-08-28 fix: it used to read back
+         *     as a raw storage locator, an applicant-document-disclosure defect).
+         *     No assigned-interviewer carve-out: the viewset's own IsRecruiterOrHRAdmin
+         *     already gates this action, and InterviewApplicantSummarySerializer's
+         *     own "deliberately narrow" design intent (no email/phone/dob/
+         *     rejected_reason) reads as never having meant to include the CV
+         *     either. Widen deliberately, later, if a real workflow needs it.
+         */
+        get: operations["v1_applicants_download_resume_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/applicants/{id}/stage_events/": {
         parameters: {
             query?: never;
@@ -6678,6 +6704,8 @@ export interface components {
             readonly source: components["schemas"]["SourceEnum"];
             /** Format: uri */
             resume?: string | null;
+            readonly has_resume: boolean;
+            readonly resume_download_url: string | null;
             readonly resume_content_type: string;
             readonly resume_size_bytes: number;
         };
@@ -7873,9 +7901,13 @@ export interface components {
          * @description Design spec §3.1: deliberately narrow, and — unlike ApplicantSerializer
          *     above — the SAME shape for every caller including recruiter/hr_admin. No
          *     demographics, no email/phone/date_of_birth, no rejected_reason, no prior
-         *     stage-event notes. This is what an assigned interviewer (who may hold no
-         *     recruitment-module role at all) is allowed to know about the applicant
-         *     they're interviewing.
+         *     stage-event notes, and (2026-08-28 fix) no résumé locator or download
+         *     signal either — an assigned interviewer is not the recruiter/hr_admin
+         *     audience ApplicantViewSet.download_resume is scoped to, and this
+         *     serializer previously leaked `resume`'s raw storage path here by
+         *     omission, not by design. If a real workflow later needs interviewers to
+         *     see the CV, that is a deliberate, separately audited access grant to add
+         *     back explicitly — not a field to restore quietly.
          */
         InterviewApplicantSummary: {
             readonly id: number;
@@ -7884,8 +7916,6 @@ export interface components {
             readonly requisition: number;
             readonly requisition_title: string;
             readonly current_stage: components["schemas"]["CurrentStageEnum"];
-            /** Format: uri */
-            readonly resume: string | null;
         };
         /**
          * @description Design spec §2.2, §3.2: `interviewer` is force-set server-side (see
@@ -9174,6 +9204,8 @@ export interface components {
             readonly source?: components["schemas"]["SourceEnum"];
             /** Format: uri */
             resume?: string | null;
+            readonly has_resume?: boolean;
+            readonly resume_download_url?: string | null;
             readonly resume_content_type?: string;
             readonly resume_size_bytes?: number;
         };
@@ -11664,6 +11696,28 @@ export interface operations {
                 "multipart/form-data": components["schemas"]["Applicant"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Applicant"];
+                };
+            };
+        };
+    };
+    v1_applicants_download_resume_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this applicant. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {

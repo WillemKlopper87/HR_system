@@ -427,7 +427,11 @@ export interface Applicant {
   disability_status?: string
   resulting_employee: number | null
   source: ApplicantSource
-  resume: string | null
+  // write-only on the wire (upload only) -- reads never return a storage
+  // locator; see has_resume/resume_download_url below (2026-08-28 fix).
+  resume?: File
+  has_resume: boolean
+  resume_download_url: string | null
   resume_content_type?: string
   resume_size_bytes?: number
 }
@@ -511,7 +515,6 @@ export interface InterviewApplicantSummary {
   requisition: number
   requisition_title: string
   current_stage: ApplicantStage
-  resume: string | null
 }
 
 export interface InterviewSession {

@@ -6,7 +6,7 @@ from core_hr.models import Department, Employee, JobGrade, Location, Occupationa
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from establishment.models import Position
-from rbac_audit.models import ConsentRecord, Role, RoleAssignment
+from rbac_audit.models import AuditLogEntry, ConsentRecord, Role, RoleAssignment
 from rest_framework.test import APIClient
 
 from .models import Applicant, BackgroundCheck, InterviewScorecard, InterviewSession, Offer, Requisition
@@ -404,10 +404,13 @@ class InterviewSessionApiTests(InterviewSchedulingApiTestCase):
         summary = response.data["applicant_summary"]
         self.assertEqual(summary["first_name"], "Alex")
         self.assertEqual(summary["current_stage"], "interview")
-        # Deliberately narrow -- no demographics, no email/phone/date_of_birth.
+        # Deliberately narrow -- no demographics, no email/phone/date_of_birth,
+        # no résumé locator either (2026-08-28: this used to leak "resume" here
+        # despite the class's own "deliberately narrow" docstring).
         self.assertNotIn("race", summary)
         self.assertNotIn("email", summary)
         self.assertNotIn("date_of_birth", summary)
+        self.assertNotIn("resume", summary)
 
     def test_plain_employee_with_no_panel_membership_sees_empty_list(self):
         session = InterviewSession.objects.create(applicant=self.applicant, scheduled_at="2026-09-01T10:00:00Z")
@@ -465,6 +468,108 @@ class InterviewSessionApiTests(InterviewSchedulingApiTestCase):
 
         write = self.client.patch(f"/api/v1/interview-sessions/{session.id}/", {"notes": "x"}, format="json")
         self.assertEqual(write.status_code, 403)
+
+
+class ApplicantResumeProtectionTests(InterviewSchedulingApiTestCase):
+    """2026-08-28: closes the résumé-locator-disclosure defect. ApplicantSerializer's
+    `resume` field is now write-only; the only way to obtain the bytes is the
+    protected download_resume action, and it is intentionally NOT open to an
+    assigned interviewer -- see ApplicantViewSet.download_resume's own docstring
+    for why that's a deliberate default rather than an oversight."""
+
+    def _attach_resume(self, applicant=None):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        applicant = applicant or self.applicant
+        applicant.resume.save(
+            "cv.pdf", SimpleUploadedFile("cv.pdf", b"%PDF-1.7\ncv content"), save=False
+        )
+        applicant.resume_content_type = "application/pdf"
+        applicant.save(update_fields=["resume", "resume_content_type"])
+        self.addCleanup(applicant.resume.delete, False)
+        return applicant
+
+    def test_ordinary_read_never_returns_a_resume_locator(self):
+        self._attach_resume()
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.get(f"/api/v1/applicants/{self.applicant.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("resume", response.data)
+        self.assertTrue(response.data["has_resume"])
+        self.assertEqual(
+            response.data["resume_download_url"], f"/api/v1/applicants/{self.applicant.id}/download_resume/"
+        )
+
+    def test_applicant_with_no_resume_reports_it_cleanly(self):
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.get(f"/api/v1/applicants/{self.applicant.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["has_resume"])
+        self.assertIsNone(response.data["resume_download_url"])
+
+    def test_internal_resume_upload_is_still_supported_and_content_sniffed(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.client.force_authenticate(user=self.recruiter.user)
+        good = self.client.patch(
+            f"/api/v1/applicants/{self.applicant.id}/",
+            {"resume": SimpleUploadedFile("cv.pdf", b"%PDF-1.7\ncv content", content_type="application/pdf")},
+            format="multipart",
+        )
+        self.assertEqual(good.status_code, 200, good.data)
+        self.assertNotIn("resume", good.data)
+        self.assertTrue(good.data["has_resume"])
+        self.applicant.refresh_from_db()
+        self.addCleanup(self.applicant.resume.delete, False)
+
+        bad = self.client.patch(
+            f"/api/v1/applicants/{self.applicant.id}/",
+            {"resume": SimpleUploadedFile("cv.pdf", b"not actually a pdf", content_type="application/pdf")},
+            format="multipart",
+        )
+        self.assertEqual(bad.status_code, 400)
+        self.assertIn("resume", bad.data)
+
+    def test_recruiter_and_hr_admin_can_download_and_it_is_audited(self):
+        self._attach_resume()
+        url = f"/api/v1/applicants/{self.applicant.id}/download_resume/"
+        for employee in (self.recruiter, self.hr_admin):
+            self.client.force_authenticate(user=employee.user)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response["Content-Type"], "application/pdf")
+            self.assertTrue(b"".join(response.streaming_content).startswith(b"%PDF-"))
+            response.close()
+        self.assertTrue(AuditLogEntry.objects.filter(
+            entity_type="recruitment.Applicant", entity_id=str(self.applicant.id),
+            action=AuditLogEntry.Action.EXPORT,
+        ).exists())
+
+    def test_download_returns_404_when_no_resume_exists(self):
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.get(f"/api/v1/applicants/{self.applicant.id}/download_resume/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_unauthenticated_request_is_denied(self):
+        self._attach_resume()
+        response = self.client.get(f"/api/v1/applicants/{self.applicant.id}/download_resume/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_plain_employee_is_denied(self):
+        self._attach_resume()
+        self.client.force_authenticate(user=self.plain_employee.user)
+        response = self.client.get(f"/api/v1/applicants/{self.applicant.id}/download_resume/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_assigned_interviewer_is_denied_by_design(self):
+        """The deliberate access decision this fix makes: being on the
+        interview panel is not, by itself, a reason to see the CV."""
+        self._attach_resume()
+        session = InterviewSession.objects.create(applicant=self.applicant, scheduled_at="2026-09-01T10:00:00Z")
+        session.interviewers.set([self.interviewer1])
+        self.client.force_authenticate(user=self.interviewer1.user)
+        response = self.client.get(f"/api/v1/applicants/{self.applicant.id}/download_resume/")
+        self.assertEqual(response.status_code, 403)
 
 
 class InterviewScorecardApiTests(InterviewSchedulingApiTestCase):

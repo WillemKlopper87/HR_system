@@ -83,14 +83,6 @@ function MyInterviewSessionCard({
         {session.applicant_summary.requisition_title} · {new Date(session.scheduled_at).toLocaleString()} ·{' '}
         {session.location || 'No location set'}
       </p>
-      {session.applicant_summary.resume && (
-        <p style={{ margin: '4px 0' }}>
-          <a href={session.applicant_summary.resume} target="_blank" rel="noreferrer">
-            View CV / résumé
-          </a>
-        </p>
-      )}
-
       {error && <p className="form-error">{error}</p>}
 
       {/* key forces a remount when `existing` first arrives (or changes

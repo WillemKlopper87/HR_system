@@ -94,13 +94,24 @@ class ApplicantSerializer(serializers.ModelSerializer):
     # presence/absence in the response actually tells you).
     has_demographic_consent = serializers.SerializerMethodField()
 
+    # write-only: a FileField reads back as a storage locator, which is a
+    # document-disclosure leak the moment media is served from anything
+    # other than "nowhere" (config/urls.py deliberately mounts no /media
+    # route today — that's a compensating deployment detail, not a safe
+    # API contract). Reads get has_resume + resume_download_url instead,
+    # the same write-only-field / derived-metadata / protected-download
+    # shape learning.TrainingRecordSerializer already uses for evidence_file.
+    resume = serializers.FileField(write_only=True, required=False, allow_null=True)
+    has_resume = serializers.SerializerMethodField()
+    resume_download_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Applicant
         fields = [
             "id", "requisition", "first_name", "last_name", "email", "phone", "date_of_birth",
             "current_stage", "rejected_reason", "race", "gender", "disability_status",
             "has_demographic_consent", "resulting_employee", "source", "resume",
-            "resume_content_type", "resume_size_bytes",
+            "has_resume", "resume_download_url", "resume_content_type", "resume_size_bytes",
         ]
         # source is set only by the create path (recruiter-entered defaults
         # to "internal"; the careers portal's own submit_portal_application
@@ -113,6 +124,12 @@ class ApplicantSerializer(serializers.ModelSerializer):
             "current_stage", "rejected_reason", "resulting_employee", "source",
             "resume_content_type", "resume_size_bytes",
         ]
+
+    def get_has_resume(self, instance) -> bool:
+        return bool(instance.resume)
+
+    def get_resume_download_url(self, instance) -> str | None:
+        return f"/api/v1/applicants/{instance.pk}/download_resume/" if instance.resume else None
 
     def validate_resume(self, value):
         """A recruiter can attach a CV to an internally-sourced applicant
@@ -212,15 +229,19 @@ class InterviewApplicantSummarySerializer(serializers.ModelSerializer):
     """Design spec §3.1: deliberately narrow, and — unlike ApplicantSerializer
     above — the SAME shape for every caller including recruiter/hr_admin. No
     demographics, no email/phone/date_of_birth, no rejected_reason, no prior
-    stage-event notes. This is what an assigned interviewer (who may hold no
-    recruitment-module role at all) is allowed to know about the applicant
-    they're interviewing."""
+    stage-event notes, and (2026-08-28 fix) no résumé locator or download
+    signal either — an assigned interviewer is not the recruiter/hr_admin
+    audience ApplicantViewSet.download_resume is scoped to, and this
+    serializer previously leaked `resume`'s raw storage path here by
+    omission, not by design. If a real workflow later needs interviewers to
+    see the CV, that is a deliberate, separately audited access grant to add
+    back explicitly — not a field to restore quietly."""
 
     requisition_title = serializers.CharField(source="requisition.title", read_only=True)
 
     class Meta:
         model = Applicant
-        fields = ["id", "first_name", "last_name", "requisition", "requisition_title", "current_stage", "resume"]
+        fields = ["id", "first_name", "last_name", "requisition", "requisition_title", "current_stage"]
         read_only_fields = fields
 
 

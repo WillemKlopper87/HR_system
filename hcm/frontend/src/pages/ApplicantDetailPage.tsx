@@ -150,6 +150,18 @@ export function ApplicantDetailPage() {
           {applicant.rejected_reason !== undefined && applicant.rejected_reason !== '' && (
             <Field label="Rejected reason" obj={applicant} field="rejected_reason" />
           )}
+          <div className="detail-field">
+            <dt>Résumé</dt>
+            <dd>
+              {applicant.has_resume && applicant.resume_download_url ? (
+                <a href={applicant.resume_download_url} target="_blank" rel="noreferrer">
+                  Download résumé
+                </a>
+              ) : (
+                'Not uploaded'
+              )}
+            </dd>
+          </div>
         </dl>
 
         {nextStages.length > 0 && (

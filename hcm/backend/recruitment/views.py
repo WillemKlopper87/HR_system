@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import os
+
 from django.db.models import Count
+from django.http import FileResponse
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rbac_audit.aggregates import suppress_count, suppress_related_counts
+from rbac_audit.audit import log_access
 from rbac_audit.consent import record_consent
 from rbac_audit.drf import get_request_employee, int_query_param
-from rbac_audit.models import ConsentRecord
+from rbac_audit.models import AuditLogEntry, ConsentRecord
 from rbac_audit.permissions import can_see_unsuppressed_aggregates, has_role
 from rbac_audit.tiers import FieldTier
 from rest_framework import permissions, viewsets
@@ -105,6 +109,30 @@ class ApplicantViewSet(viewsets.ModelViewSet):
         applicant = self.get_object()
         events = applicant.stage_events.select_related("changed_by").order_by("created_at")
         return Response(ApplicantStageEventSerializer(events, many=True).data)
+
+    @action(detail=True, methods=["get"])
+    def download_resume(self, request, pk=None):
+        """The only way to obtain the CV's bytes — ApplicantSerializer's
+        `resume` field is write-only (2026-08-28 fix: it used to read back
+        as a raw storage locator, an applicant-document-disclosure defect).
+        No assigned-interviewer carve-out: the viewset's own IsRecruiterOrHRAdmin
+        already gates this action, and InterviewApplicantSummarySerializer's
+        own "deliberately narrow" design intent (no email/phone/dob/
+        rejected_reason) reads as never having meant to include the CV
+        either. Widen deliberately, later, if a real workflow needs it."""
+        applicant = self.get_object()
+        if not applicant.resume:
+            return Response({"detail": "This applicant has no uploaded résumé."}, status=404)
+        log_access(
+            actor=get_request_employee(request), action=AuditLogEntry.Action.EXPORT,
+            entity_type="recruitment.Applicant", entity_id=applicant.pk,
+            field_tier=FieldTier.INTERNAL, fields_touched="downloaded resume",
+        )
+        filename = os.path.basename(applicant.resume.name)
+        return FileResponse(
+            applicant.resume.open("rb"), as_attachment=True, filename=filename,
+            content_type=applicant.resume_content_type or "application/octet-stream",
+        )
 
     @action(detail=True, methods=["post"])
     def transition(self, request, pk=None):
