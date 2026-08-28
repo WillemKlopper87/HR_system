@@ -39,16 +39,16 @@ does not replace legal, EE-manager, verification-agency or SETA review of the re
 
 ## P1 — Data integrity and defensible reporting
 
-- [ ] **Use historical employee versions for event reports.** Resolve demographics, department and level as at
+- [x] **Use historical employee versions for event reports.** Resolve demographics, department and level as at
       the probation outcome, exit, application stage, performance-period close or other relevant event date.
       Do not let a later employee update rewrite a historical compliance result.
-- [ ] **Define the performance-distribution unit.** Confirm whether the regulatory view is one final/calibrated
+- [x] **Define the performance-distribution unit.** Confirm whether the regulatory view is one final/calibrated
       employee score or individual KPI-element ratings. Rename the current result if KPI distribution is kept;
       otherwise report one final score band per employee. Test an agreement containing multiple KPIs.
-- [ ] **Harden probation dates and state transitions.** Require `end_date >= start_date`, prevent overlapping
+- [x] **Harden probation dates and state transitions.** Require `end_date >= start_date`, prevent overlapping
       open periods for one employee, require an extension date later than the existing end date, and reject
       reviews outside the probation window unless an explicit override reason is captured.
-- [ ] **Validate exit-interview relationships.** When supplied, `employment_change` and `probation_period` must
+- [x] **Validate exit-interview relationships.** When supplied, `employment_change` and `probation_period` must
       belong to the selected employee; define whether zero, one or both triggers are permitted and enforce it.
 - [ ] **Add browser coverage for new workflows.** Cover HR opening/deciding probation, the correct manager
       reviewing, the employee countersigning, HR capturing an exit interview, demographic dashboards, and a

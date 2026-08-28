@@ -75,6 +75,17 @@ class ProbationReviewSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["reviewed_by", "employee_signed_at", "employee_signature_sha256"]
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        period = attrs.get("probation_period") or getattr(self.instance, "probation_period", None)
+        review_date = attrs.get("review_date") or getattr(self.instance, "review_date", None)
+        if period is not None and review_date is not None:
+            if review_date < period.start_date or review_date > period.end_date:
+                raise serializers.ValidationError(
+                    {"review_date": f"Must fall within the probation window ({period.start_date} to {period.end_date})."}
+                )
+        return attrs
+
 
 class ProbationPeriodSerializer(serializers.ModelSerializer):
     employee_number = serializers.CharField(source="employee.employee_number", read_only=True)
@@ -88,6 +99,25 @@ class ProbationPeriodSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["status", "outcome_at", "outcome_by"]
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        start_date = attrs.get("start_date") or getattr(self.instance, "start_date", None)
+        end_date = attrs.get("end_date") or getattr(self.instance, "end_date", None)
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError({"end_date": "Must be on or after the start date."})
+
+        if self.instance is None:
+            employee = attrs.get("employee")
+            overlapping = ProbationPeriod.objects.filter(
+                employee=employee,
+                status__in=[ProbationPeriod.Status.IN_PROGRESS, ProbationPeriod.Status.EXTENDED],
+            ).exists()
+            if overlapping:
+                raise serializers.ValidationError(
+                    "This employee already has an open probation period -- close it before opening another."
+                )
+        return attrs
+
 
 class ExitInterviewSerializer(serializers.ModelSerializer):
     class Meta:
@@ -97,6 +127,30 @@ class ExitInterviewSerializer(serializers.ModelSerializer):
             "primary_reason", "would_recommend_employer", "comments",
         ]
         read_only_fields = ["conducted_by"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        employee = attrs.get("employee") or getattr(self.instance, "employee", None)
+        employment_change = attrs.get("employment_change") if "employment_change" in attrs else getattr(
+            self.instance, "employment_change", None
+        )
+        probation_period = attrs.get("probation_period") if "probation_period" in attrs else getattr(
+            self.instance, "probation_period", None
+        )
+        if employment_change is not None and employment_change.employee_id != employee.id:
+            raise serializers.ValidationError(
+                {"employment_change": "Must belong to the selected employee."}
+            )
+        if probation_period is not None and probation_period.employee_id != employee.id:
+            raise serializers.ValidationError(
+                {"probation_period": "Must belong to the selected employee."}
+            )
+        if employment_change is not None and probation_period is not None:
+            raise serializers.ValidationError(
+                "An exit interview links to at most one of employment_change or probation_period, not both --"
+                " a genuine exit and a probation non-confirmation are distinct triggers."
+            )
+        return attrs
 
 
 class EmployeeVersionSerializer(TieredModelSerializer):

@@ -338,15 +338,58 @@ def _funnel_max_stage_reached(applicant_ids: list[int]) -> dict[int, int]:
     return max_order
 
 
-def _funnel_breakdown(applicants_qs, demographic_field: str, max_order: dict[int, int], *, suppress: bool) -> list[dict]:
-    demographics = dict(applicants_qs.values_list("id", demographic_field))
+def _funnel_demographics_as_at_stage(applicants: list[Applicant], max_order: dict[int, int]) -> dict[str, dict[int, dict]]:
+    """Freeze each applicant's demographics at the time they entered a stage.
+
+    The initial history row represents APPLIED. Later stages use the first
+    matching transition event and the latest Applicant history row at that
+    timestamp, so a subsequent demographic correction cannot rewrite an
+    earlier recruitment-compliance result.
+    """
+    stage_entry_times: dict[int, dict[str, object]] = {applicant.id: {} for applicant in applicants}
+    events = ApplicantStageEvent.objects.filter(
+        applicant_id__in=stage_entry_times,
+        to_stage__in=FUNNEL_STAGES[1:],
+    ).order_by("created_at")
+    for event in events:
+        stage_entry_times[event.applicant_id].setdefault(event.to_stage, event.created_at)
+
+    snapshots: dict[str, dict[int, dict]] = {stage: {} for stage in FUNNEL_STAGES}
+    fields = ("race", "gender", "disability_status")
+    for applicant in applicants:
+        histories = list(applicant.history.order_by("history_date"))
+        if not histories:
+            continue
+        stage_history = histories[0]
+        for stage in FUNNEL_STAGES:
+            if max_order[applicant.id] < _FUNNEL_STAGE_ORDER[stage]:
+                continue
+            if stage != Applicant.Stage.APPLIED:
+                entered_at = stage_entry_times[applicant.id].get(stage)
+                if entered_at is None:
+                    continue
+                eligible = [history for history in histories if history.history_date <= entered_at]
+                if not eligible:
+                    continue
+                stage_history = eligible[-1]
+            snapshots[stage][applicant.id] = {field: getattr(stage_history, field) for field in fields}
+    return snapshots
+
+
+def _funnel_breakdown(
+    demographic_field: str,
+    max_order: dict[int, int],
+    stage_demographics: dict[str, dict[int, dict]],
+    *,
+    suppress: bool,
+) -> list[dict]:
     table = []
     for stage in FUNNEL_STAGES:
         stage_order = _FUNNEL_STAGE_ORDER[stage]
         counts: dict[str, int] = {}
         for applicant_id, order in max_order.items():
             if order >= stage_order:
-                key = demographics.get(applicant_id)
+                key = stage_demographics[stage][applicant_id][demographic_field]
                 counts[key] = counts.get(key, 0) + 1
         displayed, complementary = suppress_related_counts(counts, suppress=suppress)
         breakdown = [
@@ -383,12 +426,16 @@ def recruitment_funnel_by_demographic(request):
     if requisition_id is not None:
         applicants = applicants.filter(requisition_id=requisition_id)
 
-    max_order = _funnel_max_stage_reached(list(applicants.values_list("id", flat=True)))
+    applicants = list(applicants)
+    max_order = _funnel_max_stage_reached([applicant.id for applicant in applicants])
+    stage_demographics = _funnel_demographics_as_at_stage(applicants, max_order)
     data = {
         "small_cell_suppression_applied": suppress,
-        "total_applicants": suppress_count(applicants.count(), suppress=suppress),
-        "by_race": _funnel_breakdown(applicants, "race", max_order, suppress=suppress),
-        "by_gender": _funnel_breakdown(applicants, "gender", max_order, suppress=suppress),
-        "by_disability_status": _funnel_breakdown(applicants, "disability_status", max_order, suppress=suppress),
+        "total_applicants": suppress_count(len(applicants), suppress=suppress),
+        "by_race": _funnel_breakdown("race", max_order, stage_demographics, suppress=suppress),
+        "by_gender": _funnel_breakdown("gender", max_order, stage_demographics, suppress=suppress),
+        "by_disability_status": _funnel_breakdown(
+            "disability_status", max_order, stage_demographics, suppress=suppress
+        ),
     }
     return Response(data)

@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rbac_audit.aggregates import SMALL_CELL_THRESHOLD, percentage, suppress_count, suppress_related_counts
@@ -218,9 +219,15 @@ class ProbationPeriodViewSet(viewsets.ModelViewSet):
         period.outcome_by = actor
         period.outcome_notes = request.data.get("notes", "")
         if new_status == ProbationPeriod.Status.EXTENDED:
-            new_end_date = request.data.get("end_date")
-            if not new_end_date:
-                return Response({"detail": "end_date is required when extending probation."}, status=400)
+            raw_end_date = request.data.get("end_date")
+            new_end_date = parse_date(raw_end_date) if raw_end_date else None
+            if new_end_date is None:
+                return Response({"detail": "A valid end_date is required when extending probation."}, status=400)
+            if new_end_date <= period.end_date:
+                return Response(
+                    {"detail": f"The new end_date must be after the current end date ({period.end_date})."},
+                    status=400,
+                )
             period.end_date = new_end_date
             update_fields.append("end_date")
         period.save(update_fields=update_fields)
@@ -713,16 +720,18 @@ def probation_completion_dashboard(request):
     closed = ProbationPeriod.objects.filter(
         status__in=[ProbationPeriod.Status.CONFIRMED, ProbationPeriod.Status.TERMINATED]
     ).select_related("employee")
+    # As-at the outcome date, not today -- a later transfer or demographic
+    # correction must not silently rewrite an already-closed compliance
+    # result (regulatory review P1: historical employee versions).
     versions = {
-        v.employee_id: v for v in EmployeeVersion.objects.current().filter(
-            employee_id__in=closed.values_list("employee_id", flat=True)
-        )
+        period.pk: period.employee.version_as_at(period.outcome_at.date())
+        for period in closed if period.outcome_at is not None
     }
 
     def _breakdown(group_field: str):
         buckets: dict[str, dict[str, int]] = {}
         for period in closed:
-            version = versions.get(period.employee_id)
+            version = versions.get(period.pk)
             key = getattr(version, group_field, None) if version else None
             if key is None:
                 continue
@@ -775,16 +784,17 @@ def exit_interview_dashboard(request):
     app."""
     can_see_unsuppressed = can_see_unsuppressed_aggregates(get_request_employee(request), FieldTier.SENSITIVE)
     interviews = ExitInterview.objects.select_related("employee")
+    # As-at the interview date, not today -- same historical-accuracy
+    # reasoning as probation_completion_dashboard above.
     versions = {
-        v.employee_id: v for v in EmployeeVersion.objects.current().filter(
-            employee_id__in=interviews.values_list("employee_id", flat=True)
-        )
+        interview.pk: interview.employee.version_as_at(interview.interview_date)
+        for interview in interviews
     }
 
     def _breakdown(group_field: str):
         buckets: dict[str, dict[str, int]] = {}
         for interview in interviews:
-            version = versions.get(interview.employee_id)
+            version = versions.get(interview.pk)
             key = getattr(version, group_field, None) if version else None
             if key is None:
                 continue

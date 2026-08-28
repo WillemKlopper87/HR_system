@@ -5,8 +5,10 @@ two-KPI template, `_agreed`/`_open_final`/`_rate_all`) from PC-2's test file.
 """
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
+from core_hr.models import EmployeeVersion
 from rbac_audit.models import Role, RoleAssignment
 
 from .models import ImprovementPlan, PerformanceAgreement, PerformancePeriod
@@ -133,6 +135,39 @@ class RatingDistributionTests(ReviewTestCase):
         self.assertEqual(response.data["by_race"]["not_disclosed"]["4"], "<5")
         self.assertEqual(response.data["by_gender"]["not_disclosed"]["4"], "<5")
         self.assertEqual(response.data["by_disability_status"]["not_disclosed"]["4"], "<5")
+
+    def test_rating_unit_declares_kpi_element_not_final_score(self):
+        self._signed_with_rating(self.employee, 4)
+        self._login(self.hr_admin)
+        response = self.client.get(f"/api/v1/performance-periods/{self.period.id}/rating-distribution/")
+        self.assertEqual(response.data["rating_unit"], "kpi_element")
+
+    def test_breakdown_uses_the_version_as_at_period_end_not_today(self):
+        """A department transfer or demographic correction made AFTER the
+        period closed must not retroactively move the rating into a
+        different group -- the regulatory review's "historical employee
+        versions" P1 finding."""
+        self._signed_with_rating(self.employee, 4)
+        version1 = self.employee.current_version
+        version1.race = "african"
+        version1.valid_to = date(2027, 6, 1)
+        version1.save(update_fields=["race", "valid_to"])
+        version2_fields = {
+            f: getattr(version1, f) for f in [
+                "department", "job_title", "occupational_level", "job_grade", "manager",
+                "employment_status", "citizenship_status", "location", "position", "contract_end_date",
+                "gender", "disability_status", "disability_detail", "race_source", "disability_source",
+            ]
+        }
+        EmployeeVersion.objects.create(
+            employee=self.employee, valid_from=date(2027, 6, 1), valid_to=None,
+            race="coloured", **version2_fields,
+        )
+        self._login(self.hr_admin)
+        response = self.client.get(f"/api/v1/performance-periods/{self.period.id}/rating-distribution/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("african", response.data["by_race"])
+        self.assertNotIn("coloured", response.data["by_race"])
 
 
 class ImprovementPlanTests(ReviewTestCase):

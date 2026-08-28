@@ -1,9 +1,24 @@
 # Session state — 2026-08-27 (session 9)
 
-Written as a resume point. **Everything described as done is committed and pushed** —
-run `git log -1` for the exact hash; `origin/master` matches local HEAD as of this write.
+Written as a resume point. The original 2026-08-27 session material below was committed and pushed as recorded.
+The 2026-08-28 regulatory follow-up was validated locally; use `git log` and `git status` for its current branch state.
 
 ## Shipped this session
+
+### Regulatory P1 follow-up — 2026-08-28
+
+The first four data-integrity items in `docs/sprints/regulatory-review-backlog.md` are complete:
+
+- probation, exit and performance reports resolve employee attributes from the version effective at the event date;
+  recruitment funnel demographics are frozen at each applicant's stage-entry timestamp;
+- performance rating distribution explicitly reports `rating_unit: "kpi_element"` and tests multiple KPIs;
+- probation dates, open-period uniqueness, review-window rules and extension sequencing are validated; and
+- exit interviews accept at most one trigger, which must belong to the selected employee.
+
+Verification: 51 focused tests and the complete backend suite (**1182/1182**) passed; `manage.py check
+--fail-level WARNING` and `makemigrations --check --dry-run` are clean. Frontend lint, TypeScript and production
+build pass with the two pre-existing Fast Refresh warnings and known bundle-size warnings still tracked by the
+next P1 maintenance item. Browser coverage for these workflows remains open.
 
 Not a C1-C7 backlog item — a targeted response to an external EE & B-BBEE regulatory field-guide review
 (gazette-sourced research comparing SA employment-equity/B-BBEE/POPIA law against this codebase; see the

@@ -246,6 +246,17 @@ class RecruitmentFunnelTests(RecruitmentApiTestCase):
         african_at_interview = next(r for r in by_race["interview"]["breakdown"] if r["key"] == "african")
         self.assertEqual(african_at_interview["count"], 1)
 
+    def test_funnel_uses_demographics_at_stage_entry(self):
+        self.applicant.race = "coloured"
+        self.applicant.save(update_fields=["race"])
+
+        self.client.force_authenticate(user=self.recruiter.user)
+        response = self.client.get("/api/v1/dashboards/recruitment/funnel/")
+
+        self.assertEqual(response.status_code, 200)
+        interview = next(row for row in response.data["by_race"] if row["stage"] == "interview")
+        self.assertEqual(interview["breakdown"], [{"key": "african", "count": 1, "suppressed": False}])
+
     def test_department_filter_narrows_the_funnel(self):
         self.client.force_authenticate(user=self.recruiter.user)
         response = self.client.get(f"/api/v1/dashboards/recruitment/funnel/?department={self.dept.id}")

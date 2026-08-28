@@ -177,16 +177,32 @@ class PerformancePeriodViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="rating-distribution")
     def rating_distribution(self, request, pk=None):
-        """Rating distribution for the hr_admin/auditor dashboard (PC-3) --
-        by division, and by race/gender/disability status (the Code on
-        integrating EE into HR practice's performance section: "appraisal
-        distributions reviewed across designated groups with corrective
-        action on significant variation" -- the moderation-step lens the EE
-        regulatory review flagged as missing). Crossing a rating with a
-        small division or demographic group can point back at one
-        individual, so every matrix is small-cell suppressed exactly like
-        ee_reporting's equity dashboard (same SENSITIVE-tier gate, same
-        `f"<{THRESHOLD}"` replacement)."""
+        """KPI-element rating distribution for the hr_admin/auditor
+        dashboard (PC-3) -- by division, and by race/gender/disability
+        status (the Code on integrating EE into HR practice's performance
+        section: "appraisal distributions reviewed across designated
+        groups with corrective action on significant variation" -- the
+        moderation-step lens the EE regulatory review flagged as missing).
+
+        Counts individual AgreementElement.final_rating values (one per
+        KPI, several per employee), NOT one final score per employee --
+        PerformanceAgreement.final_score is a decimal weighted average
+        with no natural 1-5 banding, and inventing a banding rule here
+        would be a policy call this endpoint has no business making.
+        `rating_unit` in the response says which it is, so a consumer
+        never has to guess (regulatory review P1: "define the
+        performance-distribution unit").
+
+        Demographics are resolved as-at the period's end_date, not
+        today's version -- a later transfer or demographic correction
+        must not silently rewrite an already-closed period's distribution
+        (same historical-accuracy reasoning as core_hr's probation/exit
+        dashboards).
+
+        Crossing a rating with a small division or demographic group can
+        point back at one individual, so every matrix is small-cell
+        suppressed exactly like ee_reporting's equity dashboard (same
+        SENSITIVE-tier gate, same complementary-suppression rule)."""
         period = self.get_object()
         employee = get_request_employee(request)
         can_see_unsuppressed = can_see_unsuppressed_aggregates(employee, FieldTier.SENSITIVE)
@@ -199,8 +215,14 @@ class PerformancePeriodViewSet(viewsets.ModelViewSet):
         by_race: dict[str, dict[str, int]] = {}
         by_gender: dict[str, dict[str, int]] = {}
         by_disability_status: dict[str, dict[str, int]] = {}
+        versions = {
+            employee_id: agreement.employee.version_as_at(period.end_date)
+            for employee_id, agreement in {
+                element.agreement.employee_id: element.agreement for element in elements
+            }.items()
+        }
         for element in elements:
-            version = element.agreement.employee.current_version
+            version = versions.get(element.agreement.employee_id)
             rating = str(element.final_rating)
             division = getattr(version.department, "name", "Unassigned") if version else "Unassigned"
             by_division.setdefault(division, empty_row())[rating] += 1
@@ -220,6 +242,7 @@ class PerformancePeriodViewSet(viewsets.ModelViewSet):
 
         return Response({
             "period": period.name,
+            "rating_unit": "kpi_element",
             "small_cell_suppression_applied": not can_see_unsuppressed,
             "by_division": _suppress(by_division),
             "by_race": _suppress(by_race),

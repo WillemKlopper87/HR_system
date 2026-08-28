@@ -1706,6 +1706,7 @@ export interface PeriodCompletion {
 
 export interface RatingDistribution {
   period: string
+  rating_unit: 'kpi_element'
   small_cell_suppression_applied: boolean
   by_division: Record<string, Record<string, number | string>>
   by_race: Record<string, Record<string, number | string>>

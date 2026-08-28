@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from core_hr.models import Department, Employee, EmployeeVersion, JobGrade, Location, OccupationalLevel
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from rbac_audit.models import AuditLogEntry, Role, RoleAssignment
 from rest_framework.test import APIClient
 
@@ -103,6 +104,51 @@ class OpenProbationPeriodTests(ProbationApiTestCase):
         response = self.client.get("/api/v1/probation-periods/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data["results"]), 0)
+
+
+class ProbationValidationTests(ProbationApiTestCase):
+    def test_end_date_before_start_date_is_rejected(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post("/api/v1/probation-periods/", {
+            "employee": self.report.id, "start_date": "2026-09-01", "end_date": "2026-06-01",
+        }, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("end_date", response.data)
+
+    def test_second_open_period_for_the_same_employee_is_rejected(self):
+        self._open_period()
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post("/api/v1/probation-periods/", {
+            "employee": self.report.id, "start_date": "2026-09-02", "end_date": "2026-12-01",
+        }, format="json")
+        self.assertEqual(response.status_code, 400)
+
+    def test_a_new_period_is_allowed_once_the_first_is_closed(self):
+        period_id = self._open_period()
+        self.client.force_authenticate(user=self.hr_admin.user)
+        self.client.post(f"/api/v1/probation-periods/{period_id}/record_outcome/", {"status": "confirmed"}, format="json")
+        response = self.client.post("/api/v1/probation-periods/", {
+            "employee": self.report.id, "start_date": "2026-09-02", "end_date": "2026-12-01",
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_review_date_outside_the_probation_window_is_rejected(self):
+        period_id = self._open_period()
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.post("/api/v1/probation-reviews/", {
+            "probation_period": period_id, "review_date": "2027-01-01", "recommendation": "continue",
+        }, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("review_date", response.data)
+
+    def test_extension_date_not_after_current_end_date_is_rejected(self):
+        period_id = self._open_period()
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            f"/api/v1/probation-periods/{period_id}/record_outcome/",
+            {"status": "extended", "end_date": "2026-09-01"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400)
 
 
 class ProbationReviewTests(ProbationApiTestCase):
@@ -253,10 +299,11 @@ class ProbationCompletionDashboardTests(ProbationApiTestCase):
         self.client.force_authenticate(user=self.hr_admin.user)
 
     def _confirm(self, employee, **version_overrides):
-        for field, value in version_overrides.items():
-            setattr(employee.current_version, field, value)
         if version_overrides:
-            employee.current_version.save(update_fields=list(version_overrides))
+            version = employee.current_version
+            for field, value in version_overrides.items():
+                setattr(version, field, value)
+            version.save(update_fields=list(version_overrides))
         response = self.client.post("/api/v1/probation-periods/", {
             "employee": employee.id, "start_date": "2026-01-01", "end_date": "2026-04-01",
         }, format="json")
@@ -277,3 +324,33 @@ class ProbationCompletionDashboardTests(ProbationApiTestCase):
         self.client.force_authenticate(user=self.manager.user)
         response = self.client.get("/api/v1/dashboards/probation/")
         self.assertEqual(response.status_code, 403)
+
+    def test_breakdown_uses_the_version_as_at_the_outcome_date_not_today(self):
+        """A department transfer or demographic correction made AFTER the
+        outcome must not retroactively move the closed period into a
+        different group -- the regulatory review's "historical employee
+        versions" P1 finding."""
+        self._confirm(self.report, race="african")
+        period = ProbationPeriod.objects.get(employee=self.report)
+        period.outcome_at = timezone.make_aware(datetime(2026, 7, 1, 9, 0))
+        period.save(update_fields=["outcome_at"])
+
+        version1 = self.report.current_version
+        version1.valid_to = date(2026, 8, 1)
+        version1.save(update_fields=["valid_to"])
+        version2_fields = {
+            f: getattr(version1, f) for f in [
+                "department", "job_title", "occupational_level", "job_grade", "manager",
+                "employment_status", "citizenship_status", "location", "position", "contract_end_date",
+                "gender", "disability_status", "disability_detail", "race_source", "disability_source",
+            ]
+        }
+        EmployeeVersion.objects.create(
+            employee=self.report, valid_from=date(2026, 8, 1), valid_to=None,
+            race="coloured", **version2_fields,
+        )
+        response = self.client.get("/api/v1/dashboards/probation/")
+        self.assertEqual(response.status_code, 200)
+        keys = {row["key"] for row in response.data["by_race"]}
+        self.assertIn("african", keys)
+        self.assertNotIn("coloured", keys)
