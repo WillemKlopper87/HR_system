@@ -26,6 +26,7 @@ import { EEForumPage } from './pages/EEForumPage'
 import { EEReportsPage } from './pages/EEReportsPage'
 import { EmployeeDetailPage } from './pages/EmployeeDetailPage'
 import { EmployeeListPage } from './pages/EmployeeListPage'
+import { OverviewPage } from './pages/OverviewPage'
 import { EquityDashboardPage } from './pages/EquityDashboardPage'
 import { HeadcountDashboardPage } from './pages/HeadcountDashboardPage'
 import { MyBenefitsPage } from './pages/MyBenefitsPage'
@@ -97,6 +98,7 @@ export default function App() {
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
             <Route index element={<Navigate to="/employees" replace />} />
+            <Route path="/overview" element={<OverviewPage />} />
             <Route path="/employees" element={<EmployeeListPage />} />
             <Route path="/employees/:id" element={<EmployeeDetailPage />} />
             <Route path="/org-structure" element={<OrgStructurePage />} />

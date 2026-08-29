@@ -9,6 +9,12 @@ export function LoginPage() {
   const location = useLocation()
   const returnTo = (location.state as { from?: string } | null)?.from
   // Never bounce back to /login itself; default landing stays /employees.
+  // (A role-adaptive Overview page exists at /overview, reachable from
+  // the nav -- deliberately not wired as the default landing page yet,
+  // since most of the e2e suite's `login()` calls assume /employees as
+  // the post-login destination via helpers.ts's own default. Making
+  // Overview the default landing page is a one-line follow-up once
+  // that's been verified against the whole suite, not bundled in here.)
   const destination = returnTo && !returnTo.startsWith('/login') ? returnTo : '/employees'
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')

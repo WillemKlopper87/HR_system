@@ -39,6 +39,12 @@ export const NAV_CATEGORIES: readonly NavCategory[] = [
   {
     label: 'Workforce',
     items: [
+      // Landing page (App.tsx's index route redirects here) -- one
+      // endpoint, three role-adaptive payloads (self/own_team/all row
+      // scope), so roles: [] like Employees/Checklists rather than a
+      // role gate. Folded into Workforce rather than its own single-item
+      // category, same convention Headcount below already follows.
+      { to: '/overview', label: 'Overview', roles: [] },
       { to: '/employees', label: 'Employees', roles: [] },
       { to: '/org-structure', label: 'Org Structure', roles: [] },
       { to: '/org-chart', label: 'Org Chart', roles: ORG_CHART },

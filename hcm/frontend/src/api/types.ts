@@ -322,6 +322,57 @@ export interface BreakdownRow {
   suppressed?: boolean
 }
 
+// --- Role-adaptive overview dashboard (Wireframe all features spec(4),
+// Style A) -----------------------------------------------------------
+
+export type OverviewRowScope = 'employee' | 'line_manager' | 'hr_admin'
+export type OverviewTone = 'good' | 'warn' | 'bad' | 'neutral'
+
+export interface OverviewKpi {
+  label: string
+  value: string
+  delta: string
+  tone: OverviewTone
+}
+
+export interface OverviewQueueItem {
+  title: string
+  meta: string
+  ref: string
+  age: string
+  primary: string
+  secondary: string
+  href: string
+}
+
+export interface OverviewPolicyRow {
+  title: string
+  acknowledged_pct: number
+}
+
+export interface OverviewTrainingCompliance {
+  compliant: number
+  due: number
+  overdue: number
+  total: number
+  compliant_pct: number | null
+}
+
+export interface OverviewDashboard {
+  as_of: string
+  row_scope: OverviewRowScope
+  scope_note: string
+  kpis: OverviewKpi[]
+  queue: OverviewQueueItem[]
+  queue_count: number
+  departments?: BreakdownRow[]
+  occupational_levels?: BreakdownRow[]
+  small_cell_suppression_applied?: boolean
+  recruitment_funnel?: BreakdownRow[]
+  training_compliance?: OverviewTrainingCompliance
+  policy_acknowledgment?: OverviewPolicyRow[]
+}
+
 export type HeadcountBreakdownRow = BreakdownRow
 
 export interface HeadcountDashboard {

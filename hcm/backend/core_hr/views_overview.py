@@ -38,7 +38,7 @@ from learning.queries import mandatory_training_compliance_summary
 from policies.queries import policy_acknowledgment_summary
 from rbac_audit.drf import get_request_employee, row_scoped_queryset
 from rbac_audit.models import Role
-from rbac_audit.permissions import active_roles_for, can_see_unsuppressed_aggregates, is_in_reporting_chain
+from rbac_audit.permissions import active_roles_for, can_see_unsuppressed_aggregates
 from rbac_audit.tiers import FieldTier
 from recruitment.queries import recruitment_summary
 
@@ -113,8 +113,7 @@ def _hr_admin_queue(today) -> list[dict]:
     return queue
 
 
-def _line_manager_kpis(actor, today) -> list[dict]:
-    team = row_scoped_queryset(EmployeeVersion.objects.current(), actor, employee_field="employee")
+def _line_manager_kpis(team, today) -> list[dict]:
     team_count = team.count()
     reminder_cutoff = today + timedelta(days=CONTRACT_REMINDER_OFFSETS_DAYS[0])
     contracts_ending = team.filter(
@@ -131,10 +130,9 @@ def _line_manager_kpis(actor, today) -> list[dict]:
     ]
 
 
-def _line_manager_queue(actor, today) -> list[dict]:
+def _line_manager_queue(team, today) -> list[dict]:
     queue = []
     escalation_cutoff = today + timedelta(days=CONTRACT_ESCALATION_DAYS)
-    team = row_scoped_queryset(EmployeeVersion.objects.current(), actor, employee_field="employee")
     awaiting_recommendation = team.filter(
         employment_status=EmployeeVersion.EmploymentStatus.FIXED_TERM,
         contract_end_date__isnull=False,
@@ -185,11 +183,18 @@ def overview_dashboard(request):
     today = timezone.localdate()
     bucket = _scope_bucket(actor)
 
+    # `row_scoped_queryset` loops every employee in Python to test reporting-
+    # chain membership (rbac_audit/drf.py) -- fine once per request, but
+    # calling it separately for KPIs, the queue, and the department
+    # breakdown quadrupled that cost and made this endpoint visibly slow
+    # for line managers. Computed once here and threaded through instead.
+    team = None
     if bucket == "hr_admin":
         kpis, queue = _hr_admin_kpis(today), _hr_admin_queue(today)
         scope_note = f"Organisation-wide · {EmployeeVersion.objects.current().count()} active employment versions"
     elif bucket == "line_manager":
-        kpis, queue = _line_manager_kpis(actor, today), _line_manager_queue(actor, today)
+        team = row_scoped_queryset(EmployeeVersion.objects.current(), actor, employee_field="employee")
+        kpis, queue = _line_manager_kpis(team, today), _line_manager_queue(team, today)
         scope_note = "Your reporting line · demographics as suppressed aggregates"
     else:
         kpis, queue = _employee_kpis(actor), _employee_queue(actor)
@@ -207,14 +212,10 @@ def overview_dashboard(request):
     }
 
     if bucket in ("hr_admin", "line_manager"):
-        team = (
-            EmployeeVersion.objects.current()
-            if bucket == "hr_admin"
-            else row_scoped_queryset(EmployeeVersion.objects.current(), actor, employee_field="employee")
-        )
+        dept_source = EmployeeVersion.objects.current() if bucket == "hr_admin" else team
         # "key" is already the department name -- BreakdownRow shape
         # (api/types.ts), same as core_hr.headcount_dashboard's own rows.
-        dept_rows = team.values("department__name").annotate(count=Count("id")).order_by("-count")
+        dept_rows = dept_source.values("department__name").annotate(count=Count("id")).order_by("-count")
         data["departments"] = [
             {"key": row["department__name"], "count": row["count"]}
             for row in dept_rows if row["department__name"]
