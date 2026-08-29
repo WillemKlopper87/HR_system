@@ -19,6 +19,7 @@ from .views import (
     headcount_dashboard,
     probation_completion_dashboard,
 )
+from .views_overview import overview_dashboard
 
 router = DefaultRouter()
 router.register("employees", EmployeeViewSet, basename="employee")
@@ -36,6 +37,7 @@ router.register("probation-reviews", ProbationReviewViewSet, basename="probation
 router.register("exit-interviews", ExitInterviewViewSet, basename="exit-interview")
 
 urlpatterns = router.urls + [
+    path("dashboards/overview/", overview_dashboard, name="overview-dashboard"),
     path("dashboards/headcount/", headcount_dashboard, name="headcount-dashboard"),
     path("dashboards/probation/", probation_completion_dashboard, name="probation-dashboard"),
     path("dashboards/exit-interviews/", exit_interview_dashboard, name="exit-interview-dashboard"),

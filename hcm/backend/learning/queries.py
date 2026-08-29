@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from core_hr.models import Employee
+
+from .compliance import compliance_matrix
 from .models import EmployeeSkill, TrainingRecord
 
 # Architecture-Design.md §4: "e.g., ee_reporting reads recruitment data
@@ -19,6 +22,25 @@ def employee_ids_with_completed_training_in_period(period_start, period_end) -> 
             completion_date__lte=period_end,
         ).values_list("employee_id", flat=True)
     )
+
+
+def mandatory_training_compliance_summary(*, as_of=None) -> dict:
+    """Org-wide rollup of every mandatory-training requirement's status,
+    for the role-adaptive overview dashboard (core_hr.views_overview).
+    Real status vocabulary (compliant/due/overdue), not an invented
+    "complete/in progress/not started" scheme -- one requirement-status
+    row per employee-per-requirement, from the same compliance_matrix
+    learning.views.training_compliance_dashboard already uses."""
+    statuses = compliance_matrix(Employee.objects.all(), as_of=as_of)
+    counts = {"compliant": 0, "due": 0, "overdue": 0}
+    for status in statuses:
+        counts[status.status] += 1
+    total = sum(counts.values())
+    return {
+        **counts,
+        "total": total,
+        "compliant_pct": round(counts["compliant"] / total * 100, 1) if total else None,
+    }
 
 
 def skill_names_for_employee(employee_id: int) -> list[str]:
