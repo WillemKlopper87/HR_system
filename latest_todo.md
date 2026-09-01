@@ -105,8 +105,9 @@ advisory remains. Other `fetchAllPages<Employee>` call sites remain queued under
       privacy-minimal candidate display name supplied by the row-scoped succession response.
 - [x] Replace applicant interview-panel directory downloads with async multi-select search; embed only panel identity
       summaries and scorecard author names in the already row-scoped interview contracts.
-- [ ] Replace the final full employee-directory consumer, the organisation chart, with an organisational-topology
-      contract that preserves row scope without exposing unrelated employee detail fields.
+- [x] Replace the final full employee-directory consumer, the organisation chart, with a cursor-paginated,
+      privacy-minimal topology contract that preserves reporting-chain row scope without exposing unrelated employee
+      detail fields.
 
 Verification for this partial tranche: 7 focused API tests passed; frontend lint/build, Django warning-level checks,
 migration-drift checks and the two contract-renewal browser journeys passed. The performance review journey also
@@ -121,6 +122,14 @@ Verification for the interview-panel increment: 14 focused scheduling/scorecard 
 Playwright journeys passed. Generated API types were refreshed; frontend lint, contract-import checks, production
 build and `git diff --check` passed. The browser trace confirms panel selection calls only `search-summary` and does
 not request the detailed employee collection.
+
+Verification for the organisation-chart increment: 16 focused employee/search/topology API tests and both focused
+Org Chart Playwright journeys passed. Generated API types were refreshed; frontend lint, contract-import checks,
+production build, Django system checks, migration-drift checks and `git diff --check` passed. Browser evidence confirms
+cursor traversal uses only `org-chart` and never requests the detailed employee collection. No
+`fetchAllPages<Employee>` consumers remain in the frontend. A development-environment `check --deploy` still reports
+the six expected production-only settings warnings (HTTPS/HSTS, secure cookies, secret key and DEBUG); deployment
+evidence must use production settings rather than treating those local warnings as closed.
 
 ## Execution principles
 

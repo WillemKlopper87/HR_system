@@ -289,6 +289,30 @@ class EmployeeSearchSummarySerializer(serializers.ModelSerializer):
         return f"{preferred} {instance.last_name}".strip()
 
 
+class OrgChartNodeSerializer(serializers.ModelSerializer):
+    """Compact current-position projection for the reporting topology.
+
+    It deliberately omits contact, demographic, employment-status and other
+    employee-detail fields. Row scope is applied to EmployeeVersion before
+    this serializer runs, so a manager receives only their visible subtree.
+    """
+
+    employee_id = serializers.IntegerField(read_only=True)
+    employee_number = serializers.CharField(source="employee.employee_number", read_only=True)
+    display_name = serializers.SerializerMethodField()
+    department = serializers.IntegerField(source="department_id", read_only=True)
+    manager_id = serializers.IntegerField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = EmployeeVersion
+        fields = ["employee_id", "employee_number", "display_name", "job_title", "department", "manager_id"]
+        read_only_fields = fields
+
+    def get_display_name(self, instance) -> str:
+        employee = instance.employee
+        return f"{employee.preferred_name or employee.first_name} {employee.last_name}".strip()
+
+
 class _SelfOrHRAdminSerializer(TieredModelSerializer):
     """Shared validate() for Dependant/EmergencyContact (C2 design spec
     §2.8): narrower than learning.RowScopedLearningSerializer's

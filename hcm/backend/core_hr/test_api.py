@@ -177,6 +177,18 @@ class EmployeeApiTests(TestCase):
         response = self.client.get("/api/v1/employees/search-summary/?q=Staff")
         self.assertEqual(response.status_code, 403)
 
+    def test_org_chart_is_privacy_minimal_for_all_scope(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.get("/api/v1/employees/org-chart/")
+        self.assertEqual(response.status_code, 200)
+        rows = response.data["results"]
+        self.assertEqual({row["employee_id"] for row in rows}, {self.hr_admin.id, self.staff.id})
+        self.assertEqual(set(rows[0]), {
+            "employee_id", "employee_number", "display_name", "job_title", "department", "manager_id",
+        })
+        for forbidden in ("work_email", "date_of_birth", "employment_status", "race", "gender"):
+            self.assertNotIn(forbidden, rows[0])
+
 
 class EmployeeSearchSummaryReportingChainTests(TestCase):
     """P0.2's remaining coverage: reporting-chain row scope and pagination.
@@ -220,6 +232,16 @@ class EmployeeSearchSummaryReportingChainTests(TestCase):
         response = self.client.get("/api/v1/employees/search-summary/?q=Stranger")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["results"], [])
+
+    def test_org_chart_preserves_reporting_link_but_excludes_unrelated_rows(self):
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.get("/api/v1/employees/org-chart/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 1)
+        row = response.data["results"][0]
+        self.assertEqual(row["employee_id"], self.report.id)
+        self.assertEqual(row["manager_id"], self.manager.id)
+        self.assertEqual(row["display_name"], "Direct Report")
 
     def test_matching_more_than_a_page_is_paginated(self):
         for n in range(60):

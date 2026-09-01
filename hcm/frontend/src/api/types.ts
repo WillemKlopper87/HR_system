@@ -1268,6 +1268,15 @@ export interface EEForumMember {
   is_active: boolean
 }
 
+export interface OrgChartNodeSummary {
+  employee_id: number
+  employee_number: string
+  display_name: string
+  job_title: string
+  department: number
+  manager_id: number | null
+}
+
 export interface EEForumMemberSummary {
   id: number
   employee_name: string

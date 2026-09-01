@@ -50,6 +50,7 @@ from .serializers import (
     DepartmentSerializer,
     EmergencyContactSerializer,
     EmployeeSearchSummarySerializer,
+    OrgChartNodeSerializer,
     EmployeeSerializer,
     EmployeeVersionSerializer,
     EmploymentChangeSerializer,
@@ -401,6 +402,18 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             )
         page = self.paginate_queryset(queryset.order_by("-created_at", "-pk"))
         serializer = EmployeeSearchSummarySerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
+    @extend_schema(responses=OrgChartNodeSerializer(many=True))
+    @action(detail=False, methods=["get"], url_path="org-chart")
+    def org_chart(self, request):
+        """Return only the current reporting topology visible to the actor."""
+        queryset = row_scoped_queryset(
+            EmployeeVersion.objects.current().select_related("employee", "department", "manager"),
+            get_request_employee(request),
+        ).order_by("-created_at", "-pk")
+        page = self.paginate_queryset(queryset)
+        serializer = OrgChartNodeSerializer(page, many=True)
         return self.get_paginated_response(serializer.data)
 
     @action(detail=True, methods=["post"])

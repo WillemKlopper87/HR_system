@@ -3821,6 +3821,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/employees/org-chart/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Return only the current reporting topology visible to the actor. */
+        get: operations["v1_employees_org_chart_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/employees/search-summary/": {
         parameters: {
             query?: never;
@@ -8152,6 +8169,21 @@ export interface components {
          */
         OfferStatusEnum: "proposed" | "approved" | "accepted" | "declined" | "withdrawn";
         /**
+         * @description Compact current-position projection for the reporting topology.
+         *
+         *     It deliberately omits contact, demographic, employment-status and other
+         *     employee-detail fields. Row scope is applied to EmployeeVersion before
+         *     this serializer runs, so a manager receives only their visible subtree.
+         */
+        OrgChartNode: {
+            readonly employee_id: number;
+            readonly employee_number: string;
+            readonly display_name: string;
+            readonly job_title: string;
+            readonly department: number;
+            readonly manager_id: number | null;
+        };
+        /**
          * @description * `hr` - HR
          *     * `it` - IT
          *     * `line_manager` - Line manager
@@ -8897,6 +8929,19 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["Offer"][];
+        };
+        PaginatedOrgChartNodeList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["OrgChartNode"][];
         };
         PaginatedPDPItemList: {
             /**
@@ -17199,6 +17244,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Employee"];
+                };
+            };
+        };
+    };
+    v1_employees_org_chart_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedOrgChartNodeList"];
                 };
             };
         };

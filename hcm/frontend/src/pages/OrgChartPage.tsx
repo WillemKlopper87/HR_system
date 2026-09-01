@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import { useReferenceData } from '../api/useReferenceData'
-import type { Employee, EmployeeVersion } from '../api/types'
+import type { OrgChartNodeSummary } from '../api/types'
 
 interface OrgNode {
   employeeId: number
@@ -20,15 +20,15 @@ interface OrgNode {
 }
 
 /**
- * Builds the reporting forest from the row-scoped employees/current-versions
- * pair. "Root" is deliberately broader than "manager is null": row-scoping
+ * Builds the reporting forest from the row-scoped, privacy-minimal topology
+ * rows. "Root" is deliberately broader than "manager is null": row-scoping
  * (e.g. a line_manager's view) can return a subtree whose top person's own
  * manager exists in the org but isn't present in *this* fetch — treating
  * only `manager === null` as root would make that whole subtree vanish. So
  * a node is a root if its manager is null OR its manager isn't one of the
  * employees we actually have a node for.
  *
- * `EmployeeVersion.manager` is a plain nullable FK with no DB constraint,
+ * The topology's manager link originates from EmployeeVersion's nullable FK,
  * `clean()`, or serializer validation against self-reference or a cycle —
  * so "A manages A" or "A manages B manages A" is bad data the backend does
  * not prevent, and this builder has to guarantee an acyclic result itself
@@ -51,22 +51,17 @@ interface OrgNode {
  * placement itself rather than filtering after the fact — every node still
  * gets placed exactly once, so nobody drops out of the chart.
  */
-function buildForest(employees: Employee[], versions: EmployeeVersion[], departmentName: (id: number) => string) {
-  const versionByEmployee = new Map<number, EmployeeVersion>()
-  versions.forEach((v) => versionByEmployee.set(v.employee, v))
+function buildForest(rows: OrgChartNodeSummary[], departmentName: (id: number) => string) {
 
   const nodeById = new Map<number, OrgNode>()
-  const joined: { employee: Employee; version: EmployeeVersion }[] = []
-  employees.forEach((employee) => {
-    const version = versionByEmployee.get(employee.id)
-    if (!version) return // no current version for this employee — nothing to place in the tree
-    joined.push({ employee, version })
-    nodeById.set(employee.id, {
-      employeeId: employee.id,
-      name: `${employee.first_name} ${employee.last_name}`,
-      employeeNumber: employee.employee_number,
-      jobTitle: version.job_title,
-      departmentName: departmentName(version.department),
+  const managerByEmployeeId = new Map(rows.map((row) => [row.employee_id, row.manager_id]))
+  rows.forEach((row) => {
+    nodeById.set(row.employee_id, {
+      employeeId: row.employee_id,
+      name: row.display_name,
+      employeeNumber: row.employee_number,
+      jobTitle: row.job_title,
+      departmentName: departmentName(row.department),
       children: [],
     })
   })
@@ -89,19 +84,19 @@ function buildForest(employees: Employee[], versions: EmployeeVersion[], departm
       }
       state.set(id, GRAY)
       chain.push(id)
-      const managerId: number | null = versionByEmployee.get(id)?.manager ?? null
+      const managerId: number | null = managerByEmployeeId.get(id) ?? null
       id = managerId !== null && nodeById.has(managerId) ? managerId : undefined
     }
     chain.forEach((cid) => state.set(cid, BLACK))
   }
-  joined.forEach(({ employee }) => resolveChain(employee.id))
+  rows.forEach((row) => resolveChain(row.employee_id))
 
   const roots: OrgNode[] = []
-  joined.forEach(({ employee, version }) => {
-    const node = nodeById.get(employee.id)!
-    const managerId = version.manager
+  rows.forEach((row) => {
+    const node = nodeById.get(row.employee_id)!
+    const managerId = row.manager_id
     const managerNode = managerId !== null ? nodeById.get(managerId) : undefined
-    if (managerNode && !brokenEdge.has(employee.id)) {
+    if (managerNode && !brokenEdge.has(row.employee_id)) {
       managerNode.children.push(node)
     } else {
       if (managerNode) node.brokenLoopManagerName = managerNode.name
@@ -117,9 +112,9 @@ function buildForest(employees: Employee[], versions: EmployeeVersion[], departm
   roots.sort(byName)
   roots.forEach(sortTree)
 
-  const brokenLoopCount = joined.filter(({ employee }) => nodeById.get(employee.id)!.brokenLoopManagerName).length
+  const brokenLoopCount = rows.filter((row) => nodeById.get(row.employee_id)!.brokenLoopManagerName).length
 
-  return { roots, totalShown: joined.length, brokenLoopCount }
+  return { roots, totalShown: rows.length, brokenLoopCount }
 }
 
 /** Max depth of the forest (roots = depth 0). buildForest already
@@ -183,18 +178,14 @@ export function OrgChartPage() {
   const departmentName = (id: number) => departments.get(id)?.name ?? `#${id}`
 
   const { data, error } = useApiQuery(
-    () =>
-      Promise.all([
-        fetchAllPages<Employee>('/employees/'),
-        fetchAllPages<EmployeeVersion>('/employee-versions/?current=true'),
-      ]).then(([employees, versions]) => ({ employees, versions })),
+    () => fetchAllPages<OrgChartNodeSummary>('/employees/org-chart/'),
     [],
     { errorMessage: 'Failed to load the org chart.' },
   )
 
   const forest = useMemo(() => {
     if (!data) return null
-    return buildForest(data.employees, data.versions, departmentName)
+    return buildForest(data, departmentName)
     // departments map identity changes each ReferenceDataContext load; that's fine, this is cheap to recompute.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, departments])
