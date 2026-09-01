@@ -93,6 +93,21 @@ Verification: 44 focused backend tests and 6 Playwright selector journeys passed
 warning-level system checks, migration-drift checks and `git diff --check` passed. The existing large-chunk build
 advisory remains. Other `fetchAllPages<Employee>` call sites remain queued under the repository-wide scale item.
 
+## Employee-directory removal follow-up — 2026-09-01
+
+- [x] Remove the full employee-directory join from contract renewals; employee and manager display names now travel
+      with each row-scoped employee-version response.
+- [x] Remove the full employee-directory join from reviews; the row-scoped review response now carries the reviewee's
+      display name.
+- [ ] Replace the four remaining full employee-directory consumers: applicant interview panels, My Performance,
+      organisation chart and succession/talent pools. These require compact multi-select, feedback-recipient,
+      organisational-topology and succession-candidate contracts respectively.
+
+Verification for this partial tranche: 7 focused API tests passed; frontend lint/build, Django warning-level checks,
+migration-drift checks and the two contract-renewal browser journeys passed. The performance review journey also
+passed within the broader talent spec; that spec's unrelated recruitment journey timed out while the still-outstanding
+applicant page downloaded the full employee directory, reinforcing the priority of the next item.
+
 ## Execution principles
 
 - Preserve effective dating, audit history, row scope, field tiers and protected-download controls.

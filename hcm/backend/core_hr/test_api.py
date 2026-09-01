@@ -401,6 +401,8 @@ class EmployeeVersionQueryParamTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data["results"]), 1)
         self.assertIsNone(response.data["results"][0]["valid_to"])
+        self.assertEqual(response.data["results"][0]["employee_name"], "A B")
+        self.assertIsNone(response.data["results"][0]["manager_name"])
 
 
 class OrgStructureApiTests(TestCase):

@@ -7625,6 +7625,7 @@ export interface components {
         EmployeeVersion: {
             readonly id: number;
             employee: number;
+            readonly employee_name: string;
             /** Format: date */
             valid_from: string;
             /** Format: date */
@@ -7634,6 +7635,7 @@ export interface components {
             occupational_level: number;
             job_grade?: number | null;
             manager?: number | null;
+            readonly manager_name: string | null;
             employment_status: components["schemas"]["EmploymentStatusEnum"];
             citizenship_status: components["schemas"]["CitizenshipStatusEnum"];
             location: number;
@@ -9946,6 +9948,7 @@ export interface components {
             readonly id?: number;
             readonly review_cycle?: number;
             readonly employee?: number;
+            readonly employee_name?: string;
             readonly manager?: number | null;
             self_rating?: (components["schemas"]["Rating1To5Enum"] | components["schemas"]["NullEnum"]) | null;
             self_comments?: string;
@@ -10470,6 +10473,7 @@ export interface components {
             readonly id: number;
             readonly review_cycle: number;
             readonly employee: number;
+            readonly employee_name: string;
             readonly manager: number | null;
             self_rating?: (components["schemas"]["Rating1To5Enum"] | components["schemas"]["NullEnum"]) | null;
             self_comments?: string;

@@ -44,11 +44,12 @@ class ReviewSerializer(serializers.ModelSerializer):
     is further restricted to the specific reviewee/reviewer in validate()."""
 
     completion_status = serializers.SerializerMethodField()
+    employee_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
         fields = [
-            "id", "review_cycle", "employee", "manager",
+            "id", "review_cycle", "employee", "employee_name", "manager",
             "self_rating", "self_comments", "self_submitted_at",
             "manager_rating", "manager_comments", "manager_submitted_at",
             "completion_status",
@@ -57,6 +58,10 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     def get_completion_status(self, obj) -> str:
         return obj.completion_status
+
+    def get_employee_name(self, obj) -> str:
+        employee = obj.employee
+        return f"{employee.preferred_name or employee.first_name} {employee.last_name}".strip()
 
     def validate(self, attrs):
         request = self.context.get("request")

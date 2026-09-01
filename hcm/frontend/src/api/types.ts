@@ -33,6 +33,7 @@ export interface Employee {
 export interface EmployeeVersion {
   id: number
   employee: number
+  employee_name: string
   valid_from: string
   valid_to: string | null
   department: number
@@ -40,6 +41,7 @@ export interface EmployeeVersion {
   occupational_level: number
   job_grade: number | null
   manager: number | null
+  manager_name: string | null
   employment_status: string
   // Sensitive-tier fields — stripped entirely for roles without S-tier
   // read (e.g. line_manager sees none of these on a report's record).
@@ -695,6 +697,7 @@ export interface Goal {
   id: number
   employee: number
   manager: number | null
+  manager_name: string | null
   title: string
   description?: string
   target_date: string | null
@@ -708,6 +711,7 @@ export interface Review {
   id: number
   review_cycle: number
   employee: number
+  employee_name: string
   manager: number | null
   self_rating: number | null
   self_comments: string

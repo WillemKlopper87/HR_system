@@ -115,6 +115,7 @@ class ReviewRowScopeAndWriteGatingTests(PerformanceApiTestCase):
             f"/api/v1/reviews/{self.review.id}/", {"self_rating": 3, "self_comments": "ok"}, format="json"
         )
         self.assertEqual(ok.status_code, 200)
+        self.assertEqual(ok.data["employee_name"], f"{self.report.first_name} {self.report.last_name}")
         blocked = self.client.patch(f"/api/v1/reviews/{self.review.id}/", {"manager_rating": 5}, format="json")
         self.assertEqual(blocked.status_code, 400)
 

@@ -4,7 +4,6 @@ import { useApiQuery } from '../api/hooks'
 import {
   CONTRACT_ACTION_LABELS,
   type ContractAction,
-  type Employee,
   type EmployeeVersion,
 } from '../api/types'
 import { useAuth } from '../auth/useAuth'
@@ -46,20 +45,11 @@ export function ContractRenewalsPage() {
       Promise.all([
         fetchAllPages<EmployeeVersion>('/employee-versions/?fixed_term=true&current=true'),
         fetchAllPages<EmployeeVersion>('/employee-versions/?fixed_term=true'),
-        fetchAllPages<Employee>('/employees/'),
-      ]).then(([contracts, allVersions, employees]) => ({ contracts, allVersions, employees })),
+      ]).then(([contracts, allVersions]) => ({ contracts, allVersions })),
     [],
     { errorMessage: 'Failed to load contracts.' },
   )
   const contracts = data?.contracts ?? null
-  const employees = data?.employees ?? null
-
-  const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
-  const nameFor = (id: number | null) => {
-    if (id === null) return '—'
-    const emp = employeeById.get(id)
-    return emp ? `${emp.first_name} ${emp.last_name}` : `#${id}`
-  }
 
   const expiringSoonCount = contracts?.filter(
     (c) =>
@@ -130,7 +120,7 @@ export function ContractRenewalsPage() {
               const decision = version.contract_renewal_decision
               return (
                 <li key={version.id} className="hint-text">
-                  {(decision?.decided_at ?? '').slice(0, 10)} · {nameFor(version.employee)} ·{' '}
+                  {(decision?.decided_at ?? '').slice(0, 10)} · {version.employee_name} ·{' '}
                   {decision?.decided_action ? CONTRACT_ACTION_LABELS[decision.decided_action] : '—'}
                   {decision?.decided_action === 'renew' && decision.decided_end_date
                     ? ` to ${decision.decided_end_date}`
@@ -171,8 +161,8 @@ export function ContractRenewalsPage() {
                 <ContractRow
                   key={version.id}
                   version={version}
-                  employeeName={nameFor(version.employee)}
-                  managerName={nameFor(version.manager)}
+                  employeeName={version.employee_name}
+                  managerName={version.manager_name ?? '—'}
                   onChanged={load}
                 />
               ))}

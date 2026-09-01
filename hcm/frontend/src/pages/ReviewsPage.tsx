@@ -2,7 +2,7 @@ import { useMemo} from 'react'
 import { Link } from 'react-router-dom'
 import { fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
-import type { Employee, Review, ReviewCycle } from '../api/types'
+import type { Review, ReviewCycle } from '../api/types'
 
 const STATUS_LABELS: Record<Review['completion_status'], string> = {
   not_started: 'Not started',
@@ -17,17 +17,14 @@ export function ReviewsPage() {
       Promise.all([
         fetchAllPages<Review>('/reviews/'),
         fetchAllPages<ReviewCycle>('/review-cycles/'),
-        fetchAllPages<Employee>('/employees/'),
-      ]).then(([reviews, cycles, employees]) => ({ reviews, cycles, employees })),
+      ]).then(([reviews, cycles]) => ({ reviews, cycles })),
     [],
     { errorMessage: 'Failed to load reviews.' },
   )
   const reviews = data?.reviews ?? null
   const cycles = data?.cycles ?? null
-  const employees = data?.employees ?? null
 
   const cycleById = useMemo(() => new Map((cycles ?? []).map((c) => [c.id, c])), [cycles])
-  const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
 
   return (
     <div className="page">
@@ -53,11 +50,10 @@ export function ReviewsPage() {
             </thead>
             <tbody>
               {reviews.map((r) => {
-                const emp = employeeById.get(r.employee)
                 return (
                   <tr key={r.id}>
                     <td>
-                      <Link to={`/reviews/${r.id}`}>{emp ? `${emp.first_name} ${emp.last_name}` : `#${r.employee}`}</Link>
+                      <Link to={`/reviews/${r.id}`}>{r.employee_name}</Link>
                     </td>
                     <td>{cycleById.get(r.review_cycle)?.name ?? '—'}</td>
                     <td>

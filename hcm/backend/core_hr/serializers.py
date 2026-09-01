@@ -155,15 +155,29 @@ class ExitInterviewSerializer(serializers.ModelSerializer):
 
 class EmployeeVersionSerializer(TieredModelSerializer):
     contract_renewal_decision = serializers.SerializerMethodField()
+    employee_name = serializers.SerializerMethodField()
+    manager_name = serializers.SerializerMethodField()
 
     class Meta:
         model = EmployeeVersion
         fields = [
-            "id", "employee", "valid_from", "valid_to", "department", "job_title",
-            "occupational_level", "job_grade", "manager", "employment_status",
+            "id", "employee", "employee_name", "valid_from", "valid_to", "department", "job_title",
+            "occupational_level", "job_grade", "manager", "manager_name", "employment_status",
             "citizenship_status", "location", "contract_end_date", "contract_renewal_decision",
             "race", "gender", "disability_status", "disability_detail", "race_source", "disability_source",
         ]
+
+    @staticmethod
+    def _display_name(employee) -> str | None:
+        if employee is None:
+            return None
+        return f"{employee.preferred_name or employee.first_name} {employee.last_name}".strip()
+
+    def get_employee_name(self, obj) -> str:
+        return self._display_name(obj.employee) or ""
+
+    def get_manager_name(self, obj) -> str | None:
+        return self._display_name(obj.manager)
 
     def get_contract_renewal_decision(self, obj) -> dict | None:
         try:
