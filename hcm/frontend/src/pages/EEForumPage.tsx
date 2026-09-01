@@ -3,7 +3,7 @@ import { api, ApiError, fetchAllPages, type Paginated } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import { useAuth } from '../auth/useAuth'
 import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
-import type { EEForumComposition, EEForumMeeting, EEForumMember, EEForumRepresentation, EEForumRole } from '../api/types'
+import type { EEForumComposition, EEForumMeeting, EEForumMember, EEForumMemberSummary, EEForumRepresentation, EEForumRole } from '../api/types'
 import { EE_FORUM_REPRESENTATION_LABELS, EE_FORUM_ROLE_LABELS } from '../api/types'
 import { OCCUPATIONAL_LEVEL_LABELS } from '../ee-reporting/constants'
 
@@ -16,10 +16,21 @@ const CURRENT_YEAR = new Date().getFullYear()
 export function EEForumPage() {
   const { hasRole } = useAuth()
   const canWrite = hasRole('hr_admin') || hasRole('ee_manager')
+  const [memberPagePath, setMemberPagePath] = useState<string | null>(null)
   const [meetingPagePath, setMeetingPagePath] = useState<string | null>(null)
+  const memberRequestPath = memberPagePath ?? '/ee-forum-members/'
   const meetingRequestPath = meetingPagePath ?? '/ee-forum-meetings/'
 
-  const members = useApiQuery(() => fetchAllPages<EEForumMember>('/ee-forum-members/'), [], { errorMessage: 'Failed to load forum members.' })
+  const members = useApiQuery(
+    () => api.get<Paginated<EEForumMember>>(memberRequestPath).then((page) => ({ memberRequestPath, page })),
+    [memberRequestPath],
+    { errorMessage: 'Failed to load forum members.' },
+  )
+  const activeMembers = useApiQuery(
+    () => fetchAllPages<EEForumMemberSummary>('/ee-forum-members/active-summary/'),
+    [],
+    { enabled: canWrite, errorMessage: 'Failed to load active forum members.' },
+  )
   const composition = useApiQuery(() => api.get<EEForumComposition>('/ee-forum-members/composition/'), [], { errorMessage: 'Failed to load the composition check.' })
   const meetings = useApiQuery(
     () => api.get<Paginated<EEForumMeeting>>(meetingRequestPath).then((page) => ({ meetingRequestPath, page })),
@@ -27,9 +38,11 @@ export function EEForumPage() {
     { errorMessage: 'Failed to load forum meetings.' },
   )
   const meetingPage = meetings.data?.meetingRequestPath === meetingRequestPath ? meetings.data.page : null
+  const memberPage = members.data?.memberRequestPath === memberRequestPath ? members.data.page : null
 
   function reloadAll() {
     members.reload()
+    activeMembers.reload()
     composition.reload()
     meetings.reload()
   }
@@ -54,9 +67,9 @@ export function EEForumPage() {
       <section className="detail-card">
         <h2>Members</h2>
         {members.error && <p className="form-error">{members.error}</p>}
-        {members.data === null ? (
+        {memberPage === null ? (
           !members.error && <p className="empty-state">Loading…</p>
-        ) : members.data.length === 0 ? (
+        ) : memberPage.results.length === 0 ? (
           <p className="empty-state">No forum members recorded yet.</p>
         ) : (
           <div className="table-scroll">
@@ -72,7 +85,7 @@ export function EEForumPage() {
                 </tr>
               </thead>
               <tbody>
-                {members.data.map((m) => (
+                {memberPage.results.map((m) => (
                   <tr key={m.id}>
                     <td>{m.employee_name} ({m.employee_number})</td>
                     <td>{m.representation ? EE_FORUM_REPRESENTATION_LABELS[m.representation] : '—'}</td>
@@ -87,6 +100,16 @@ export function EEForumPage() {
               </tbody>
             </table>
           </div>
+        )}
+        {memberPage && (memberPage.previous || memberPage.next) && (
+          <nav className="form-actions" aria-label="EE forum member pages">
+            <button type="button" className="btn-secondary" disabled={!memberPage.previous} onClick={() => setMemberPagePath(memberPage.previous)}>
+              Previous
+            </button>
+            <button type="button" className="btn-secondary" disabled={!memberPage.next} onClick={() => setMemberPagePath(memberPage.next)}>
+              Next
+            </button>
+          </nav>
         )}
         {canWrite && <AddMemberForm onSaved={reloadAll} />}
       </section>
@@ -144,7 +167,9 @@ export function EEForumPage() {
             </button>
           </nav>
         )}
-        {canWrite && <AddMeetingForm members={(members.data ?? []).filter((m) => m.is_active)} onSaved={reloadAll} />}
+        {canWrite && activeMembers.error && <p className="form-error">{activeMembers.error}</p>}
+        {canWrite && activeMembers.loading && <p className="empty-state">Loading active members…</p>}
+        {canWrite && activeMembers.data !== null && <AddMeetingForm members={activeMembers.data} onSaved={reloadAll} />}
       </section>
     </div>
   )
@@ -259,7 +284,7 @@ function AddMemberForm({ onSaved }: { onSaved: () => void }) {
   )
 }
 
-function AddMeetingForm({ members, onSaved }: { members: EEForumMember[]; onSaved: () => void }) {
+function AddMeetingForm({ members, onSaved }: { members: EEForumMemberSummary[]; onSaved: () => void }) {
   const [meetingDate, setMeetingDate] = useState(new Date().toISOString().slice(0, 10))
   const [title, setTitle] = useState('')
   const [reportYear, setReportYear] = useState(String(CURRENT_YEAR))

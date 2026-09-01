@@ -155,6 +155,19 @@ class EEForumMemberSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class EEForumMemberSummarySerializer(serializers.ModelSerializer):
+    """Privacy-minimal active-member projection for meeting attendance."""
+
+    employee_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EEForumMember
+        fields = ["id", "employee_name"]
+
+    def get_employee_name(self, obj) -> str:
+        return _employee_name(obj.employee)
+
+
 class EEForumMeetingSerializer(serializers.ModelSerializer):
     attendee_count = serializers.SerializerMethodField()
     has_minutes = serializers.SerializerMethodField()

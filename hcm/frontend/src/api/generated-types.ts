@@ -2865,6 +2865,23 @@ export interface paths {
         patch: operations["v1_ee_forum_members_partial_update"];
         trace?: never;
     };
+    "/api/v1/ee-forum-members/active-summary/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Return the complete, minimal roster required by attendance forms. */
+        get: operations["v1_ee_forum_members_active_summary_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ee-forum-members/composition/": {
         parameters: {
             query?: never;
@@ -7335,6 +7352,11 @@ export interface components {
          * @enum {string}
          */
         EEForumMemberRoleEnum: "chair" | "secretary" | "member";
+        /** @description Privacy-minimal active-member projection for meeting attendance. */
+        EEForumMemberSummary: {
+            readonly id: number;
+            readonly employee_name: string;
+        };
         EEPlan: {
             readonly id: number;
             /** Format: date */
@@ -8471,6 +8493,19 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["EEForumMember"][];
+        };
+        PaginatedEEForumMemberSummaryList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["EEForumMemberSummary"][];
         };
         PaginatedEEPlanList: {
             /**
@@ -15600,6 +15635,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EEForumMember"];
+                };
+            };
+        };
+    };
+    v1_ee_forum_members_active_summary_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEEForumMemberSummaryList"];
                 };
             };
         };

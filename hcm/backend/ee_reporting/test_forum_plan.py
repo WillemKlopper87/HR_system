@@ -277,6 +277,35 @@ class ForumApiTests(ForumPlanTestCase):
         self._auth(self.ee_manager)
         self.assertEqual(_rows(self.client.get("/api/v1/ee-forum-members/").data)[0]["representation"], "union_nominated")
 
+    def test_active_summary_is_minimal_and_excludes_expired_terms(self):
+        expired_employee = self._hire("OLD1", username="expired-member")
+        EEForumMember.objects.create(
+            employee=expired_employee,
+            representation="employee_nominated",
+            term_start=date(2025, 1, 1),
+            term_end=date(2025, 12, 31),
+        )
+        self._auth(self.ee_manager)
+
+        r = self.client.get("/api/v1/ee-forum-members/active-summary/")
+
+        self.assertEqual(r.status_code, 200, r.data)
+        rows = _rows(r.data)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["id"], self.member.id)
+        self.assertEqual(set(rows[0]), {"id", "employee_name"})
+
+    def test_active_summary_preserves_roster_permissions(self):
+        self._auth(self.member_emp)
+        r = self.client.get("/api/v1/ee-forum-members/active-summary/")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual([row["id"] for row in _rows(r.data)], [self.member.id])
+
+        self._auth(self.outsider)
+        r = self.client.get("/api/v1/ee-forum-members/active-summary/")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(_rows(r.data), [])
+
     def test_non_member_employee_sees_nothing(self):
         self._auth(self.outsider)
         self.assertEqual(len(_rows(self.client.get("/api/v1/ee-forum-members/").data)), 0)

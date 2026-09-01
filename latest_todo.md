@@ -57,6 +57,24 @@ suppression) passed twice — once before and once after the contract-facade mig
 gate but not engineering-only; the effort-buildable P1 items are identity/SSO, employee-relations case
 management, reasonable accommodation, and the statutory workflow foundation).
 
+## Scale and privacy follow-up — 2026-09-01
+
+Completed in the current high-volume-screen tranche:
+
+- [x] Cursor-paginate the applicant, compensation-proposal, workforce-integrity, EE-forum meeting and EE-forum
+      member tables instead of downloading every detailed record.
+- [x] Replace the EE-forum add-member directory download with the shared row-scoped async employee selector.
+- [x] Add a complete active-forum-member attendance endpoint exposing only the membership ID and display name;
+      preserve the existing EE-reader/member/outsider roster boundary.
+- [x] Regenerate the OpenAPI client contract and add focused active-only, minimal-field and permission tests.
+- [x] Remove the date-expired “current EE plan” assumption from the management-control disability-target test.
+
+Verification: all 130 EE reporting tests passed; frontend lint and production build passed; Django system and
+migration-drift checks passed. The production build continues to report the known large-chunk advisory.
+
+The broad high-volume-screen and selector-summary items below remain open because other screens still use
+`fetchAllPages`; this slice closes the named workflows, not the repository-wide migration.
+
 ## Execution principles
 
 - Preserve effective dating, audit history, row scope, field tiers and protected-download controls.

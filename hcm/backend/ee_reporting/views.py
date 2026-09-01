@@ -5,6 +5,7 @@ import os
 from django.db.models import Q
 from django.http import FileResponse, HttpResponse
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rbac_audit.audit import log_access
 from rbac_audit.drf import get_request_employee, int_query_param
 from rbac_audit.models import AuditLogEntry
@@ -41,6 +42,7 @@ from .permissions import (
 from .serializers import (
     EEForumMeetingSerializer,
     EEForumMemberSerializer,
+    EEForumMemberSummarySerializer,
     EEPlanMeasureSerializer,
     EEPlanProgressSnapshotSerializer,
     EEPlanSerializer,
@@ -336,6 +338,11 @@ class EEForumMemberViewSet(viewsets.ModelViewSet):
     serializer_class = EEForumMemberSerializer
     permission_classes = [EEForumPermission]
 
+    def get_serializer_class(self):
+        if self.action == "active_summary":
+            return EEForumMemberSummarySerializer
+        return super().get_serializer_class()
+
     def get_queryset(self):
         qs = super().get_queryset()
         employee = get_request_employee(self.request)
@@ -356,6 +363,20 @@ class EEForumMemberViewSet(viewsets.ModelViewSet):
         if not is_ee_reader(get_request_employee(request)):
             raise PermissionDenied("Only EE reporting roles can view the forum composition check.")
         return Response(forum_composition())
+
+    @extend_schema(responses=EEForumMemberSummarySerializer(many=True))
+    @action(detail=False, methods=["get"], url_path="active-summary")
+    def active_summary(self, request):
+        """Return the complete, minimal roster required by attendance forms."""
+        today = timezone.localdate()
+        members = self.get_queryset().filter(term_start__lte=today).filter(
+            Q(term_end__isnull=True) | Q(term_end__gte=today)
+        )
+        page = self.paginate_queryset(members)
+        serializer = self.get_serializer(page if page is not None else members, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
 
 
 class EEForumMeetingViewSet(viewsets.ModelViewSet):

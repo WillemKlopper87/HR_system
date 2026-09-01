@@ -374,7 +374,7 @@ class ManagementControlScheduleApiTests(EEReportingApiTestCase):
 
     def test_disability_representation_and_target_included(self):
         EEPlan.objects.create(
-            plan_period_start=self.period_start, plan_period_end=self.period_end,
+            plan_period_start=date(2025, 9, 1), plan_period_end=date(2030, 8, 31),
             disability_5yr_target_pct=Decimal("3.0"),
         )
         Employee.objects.hire(

@@ -1257,6 +1257,11 @@ export interface EEForumMember {
   is_active: boolean
 }
 
+export interface EEForumMemberSummary {
+  id: number
+  employee_name: string
+}
+
 export interface EEForumComposition {
   as_of: string
   active_member_count: number
