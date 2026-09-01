@@ -59,6 +59,48 @@ def is_in_reporting_chain(manager_employee, target_employee, *, max_depth: int =
     return False
 
 
+def accessible_employee_ids(employee, *, max_depth: int = 20) -> set[int] | None:
+    """Return employee ids covered by the actor's active row scopes.
+
+    ``None`` represents unrestricted ALL scope. OWN_TEAM is expanded one
+    reporting level at a time with set-based database queries. Query count is
+    therefore bounded by hierarchy depth rather than total workforce size.
+
+    SELF remains role-driven: a line-manager assignment alone does not grant
+    access to the manager's own employee row.
+    """
+    if employee is None:
+        return set()
+
+    scopes = set(active_roles_for(employee).values_list("row_scope", flat=True))
+    if Role.RowScope.ALL in scopes:
+        return None
+
+    accessible_ids: set[int] = set()
+    if Role.RowScope.SELF in scopes:
+        accessible_ids.add(employee.id)
+
+    if Role.RowScope.OWN_TEAM not in scopes or max_depth <= 0:
+        return accessible_ids
+
+    from core_hr.models import EmployeeVersion
+
+    frontier = {employee.id}
+    visited = {employee.id}
+    current_versions = EmployeeVersion.objects.current()
+    for _ in range(max_depth):
+        report_ids = set(
+            current_versions.filter(manager_id__in=frontier).values_list("employee_id", flat=True)
+        )
+        frontier = report_ids - visited
+        if not frontier:
+            break
+        accessible_ids.update(frontier)
+        visited.update(frontier)
+
+    return accessible_ids
+
+
 def _role_covers_target(role, employee, target_employee) -> bool:
     if role.row_scope == Role.RowScope.ALL:
         return True

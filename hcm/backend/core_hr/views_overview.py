@@ -10,15 +10,11 @@ Cross-app data comes through each app's own queries.py read seam
 establishment/policies/ee_reporting/learning models directly, same rule
 every other app already follows.
 
-Role bucketing is by the viewer's widest active row-scope grant (all >
-own_team > self), not by a hardcoded role-name list, so any role
-combination lands in a sensible bucket automatically. This is a
-deliberate v1 simplification: recruiter/comp_manager/ee_manager/auditor/
-accounting_officer/sysadmin all currently fall into the "employee"
-bucket here (their own dedicated dashboards elsewhere in the nav are
-unaffected) rather than getting a bespoke KPI/queue set each -- a real
-limitation, not an oversight, and the next thing to widen if this proves
-out."""
+Dashboard persona is based on explicit business capability, not the widest
+data row scope. An all-scope specialist therefore does not inherit HR-admin
+actions merely because another module grants broad read scope. Multi-role
+users receive the widest dashboard capability they actually hold: hr_admin,
+then line_manager, then employee."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -35,9 +31,8 @@ from config.settings import CONTRACT_ESCALATION_DAYS, CONTRACT_REMINDER_OFFSETS_
 from ee_reporting.queries import workforce_profile_totals_by_level
 from establishment.queries import establishment_summary
 from learning.queries import mandatory_training_compliance_summary
-from policies.queries import policy_acknowledgment_summary
+from policies.queries import outstanding_policies_for_employee, policy_acknowledgment_summary
 from rbac_audit.drf import get_request_employee, row_scoped_queryset
-from rbac_audit.models import Role
 from rbac_audit.permissions import active_roles_for, can_see_unsuppressed_aggregates
 from rbac_audit.tiers import FieldTier
 from recruitment.queries import recruitment_summary
@@ -46,10 +41,10 @@ from .models import ContractRenewalDecision, Employee, EmployeeVersion
 
 
 def _scope_bucket(actor) -> str:
-    scopes = set(active_roles_for(actor).values_list("row_scope", flat=True))
-    if Role.RowScope.ALL in scopes:
+    role_names = set(active_roles_for(actor).values_list("name", flat=True))
+    if "hr_admin" in role_names:
         return "hr_admin"
-    if Role.RowScope.OWN_TEAM in scopes:
+    if "line_manager" in role_names:
         return "line_manager"
     return "employee"
 
@@ -149,27 +144,19 @@ def _line_manager_queue(team, today) -> list[dict]:
     return queue
 
 
-def _employee_kpis(actor) -> list[dict]:
-    from policies.models import Policy, PolicyAcknowledgment
-
-    published = Policy.objects.filter(status=Policy.Status.PUBLISHED)
-    acknowledged_ids = PolicyAcknowledgment.objects.filter(employee=actor).values_list("policy_id", flat=True)
-    outstanding = published.exclude(id__in=acknowledged_ids).count()
+def _employee_kpis(policy_obligations) -> list[dict]:
+    outstanding = policy_obligations["count"]
     return [
         _kpi("Policies to acknowledge", str(outstanding), "", "warn" if outstanding else "good"),
     ]
 
 
-def _employee_queue(actor) -> list[dict]:
-    from policies.models import Policy, PolicyAcknowledgment
-
-    published = Policy.objects.filter(status=Policy.Status.PUBLISHED)
-    acknowledged_ids = PolicyAcknowledgment.objects.filter(employee=actor).values_list("policy_id", flat=True)
+def _employee_queue(policy_obligations) -> list[dict]:
     queue = []
-    for policy in published.exclude(id__in=acknowledged_ids).order_by("title")[:5]:
+    for policy in policy_obligations["policies"]:
         queue.append(_queue_item(
-            title=f"Acknowledge {policy.title} v{policy.version}",
-            meta="Required for all employees", ref=f"POL-{policy.id}", age="outstanding",
+            title=f"Acknowledge {policy['title']} v{policy['version']}",
+            meta="Required for all employees", ref=f"POL-{policy['id']}", age="outstanding",
             primary="Acknowledge", secondary="Read", href="/my-policies",
         ))
     return queue
@@ -183,11 +170,7 @@ def overview_dashboard(request):
     today = timezone.localdate()
     bucket = _scope_bucket(actor)
 
-    # `row_scoped_queryset` loops every employee in Python to test reporting-
-    # chain membership (rbac_audit/drf.py) -- fine once per request, but
-    # calling it separately for KPIs, the queue, and the department
-    # breakdown quadrupled that cost and made this endpoint visibly slow
-    # for line managers. Computed once here and threaded through instead.
+    # Compute the team scope once and reuse it for KPIs, queue and breakdown.
     team = None
     if bucket == "hr_admin":
         kpis, queue = _hr_admin_kpis(today), _hr_admin_queue(today)
@@ -197,7 +180,8 @@ def overview_dashboard(request):
         kpis, queue = _line_manager_kpis(team, today), _line_manager_queue(team, today)
         scope_note = "Your reporting line · demographics as suppressed aggregates"
     else:
-        kpis, queue = _employee_kpis(actor), _employee_queue(actor)
+        policy_obligations = outstanding_policies_for_employee(actor)
+        kpis, queue = _employee_kpis(policy_obligations), _employee_queue(policy_obligations)
         scope_note = "Your own record and obligations"
 
     can_see_unsuppressed = can_see_unsuppressed_aggregates(actor, FieldTier.SENSITIVE)

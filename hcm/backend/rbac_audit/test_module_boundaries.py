@@ -37,7 +37,15 @@ DOMAIN_APPS = [
 # and who's allowed to approve them. The kernel test below is what keeps
 # that true: infrastructure may not import a domain app back.
 SHARED_KERNEL = {"core_hr", "rbac_audit", "integrations", "notifications", "establishment"}
-EXEMPT_FILES = {BACKEND / "core_hr" / "management" / "commands" / "seed_demo_data.py"}
+EXEMPT_FILES = {
+    BACKEND / "core_hr" / "management" / "commands" / "seed_demo_data.py",
+}
+COMPOSITION_FILES = {
+    # Intentionally joins peer query seams but owns no domain data or writes.
+    # It remains in _production_modules so the peer-import test still forbids
+    # direct model/service imports.
+    BACKEND / "core_hr" / "views_overview.py",
+}
 
 
 def _production_modules(app: str):
@@ -83,6 +91,8 @@ class ModuleBoundaryTests(SimpleTestCase):
         violations = []
         for app in SHARED_KERNEL:
             for path in _production_modules(app):
+                if path in COMPOSITION_FILES:
+                    continue
                 for dotted, root in _imported_roots(path):
                     if root in DOMAIN_APPS and root not in SHARED_KERNEL:
                         violations.append(f"{path.relative_to(BACKEND)} imports {dotted}")

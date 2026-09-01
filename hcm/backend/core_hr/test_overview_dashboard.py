@@ -24,8 +24,8 @@ def _seed_reference_data():
 class OverviewDashboardTests(TestCase):
     """core_hr.views_overview.overview_dashboard -- the role-adaptive
     landing dashboard (Wireframe all features spec(4), Style A). One
-    endpoint, three payloads, bucketed by the viewer's widest active
-    row-scope grant rather than a hardcoded role list."""
+    endpoint, three payloads, selected by explicit business capability rather
+    than broad data row scope."""
 
     def setUp(self):
         self.client = APIClient()
@@ -180,11 +180,9 @@ class OverviewDashboardTests(TestCase):
         policies_kpi = next(k for k in response.data["kpis"] if k["label"] == "Policies to acknowledge")
         self.assertEqual(policies_kpi["value"], "1")
 
-    def test_accounting_officer_gets_hr_admin_bucket_but_suppressed_matrix(self):
-        """accounting_officer holds row_scope=all (so lands in the same
-        bucket as hr_admin) but no standing Sensitive-tier grant
-        (RBAC-Roles.md) -- the occupational-level totals should come back
-        small-cell-suppressed for them, unlike for hr_admin."""
+    def test_all_scope_specialist_does_not_inherit_hr_admin_dashboard(self):
+        """Accounting officers have broad EE data scope, not HR operations
+        capability, so HR queues and organisation widgets must stay hidden."""
         officer = Employee.objects.hire(
             employee_number="OV005", first_name="Officer", last_name="Accounting", date_of_birth=date(1979, 1, 1),
             work_email="ov-officer@example.com", hire_date=date(2014, 1, 1), department=self.dept,
@@ -196,8 +194,20 @@ class OverviewDashboardTests(TestCase):
         self.client.force_authenticate(user=officer.user)
         response = self.client.get("/api/v1/dashboards/overview/")
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data["row_scope"], "hr_admin")
-        self.assertTrue(response.data["small_cell_suppression_applied"])
+        self.assertEqual(response.data["row_scope"], "employee")
+        self.assertNotIn("occupational_levels", response.data)
+        self.assertNotIn("recruitment_funnel", response.data)
+        self.assertNotIn("departments", response.data)
+
+    def test_specialist_plus_manager_gets_manager_not_hr_admin_dashboard(self):
+        RoleAssignment.objects.create(employee=self.manager, role=Role.objects.get(name="recruiter"))
+
+        self.client.force_authenticate(user=self.manager.user)
+        response = self.client.get("/api/v1/dashboards/overview/")
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["row_scope"], "line_manager")
+        self.assertNotIn("occupational_levels", response.data)
 
         self.client.force_authenticate(user=self.hr_admin.user)
         hr_response = self.client.get("/api/v1/dashboards/overview/")

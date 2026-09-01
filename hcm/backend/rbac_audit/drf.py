@@ -3,8 +3,8 @@ from __future__ import annotations
 from rest_framework import permissions, serializers
 
 from .audit import log_access
-from .models import AuditLogEntry, Role
-from .permissions import active_roles_for, can_access_tier_for_target, has_row_access
+from .models import AuditLogEntry
+from .permissions import accessible_employee_ids, can_access_tier_for_target, has_row_access
 from .tiers import FieldTier, highest_tier, tier_of
 
 
@@ -71,19 +71,12 @@ def row_scoped_queryset(queryset, employee, *, employee_field: str | None = "emp
     """Filters a queryset to rows the employee's active roles' row-scope
     permits. `employee_field=None` means the row itself IS the employee
     (e.g. the Employee model's own queryset) rather than a queryset with a
-    foreign key to one. Adequate for pilot-scale data (loops employees in
-    Python) — Sprint 3's real dashboards should replace this with a
-    set-based query (e.g. a recursive CTE for reporting-line membership)
-    at production scale."""
-    from core_hr.models import Employee
-
-    if employee is None:
-        return queryset.none()
-
-    if any(r.row_scope == Role.RowScope.ALL for r in active_roles_for(employee)):
+    foreign key to one. Reporting chains are expanded with set-based queries
+    per hierarchy level, so unrelated workforce size does not increase query
+    count or require loading Employee objects in Python."""
+    accessible_ids = accessible_employee_ids(employee)
+    if accessible_ids is None:
         return queryset
-
-    accessible_ids = [e.id for e in Employee.objects.all() if has_row_access(employee, e)]
     lookup = "pk__in" if employee_field is None else f"{employee_field}_id__in"
     return queryset.filter(**{lookup: accessible_ids})
 

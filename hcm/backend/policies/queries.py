@@ -25,3 +25,19 @@ def policy_acknowledgment_summary() -> dict:
 
     avg_pct = round(sum(row["acknowledged_pct"] for row in rows) / len(rows), 1) if rows else None
     return {"policies": rows, "average_acknowledged_pct": avg_pct}
+
+
+def outstanding_policies_for_employee(employee, *, limit: int = 5) -> dict:
+    """Return the employee's outstanding published-policy obligations.
+
+    This keeps dashboard composition behind the policies read seam and
+    returns display-ready, minimum-necessary fields rather than Policy model
+    instances.
+    """
+    if employee is None:
+        return {"count": 0, "policies": []}
+
+    acknowledged_ids = PolicyAcknowledgment.objects.filter(employee=employee).values("policy_id")
+    outstanding = Policy.objects.filter(status=Policy.Status.PUBLISHED).exclude(id__in=acknowledged_ids)
+    rows = list(outstanding.order_by("title").values("id", "title", "version")[:limit])
+    return {"count": outstanding.count(), "policies": rows}

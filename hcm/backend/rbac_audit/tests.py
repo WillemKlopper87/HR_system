@@ -1,14 +1,17 @@
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
 
 from .consent import has_active_consent, record_consent, withdraw_consent
 from .models import AuditLogEntry, ConsentRecord, Role, RoleAssignment
-from .permissions import can_access_tier, has_row_access, is_in_reporting_chain
+from .drf import row_scoped_queryset
+from .permissions import accessible_employee_ids, can_access_tier, has_row_access, is_in_reporting_chain
 from .tiers import FieldTier
 
 User = get_user_model()
@@ -137,6 +140,54 @@ class RowScopeTests(TestCase):
     def test_no_roles_denies_everything(self):
         self.assertFalse(has_row_access(self.outsider, self.direct_report))
         self.assertFalse(has_row_access(self.outsider, self.outsider))
+
+    def test_set_based_scope_matches_reporting_chain_semantics(self):
+        RoleAssignment.objects.create(employee=self.top_manager, role=Role.objects.get(name="line_manager"))
+
+        accessible = accessible_employee_ids(self.top_manager)
+
+        self.assertEqual(accessible, {self.direct_report.id, self.indirect_report.id})
+        scoped = row_scoped_queryset(Employee.objects.all(), self.top_manager, employee_field=None)
+        self.assertEqual(set(scoped.values_list("id", flat=True)), accessible)
+
+    def test_combined_self_and_team_scopes_include_actor_and_reports(self):
+        RoleAssignment.objects.create(employee=self.top_manager, role=Role.objects.get(name="line_manager"))
+        RoleAssignment.objects.create(employee=self.top_manager, role=Role.objects.get(name="employee"))
+
+        self.assertEqual(
+            accessible_employee_ids(self.top_manager),
+            {self.top_manager.id, self.direct_report.id, self.indirect_report.id},
+        )
+
+    def test_all_scope_returns_unrestricted_sentinel(self):
+        RoleAssignment.objects.create(employee=self.top_manager, role=Role.objects.get(name="hr_admin"))
+        self.assertIsNone(accessible_employee_ids(self.top_manager))
+
+    def test_scope_query_count_does_not_grow_with_unrelated_workforce(self):
+        RoleAssignment.objects.create(employee=self.top_manager, role=Role.objects.get(name="line_manager"))
+
+        with CaptureQueriesContext(connection) as baseline_queries:
+            baseline = accessible_employee_ids(self.top_manager)
+
+        for index in range(25):
+            Employee.objects.hire(
+                employee_number=f"UNRELATED-{index}",
+                first_name="Unrelated",
+                last_name=str(index),
+                date_of_birth=date(1990, 1, 1),
+                work_email=f"unrelated-{index}@example.com",
+                hire_date=date(2022, 1, 1),
+                department=self.dept,
+                occupational_level=self.level,
+                job_grade=self.grade,
+                location=self.location,
+            )
+
+        with CaptureQueriesContext(connection) as scaled_queries:
+            scaled = accessible_employee_ids(self.top_manager)
+
+        self.assertEqual(scaled, baseline)
+        self.assertEqual(len(scaled_queries), len(baseline_queries))
 
 
 class AuditLogImmutabilityTests(TestCase):
