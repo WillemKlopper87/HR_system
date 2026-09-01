@@ -1,35 +1,60 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, fetchAllPages } from '../api/client'
+import { api, ApiError, fetchAllPages, type Paginated } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import { STAGE_LABELS, type Applicant, type ApplicantStage, type Requisition } from '../api/types'
 
 export function ApplicantsPage() {
   const [stageFilter, setStageFilter] = useState<ApplicantStage | ''>('')
+  const [search, setSearch] = useState('')
+  const [pagePath, setPagePath] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
 
-  const { data, error: loadError, reload: load } = useApiQuery(
-    () =>
-      Promise.all([
-        fetchAllPages<Applicant>('/applicants/'),
-        fetchAllPages<Requisition>('/requisitions/'),
-      ]).then(([applicants, requisitions]) => ({ applicants, requisitions })),
-    [],
+  const applicantParams = new URLSearchParams()
+  if (stageFilter) applicantParams.set('stage', stageFilter)
+  if (search.trim()) applicantParams.set('search', search.trim())
+  const applicantPath = `/applicants/${applicantParams.size ? `?${applicantParams.toString()}` : ''}`
+  const requestPath = pagePath ?? applicantPath
+
+  const { data: applicantResponse, error: loadError, reload: load } = useApiQuery(
+    () => api.get<Paginated<Applicant>>(requestPath).then((page) => ({ requestPath, page })),
+    [requestPath],
     { errorMessage: 'Failed to load applicants.' },
   )
-  const applicants = data?.applicants ?? null
-  const requisitions = data?.requisitions ?? null
+  const { data: requisitions } = useApiQuery(
+    () => fetchAllPages<Requisition>('/requisitions/'),
+    [],
+    { errorMessage: 'Failed to load requisitions.' },
+  )
+  const applicantPage = applicantResponse?.requestPath === requestPath ? applicantResponse.page : null
+  const applicants = applicantPage?.results ?? null
 
 
   const requisitionById = useMemo(() => new Map((requisitions ?? []).map((r) => [r.id, r])), [requisitions])
-  const filtered = applicants?.filter((a) => !stageFilter || a.current_stage === stageFilter) ?? null
 
   return (
     <div className="page">
       <div className="page-header">
         <h1>Applicants</h1>
         <div className="row-actions">
-          <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as ApplicantStage | '')}>
+          <input
+            className="search-input"
+            type="search"
+            placeholder="Search candidates or requisitions…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPagePath(null)
+            }}
+          />
+          <select
+            aria-label="Filter applicants by stage"
+            value={stageFilter}
+            onChange={(e) => {
+              setStageFilter(e.target.value as ApplicantStage | '')
+              setPagePath(null)
+            }}
+          >
             <option value="">All stages</option>
             {Object.entries(STAGE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -55,9 +80,9 @@ export function ApplicantsPage() {
         />
       )}
 
-      {filtered === null ? (
+      {applicants === null ? (
         <p className="empty-state">Loading…</p>
-      ) : filtered.length === 0 ? (
+      ) : applicants.length === 0 ? (
         <p className="empty-state">No applicants.</p>
       ) : (
         <div className="table-scroll">
@@ -72,7 +97,7 @@ export function ApplicantsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((a) => (
+              {applicants.map((a) => (
                 <tr key={a.id}>
                   <td>
                     <Link to={`/applicants/${a.id}`}>
@@ -90,6 +115,26 @@ export function ApplicantsPage() {
             </tbody>
           </table>
         </div>
+      )}
+      {applicantPage && (applicantPage.previous || applicantPage.next) && (
+        <nav className="form-actions" aria-label="Applicant pages">
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={!applicantPage.previous}
+            onClick={() => setPagePath(applicantPage.previous)}
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={!applicantPage.next}
+            onClick={() => setPagePath(applicantPage.next)}
+          >
+            Next
+          </button>
+        </nav>
       )}
     </div>
   )

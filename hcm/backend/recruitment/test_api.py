@@ -94,6 +94,61 @@ class RequisitionPermissionTests(RecruitmentApiTestCase):
         self.assertIsNotNone(response.data["opened_at"])
 
 
+class ApplicantListFilterTests(RecruitmentApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.rejected = Applicant.objects.create(
+            requisition=self.requisition,
+            first_name="Rejected",
+            last_name="Candidate",
+            email="rejected@example.com",
+            date_of_birth=date(1992, 4, 4),
+            current_stage=Applicant.Stage.REJECTED,
+        )
+        self.client.force_authenticate(user=self.recruiter.user)
+
+    def test_stage_filter_is_applied_server_side(self):
+        response = self.client.get("/api/v1/applicants/?stage=rejected")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row["id"] for row in response.data["results"]], [self.rejected.id])
+
+    def test_search_matches_candidate_and_requisition_fields(self):
+        by_candidate = self.client.get("/api/v1/applicants/?search=Rejected")
+        by_requisition = self.client.get("/api/v1/applicants/?search=Backend%20Engineer")
+
+        self.assertEqual([row["id"] for row in by_candidate.data["results"]], [self.rejected.id])
+        self.assertEqual(
+            {row["id"] for row in by_requisition.data["results"]},
+            {self.applicant.id, self.rejected.id},
+        )
+
+    def test_requisition_filter_excludes_other_requisitions(self):
+        other = Requisition.objects.create(
+            title="Other role",
+            department=self.dept,
+            occupational_level=self.level,
+            job_grade=self.grade,
+            location=self.location,
+            headcount=1,
+            status=Requisition.Status.OPEN,
+        )
+        Applicant.objects.create(
+            requisition=other,
+            first_name="Other",
+            last_name="Candidate",
+            email="other@example.com",
+            date_of_birth=date(1991, 5, 5),
+        )
+
+        response = self.client.get(f"/api/v1/applicants/?requisition={self.requisition.id}")
+
+        self.assertEqual(
+            {row["id"] for row in response.data["results"]},
+            {self.applicant.id, self.rejected.id},
+        )
+
+
 class ApplicantConsentGatingTests(RecruitmentApiTestCase):
     def test_setting_demographics_without_consent_is_rejected(self):
         self.client.force_authenticate(user=self.recruiter.user)

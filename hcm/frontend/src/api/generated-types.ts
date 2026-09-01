@@ -2270,6 +2270,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboards/overview/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["v1_dashboards_overview_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboards/policy-acknowledgment/": {
         parameters: {
             query?: never;
@@ -11580,6 +11596,12 @@ export interface operations {
             query?: {
                 /** @description The pagination cursor value. */
                 cursor?: string;
+                /** @description Filter by requisition id. */
+                requisition?: number;
+                /** @description Search candidate name, email, or requisition title. */
+                search?: string;
+                /** @description Filter by current applicant stage. */
+                stage?: string;
             };
             header?: never;
             path?: never;
@@ -14605,6 +14627,27 @@ export interface operations {
         };
     };
     v1_dashboards_management_control_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    v1_dashboards_overview_retrieve: {
         parameters: {
             query?: never;
             header?: never;

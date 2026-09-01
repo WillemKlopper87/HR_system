@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import os
 
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.http import FileResponse
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rbac_audit.aggregates import suppress_count, suppress_related_counts
 from rbac_audit.audit import log_access
 from rbac_audit.consent import record_consent
@@ -72,6 +72,19 @@ class RequisitionViewSet(viewsets.ModelViewSet):
             instance.save(update_fields=update_fields)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            OpenApiParameter("stage", OpenApiTypes.STR, description="Filter by current applicant stage."),
+            OpenApiParameter("requisition", OpenApiTypes.INT, description="Filter by requisition id."),
+            OpenApiParameter(
+                "search",
+                OpenApiTypes.STR,
+                description="Search candidate name, email, or requisition title.",
+            ),
+        ]
+    )
+)
 class ApplicantViewSet(viewsets.ModelViewSet):
     """No DELETE — applicants leave the pipeline via the 'rejected' stage,
     not row deletion, so the audit trail (stage_events, consent_records)
@@ -81,6 +94,26 @@ class ApplicantViewSet(viewsets.ModelViewSet):
     serializer_class = ApplicantSerializer
     permission_classes = [IsRecruiterOrHRAdmin]
     http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        stage = self.request.query_params.get("stage")
+        if stage in Applicant.Stage.values:
+            queryset = queryset.filter(current_stage=stage)
+
+        requisition_id = int_query_param(self.request, "requisition")
+        if requisition_id is not None:
+            queryset = queryset.filter(requisition_id=requisition_id)
+
+        search = self.request.query_params.get("search", "").strip()
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search)
+                | Q(last_name__icontains=search)
+                | Q(email__icontains=search)
+                | Q(requisition__title__icontains=search)
+            )
+        return queryset
 
     @action(detail=True, methods=["post"])
     def consent(self, request, pk=None):
