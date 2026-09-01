@@ -7092,6 +7092,7 @@ export interface components {
         CompProposal: {
             readonly id: number;
             employee: number;
+            readonly employee_display: string;
             readonly current_job_grade: number;
             proposal_type?: components["schemas"]["ProposalTypeEnum"];
             /** Format: decimal */

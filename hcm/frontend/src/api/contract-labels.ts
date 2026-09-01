@@ -1,4 +1,10 @@
-import type { ExitInterviewReason, ProbationRecommendation, ProbationStatus } from './contracts'
+import type {
+  CompProposalStatus,
+  CompProposalType,
+  ExitInterviewReason,
+  ProbationRecommendation,
+  ProbationStatus,
+} from './contracts'
 
 // Presentation-only labels for generated-contract enums (api/contracts.ts).
 // Kept in their own module rather than merged into either contracts.ts
@@ -28,4 +34,15 @@ export const EXIT_INTERVIEW_REASON_LABELS: Record<ExitInterviewReason, string> =
   health: 'Health or personal',
   role_fit: 'Role fit',
   other: 'Other',
+}
+
+export const COMP_PROPOSAL_STATUS_LABELS: Record<CompProposalStatus, string> = {
+  proposed: 'Proposed',
+  approved: 'Approved',
+  rejected: 'Rejected',
+}
+
+export const COMP_PROPOSAL_TYPE_LABELS: Record<CompProposalType, string> = {
+  increase: 'Salary increase',
+  bonus: 'Bonus',
 }

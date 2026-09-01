@@ -853,47 +853,12 @@ export interface PayBand {
   created_by: number | null
 }
 
-export type CompProposalStatus = 'proposed' | 'approved' | 'rejected'
-export type CompProposalType = 'increase' | 'bonus'
 export type CompCycleStatus = 'draft' | 'open' | 'closed'
 
 export interface PerformanceContext {
   final_score: string
   period_name: string
   hr_attention: boolean
-}
-
-export interface CompProposal {
-  id: number
-  employee: number
-  current_job_grade: number
-  proposal_type: CompProposalType
-  proposed_annual_salary: string | null
-  bonus_amount: string | null
-  baseline_salary_at_proposal: string | null
-  budget_impact: string | null
-  justification: string
-  status: CompProposalStatus
-  requires_override: boolean
-  exceeds_cycle_budget: boolean
-  override_reason: string
-  effective_date: string | null
-  cycle: number | null
-  proposed_by: number | null
-  approved_by: number | null
-  approved_at: string | null
-  performance_context: PerformanceContext | null
-}
-
-export const COMP_PROPOSAL_STATUS_LABELS: Record<CompProposalStatus, string> = {
-  proposed: 'Proposed',
-  approved: 'Approved',
-  rejected: 'Rejected',
-}
-
-export const COMP_PROPOSAL_TYPE_LABELS: Record<CompProposalType, string> = {
-  increase: 'Salary increase',
-  bonus: 'Bonus',
 }
 
 export interface CompCycleUtilization {

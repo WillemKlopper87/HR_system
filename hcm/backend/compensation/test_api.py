@@ -121,6 +121,23 @@ class ModuleWidePermissionTests(CompensationApiTestCase):
         self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(response.data["results"][0]["employee"], self.plain_employee.id)
 
+    def test_comp_proposal_list_includes_minimal_employee_display(self):
+        CompProposal.objects.create(
+            employee=self.plain_employee,
+            current_job_grade=self.grade,
+            proposed_annual_salary=Decimal("420000.00"),
+            proposed_by=self.comp_manager,
+        )
+        self.client.force_authenticate(user=self.comp_manager.user)
+
+        response = self.client.get("/api/v1/comp-proposals/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data["results"][0]["employee_display"],
+            f"{self.plain_employee.employee_number} — {self.plain_employee.first_name} {self.plain_employee.last_name}",
+        )
+
     def test_comp_manager_can_view_all_endpoints(self):
         self.client.force_authenticate(user=self.comp_manager.user)
         for path in ("/api/v1/pay-bands/", "/api/v1/comp-proposals/", "/api/v1/benefits/", "/api/v1/benefits-elections/"):

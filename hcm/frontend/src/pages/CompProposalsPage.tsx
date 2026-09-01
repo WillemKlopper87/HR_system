@@ -1,37 +1,38 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatZAR } from '../lib/format'
-import { api, ApiError, fetchAllPages } from '../api/client'
+import { api, ApiError, fetchAllPages, type Paginated } from '../api/client'
 import { useApiQuery } from '../api/hooks'
+import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
+import { COMP_PROPOSAL_STATUS_LABELS, COMP_PROPOSAL_TYPE_LABELS } from '../api/contract-labels'
+import type { CompProposal, CompProposalType } from '../api/contracts'
 import {
-  COMP_PROPOSAL_STATUS_LABELS,
-  COMP_PROPOSAL_TYPE_LABELS,
   type CompCycle,
-  type CompProposal,
-  type CompProposalType,
-  type Employee,
 } from '../api/types'
 
 export function CompProposalsPage() {
   const [showForm, setShowForm] = useState(false)
+  const [pagePath, setPagePath] = useState<string | null>(null)
   const [searchParams] = useSearchParams()
   const cycleFilter = searchParams.get('cycle')
+  const initialPath = cycleFilter ? `/comp-proposals/?cycle=${encodeURIComponent(cycleFilter)}` : '/comp-proposals/'
+  const requestPath = pagePath ?? initialPath
 
-  const { data, error: loadError, reload: load } = useApiQuery(
-    () =>
-      Promise.all([
-        fetchAllPages<CompProposal>(cycleFilter ? `/comp-proposals/?cycle=${cycleFilter}` : '/comp-proposals/'),
-        fetchAllPages<Employee>('/employees/'),
-        fetchAllPages<CompCycle>('/comp-cycles/'),
-      ]).then(([proposals, employees, cycles]) => ({ proposals, employees, cycles })),
-    [cycleFilter],
+  useEffect(() => setPagePath(null), [cycleFilter])
+
+  const { data: proposalResponse, error: loadError, reload: load } = useApiQuery(
+    () => api.get<Paginated<CompProposal>>(requestPath).then((page) => ({ requestPath, page })),
+    [requestPath],
     { errorMessage: 'Failed to load compensation proposals.' },
   )
-  const proposals = data?.proposals ?? null
-  const employees = data?.employees ?? null
-  const cycles = data?.cycles ?? null
+  const { data: cycles } = useApiQuery(
+    () => fetchAllPages<CompCycle>('/comp-cycles/'),
+    [],
+    { errorMessage: 'Failed to load compensation cycles.' },
+  )
+  const proposalPage = proposalResponse?.requestPath === requestPath ? proposalResponse.page : null
+  const proposals = proposalPage?.results ?? null
 
-  const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
   const cycleById = useMemo(() => new Map((cycles ?? []).map((c) => [c.id, c])), [cycles])
   const filteredCycle = cycleFilter ? cycleById.get(Number(cycleFilter)) : undefined
 
@@ -48,7 +49,6 @@ export function CompProposalsPage() {
 
       {showForm && (
         <NewProposalForm
-          employees={employees ?? []}
           cycles={(cycles ?? []).filter((c) => c.status === 'open')}
           defaultCycleId={cycleFilter ? Number(cycleFilter) : null}
           onCreated={() => {
@@ -80,12 +80,11 @@ export function CompProposalsPage() {
             </thead>
             <tbody>
               {proposals.map((proposal) => {
-                const emp = employeeById.get(proposal.employee)
                 return (
                   <ProposalRow
                     key={proposal.id}
                     proposal={proposal}
-                    employeeName={emp ? `${emp.first_name} ${emp.last_name}` : `#${proposal.employee}`}
+                    employeeName={proposal.employee_display}
                     cycleName={proposal.cycle ? cycleById.get(proposal.cycle)?.name ?? `#${proposal.cycle}` : '—'}
                     onChanged={load}
                   />
@@ -94,6 +93,16 @@ export function CompProposalsPage() {
             </tbody>
           </table>
         </div>
+      )}
+      {proposalPage && (proposalPage.previous || proposalPage.next) && (
+        <nav className="form-actions" aria-label="Compensation proposal pages">
+          <button type="button" className="btn-secondary" disabled={!proposalPage.previous} onClick={() => setPagePath(proposalPage.previous)}>
+            Previous
+          </button>
+          <button type="button" className="btn-secondary" disabled={!proposalPage.next} onClick={() => setPagePath(proposalPage.next)}>
+            Next
+          </button>
+        </nav>
       )}
     </div>
   )
@@ -143,13 +152,14 @@ function ProposalRow({
     }
   }
 
-  const amount = proposal.proposal_type === 'bonus' ? proposal.bonus_amount : proposal.proposed_annual_salary
+  const proposalType = proposal.proposal_type ?? 'increase'
+  const amount = proposalType === 'bonus' ? proposal.bonus_amount : proposal.proposed_annual_salary
 
   return (
     <tr>
       <td>{employeeName}</td>
-      <td>{COMP_PROPOSAL_TYPE_LABELS[proposal.proposal_type]}</td>
-      <td>{amount !== null ? formatZAR(amount) : '—'}</td>
+      <td>{COMP_PROPOSAL_TYPE_LABELS[proposalType]}</td>
+      <td>{amount != null ? formatZAR(amount) : '—'}</td>
       <td>{cycleName}</td>
       <td>
         {proposal.performance_context
@@ -210,10 +220,9 @@ function ProposalRow({
 }
 
 function NewProposalForm({
-  employees, cycles, defaultCycleId, onCreated,
-}: { employees: Employee[]; cycles: CompCycle[]; defaultCycleId: number | null; onCreated: () => void }) {
-  const [search, setSearch] = useState('')
-  const [employee, setEmployee] = useState<number | ''>('')
+  cycles, defaultCycleId, onCreated,
+}: { cycles: CompCycle[]; defaultCycleId: number | null; onCreated: () => void }) {
+  const [employee, setEmployee] = useState<number | null>(null)
   const [proposalType, setProposalType] = useState<CompProposalType>('increase')
   const [salary, setSalary] = useState('')
   const [bonusAmount, setBonusAmount] = useState('')
@@ -222,16 +231,6 @@ function NewProposalForm({
   const [effectiveDate, setEffectiveDate] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    if (!term) return employees
-    return employees.filter(
-      (e) =>
-        e.employee_number.toLowerCase().includes(term) ||
-        `${e.first_name} ${e.last_name}`.toLowerCase().includes(term),
-    )
-  }, [employees, search])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -261,21 +260,7 @@ function NewProposalForm({
 
   return (
     <form className="inline-form" onSubmit={handleSubmit}>
-      <label>
-        Search employee
-        <input placeholder="Name or employee #…" value={search} onChange={(e) => setSearch(e.target.value)} />
-      </label>
-      <label>
-        Employee
-        <select value={employee} onChange={(e) => setEmployee(e.target.value ? Number(e.target.value) : '')} required>
-          <option value="">— Select —</option>
-          {filtered.map((emp) => (
-            <option key={emp.id} value={emp.id}>
-              {emp.employee_number} — {emp.first_name} {emp.last_name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <EmployeeAsyncSelect value={employee} onChange={setEmployee} required />
       <label>
         Type
         <select value={proposalType} onChange={(e) => setProposalType(e.target.value as CompProposalType)}>

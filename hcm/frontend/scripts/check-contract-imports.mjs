@@ -24,6 +24,13 @@ const MIGRATED_MODULES = {
     'PROBATION_RECOMMENDATION_LABELS',
   ],
   'pages/ExitInterviewsPage.tsx': ['ExitInterviewReason', 'ExitInterview', 'EXIT_INTERVIEW_REASON_LABELS'],
+  'pages/CompProposalsPage.tsx': [
+    'CompProposal',
+    'CompProposalStatus',
+    'CompProposalType',
+    'COMP_PROPOSAL_STATUS_LABELS',
+    'COMP_PROPOSAL_TYPE_LABELS',
+  ],
 }
 
 const IMPORT_FROM_TYPES = /import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]\.\.\/api\/types['"]/g

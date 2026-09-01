@@ -66,6 +66,7 @@ class CompProposalSerializer(serializers.ModelSerializer):
     here."""
 
     performance_context = serializers.SerializerMethodField()
+    employee_display = serializers.SerializerMethodField()
     # A plain DecimalField (not ReadOnlyField) so it string-coerces the
     # same way every other money field on this serializer already does
     # (proposed_annual_salary, bonus_amount, baseline_salary_at_proposal
@@ -76,7 +77,7 @@ class CompProposalSerializer(serializers.ModelSerializer):
     class Meta:
         model = CompProposal
         fields = [
-            "id", "employee", "current_job_grade", "proposal_type", "proposed_annual_salary", "bonus_amount",
+            "id", "employee", "employee_display", "current_job_grade", "proposal_type", "proposed_annual_salary", "bonus_amount",
             "baseline_salary_at_proposal", "budget_impact", "justification", "status", "requires_override",
             "exceeds_cycle_budget", "override_reason", "effective_date", "cycle",
             "proposed_by", "approved_by", "approved_at", "performance_context",
@@ -88,6 +89,9 @@ class CompProposalSerializer(serializers.ModelSerializer):
 
     def get_performance_context(self, obj) -> dict | None:
         return latest_final_score(obj.employee_id)
+
+    def get_employee_display(self, obj) -> str:
+        return f"{obj.employee.employee_number} — {obj.employee.first_name} {obj.employee.last_name}"
 
 
 class BenefitSerializer(serializers.ModelSerializer):
