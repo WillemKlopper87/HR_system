@@ -46,6 +46,33 @@ test.describe('EE reporting (Sprint 13-14)', () => {
 })
 
 test.describe('workforce integrity (Sprint 12c)', () => {
+  test('biometric capture is gated by explicit informed consent', async ({ page }) => {
+    await login(page, 'employee')
+    let consentPostBody: unknown = null
+    await page.route('**/api/v1/liveness-checks/consent/**', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ active: false }) })
+        return
+      }
+      consentPostBody = route.request().postDataJSON()
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ detail: 'Consent recorded.' }) })
+    })
+
+    await page.goto('/my-verification')
+    await expectHeading(page, 'My Identity Verification')
+    await settled(page)
+
+    await expect(page.getByRole('button', { name: /Verify now|Enroll now/ })).toHaveCount(0)
+    const recordConsent = page.getByRole('button', { name: 'Record consent' })
+    await expect(recordConsent).toBeDisabled()
+    await page.getByLabel(/I have read this notice and consent/).check()
+    await recordConsent.click()
+    await expect.poll(() => consentPostBody).toEqual({
+      employee: expect.any(Number), lawful_basis: 'consent', text_version: 'biometric-v1',
+    })
+    await expect(page.getByRole('button', { name: 'Start camera' })).toBeVisible()
+  })
+
   test('hr_admin review queue + attendance; employee self-service check-in page', async ({ page }) => {
     await login(page, 'hradmin')
     await page.goto('/workforce-integrity')

@@ -4702,7 +4702,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * @description No PATCH/DELETE on a check itself — the only mutation after
+         *     creation is the dedicated review action, which enforces its own
+         *     state-machine rule (services.py::resolve_review — only a PENDING
+         *     check can be reviewed, exactly once).
+         */
+        get: operations["v1_liveness_checks_consent_retrieve"];
         put?: never;
         /**
          * @description No PATCH/DELETE on a check itself — the only mutation after
@@ -6883,6 +6889,16 @@ export interface components {
          * @enum {string}
          */
         BenefitsElectionStatusEnum: "enrolled" | "waived" | "pending";
+        BiometricConsent: {
+            employee: number;
+            /** @default consent */
+            lawful_basis: components["schemas"]["LawfulBasisEnum"];
+            /** @default biometric-v1 */
+            text_version: string;
+        };
+        BiometricConsentStatus: {
+            readonly active: boolean;
+        };
         /**
          * @description Deliberately never exposes `descriptor` — the client writes a new
          *     one (via the create input serializer below) but has no reason to read
@@ -8047,6 +8063,11 @@ export interface components {
             occupational_level: number;
             active?: boolean;
         };
+        /**
+         * @description * `consent` - consent
+         * @enum {string}
+         */
+        LawfulBasisEnum: "consent";
         /**
          * @description * `A` - Category A
          *     * `B` - Category B
@@ -18964,6 +18985,27 @@ export interface operations {
             };
         };
     };
+    v1_liveness_checks_consent_retrieve: {
+        parameters: {
+            query: {
+                employee: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BiometricConsentStatus"];
+                };
+            };
+        };
+    };
     v1_liveness_checks_consent_create: {
         parameters: {
             query?: never;
@@ -18973,9 +19015,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["LivenessCheck"];
-                "application/x-www-form-urlencoded": components["schemas"]["LivenessCheck"];
-                "multipart/form-data": components["schemas"]["LivenessCheck"];
+                "application/json": components["schemas"]["BiometricConsent"];
+                "application/x-www-form-urlencoded": components["schemas"]["BiometricConsent"];
+                "multipart/form-data": components["schemas"]["BiometricConsent"];
             };
         };
         responses: {
@@ -18984,7 +19026,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LivenessCheck"];
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

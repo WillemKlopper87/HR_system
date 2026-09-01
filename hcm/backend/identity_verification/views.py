@@ -3,7 +3,7 @@ from __future__ import annotations
 from core_hr.models import Employee
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
-from rbac_audit.consent import record_consent
+from rbac_audit.consent import has_active_consent, record_consent
 from rbac_audit.drf import get_request_employee, int_query_param
 from rbac_audit.models import ConsentRecord
 from rbac_audit.permissions import has_role
@@ -15,6 +15,8 @@ from rest_framework.response import Response
 from .models import BiometricEnrollment, LivenessCheck
 from .permissions import IsSelfOrHRAdmin
 from .serializers import (
+    BiometricConsentSerializer,
+    BiometricConsentStatusSerializer,
     BiometricEnrollmentCreateSerializer,
     BiometricEnrollmentSerializer,
     LivenessCheckCreateSerializer,
@@ -120,9 +122,16 @@ class LivenessCheckViewSet(viewsets.ModelViewSet):
             raise ValidationError({"detail": str(exc)}) from exc
         return Response(LivenessCheckSerializer(check).data, status=201)
 
-    @action(detail=False, methods=["post"])
+    @extend_schema(
+        methods=["GET"],
+        parameters=[OpenApiParameter("employee", OpenApiTypes.INT, required=True)],
+        responses=BiometricConsentStatusSerializer,
+    )
+    @extend_schema(methods=["POST"], request=BiometricConsentSerializer, responses=OpenApiTypes.OBJECT)
+    @action(detail=False, methods=["get", "post"])
     def consent(self, request):
-        employee_id = request.data.get("employee")
+        source = request.query_params if request.method == "GET" else request.data
+        employee_id = source.get("employee")
         if not employee_id:
             return Response({"detail": "employee is required."}, status=400)
         try:
@@ -131,11 +140,17 @@ class LivenessCheckViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No such employee."}, status=400)
         actor = get_request_employee(request)
         if actor is None or (actor.id != employee.id and not has_role(actor, "hr_admin")):
-            return Response({"detail": "Only the employee themself or hr_admin can capture this consent."}, status=403)
+            return Response({"detail": "Only the employee themself or hr_admin can access this consent."}, status=403)
+        if request.method == "GET":
+            return Response({
+                "active": has_active_consent(employee=employee, purpose=ConsentRecord.Purpose.BIOMETRIC)
+            })
+        input_serializer = BiometricConsentSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
         record_consent(
             employee=employee, purpose=ConsentRecord.Purpose.BIOMETRIC,
-            lawful_basis=request.data.get("lawful_basis", ConsentRecord.LawfulBasis.CONSENT),
-            text_version=request.data.get("text_version", "v1"), actor=actor,
+            lawful_basis=input_serializer.validated_data["lawful_basis"],
+            text_version=input_serializer.validated_data["text_version"], actor=actor,
         )
         return Response({"detail": "Consent recorded."}, status=201)
 

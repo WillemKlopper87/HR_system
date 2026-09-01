@@ -228,6 +228,11 @@ manufactured by engineering.
       authenticator replacement now requires current-password verification and revokes grants issued for the old
       device. Independent review of a production-like pilot environment remains outstanding.
 - [ ] Run privacy review of biometrics, disability data, union representation and protected documents.
+      Engineering review evidence is recorded in `docs/PILOT-PRIVACY-REVIEW.md`. PR-001 (High) is resolved: biometric
+      capture is now blocked until explicit informed consent, only the consent lawful basis is accepted, and sensitive
+      check-in history uses bounded cursor pages. Independent privacy/legal review remains outstanding; PR-002 and
+      PR-003 block mandatory biometric production use until an operational alternative/appeal and consent-withdrawal/
+      descriptor-disposal workflow are implemented and approved.
 - [ ] Verify non-biometric identity/check-in alternative and appeal procedure.
 - [ ] Record findings with severity, owner, target date and production-blocking flag.
 - [ ] Resolve all critical findings before production reliance.

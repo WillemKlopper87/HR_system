@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, ApiError, fetchAllPages } from '../api/client'
+import { api, ApiError, type Paginated } from '../api/client'
 import {
   LIVENESS_OUTCOME_LABELS,
   LIVENESS_REVIEW_STATUS_LABELS,
@@ -15,10 +15,12 @@ export function MyIdentityVerificationPage() {
   const employeeId = user?.employee_id ?? null
 
   const [enrollment, setEnrollment] = useState<BiometricEnrollment | null>(null)
-  const [checks, setChecks] = useState<LivenessCheck[] | null>(null)
+  const [checkPage, setCheckPage] = useState<Paginated<LivenessCheck> | null>(null)
+  const [checkPagePath, setCheckPagePath] = useState<string | null>(null)
   const [attendance, setAttendance] = useState<AttendanceSummaryRow | null>(null)
+  const [hasConsent, setHasConsent] = useState<boolean | null>(null)
+  const [consentConfirmed, setConsentConfirmed] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [needsConsent, setNeedsConsent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [lastResult, setLastResult] = useState<LivenessCheck | null>(null)
 
@@ -26,23 +28,39 @@ export function MyIdentityVerificationPage() {
     if (!employeeId) return
     setError(null)
     Promise.all([
-      fetchAllPages<BiometricEnrollment>(`/biometric-enrollments/?employee=${employeeId}`),
-      fetchAllPages<LivenessCheck>(`/liveness-checks/?employee=${employeeId}`),
+      api.get<Paginated<BiometricEnrollment>>(`/biometric-enrollments/?employee=${employeeId}`),
+      api.get<Paginated<LivenessCheck>>(
+        checkPagePath ?? `/liveness-checks/?employee=${employeeId}`,
+      ),
       api.get<AttendanceSummaryRow[]>('/dashboards/attendance/'),
+      api.get<{ active: boolean }>(`/liveness-checks/consent/?employee=${employeeId}`),
     ])
-      .then(([enrollments, checkRows, attendanceRows]) => {
-        setEnrollment(enrollments[0] ?? null)
-        setChecks(checkRows)
+      .then(([enrollments, checkRows, attendanceRows, consentStatus]) => {
+        setEnrollment(enrollments.results[0] ?? null)
+        setCheckPage(checkRows)
         setAttendance(attendanceRows[0] ?? null)
+        setHasConsent(consentStatus.active)
       })
       .catch(() => setError('Failed to load your verification status.'))
   }
 
-  useEffect(load, [employeeId])
+  useEffect(load, [employeeId, checkPagePath])
 
   async function handleCaptureConsent() {
     if (!employeeId) return
-    await api.post('/liveness-checks/consent/', { employee: employeeId, lawful_basis: 'consent', text_version: 'v1' })
+    setError(null)
+    setBusy(true)
+    try {
+      await api.post('/liveness-checks/consent/', {
+        employee: employeeId, lawful_basis: 'consent', text_version: 'biometric-v1',
+      })
+      setHasConsent(true)
+      setConsentConfirmed(false)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Consent could not be recorded.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleEnroll(result: CaptureResult) {
@@ -55,22 +73,9 @@ export function MyIdentityVerificationPage() {
         return
       }
       await api.post('/biometric-enrollments/', { employee: employeeId, descriptor: result.descriptor })
-      setNeedsConsent(false)
       load()
     } catch (err) {
-      if (err instanceof ApiError && /consent/i.test(err.message)) {
-        setNeedsConsent(true)
-        try {
-          await handleCaptureConsent()
-          await api.post('/biometric-enrollments/', { employee: employeeId, descriptor: result.descriptor })
-          setNeedsConsent(false)
-          load()
-        } catch (retryErr) {
-          setError(retryErr instanceof ApiError ? retryErr.message : 'Enrollment failed.')
-        }
-      } else {
-        setError(err instanceof ApiError ? err.message : 'Enrollment failed.')
-      }
+      setError(err instanceof ApiError ? err.message : 'Enrollment failed.')
     } finally {
       setBusy(false)
     }
@@ -134,15 +139,39 @@ export function MyIdentityVerificationPage() {
             {lastResult.review_status === 'pending' && ' — flagged for HR review'}
           </p>
         )}
-        <CameraCapture
-          buttonLabel={enrollment ? 'Verify now' : 'Enroll now'}
-          busy={busy}
-          onCapture={(result) => void (enrollment ? handleVerify(result) : handleEnroll(result))}
-        />
-        {needsConsent && <p className="hint-text">Capturing consent and retrying automatically…</p>}
+        {hasConsent === false ? (
+          <div className="notice-card">
+            <p>
+              Biometric verification is optional. If you consent, your camera runs locally and only a derived numeric
+              face template is stored. You may use the non-biometric HR-assisted check-in process instead, without
+              penalty, and may ask HR to withdraw consent or appeal a result.
+            </p>
+            <label>
+              <input
+                type="checkbox"
+                checked={consentConfirmed}
+                onChange={(event) => setConsentConfirmed(event.target.checked)}
+              />{' '}
+              I have read this notice and consent to biometric identity and attendance verification.
+            </label>
+            <div className="form-actions">
+              <button type="button" className="btn-primary" disabled={busy || !consentConfirmed} onClick={() => void handleCaptureConsent()}>
+                Record consent
+              </button>
+            </div>
+          </div>
+        ) : hasConsent === true ? (
+          <CameraCapture
+            buttonLabel={enrollment ? 'Verify now' : 'Enroll now'}
+            busy={busy}
+            onCapture={(result) => void (enrollment ? handleVerify(result) : handleEnroll(result))}
+          />
+        ) : (
+          <p className="empty-state">Loading consent status...</p>
+        )}
       </section>
 
-      {checks && checks.length > 0 && (
+      {checkPage && checkPage.results.length > 0 && (
         <section className="detail-card">
           <h2>My recent checks</h2>
           <div className="table-scroll">
@@ -156,7 +185,7 @@ export function MyIdentityVerificationPage() {
                 </tr>
               </thead>
               <tbody>
-                {checks.map((c) => (
+                {checkPage.results.map((c) => (
                   <tr key={c.id}>
                     <td>{new Date(c.created_at).toLocaleString()}</td>
                     <td>{LIVENESS_OUTCOME_LABELS[c.outcome]}</td>
@@ -167,6 +196,16 @@ export function MyIdentityVerificationPage() {
               </tbody>
             </table>
           </div>
+          {(checkPage.previous || checkPage.next) && (
+            <nav className="form-actions" aria-label="My identity-check pages">
+              <button type="button" className="btn-secondary" disabled={!checkPage.previous} onClick={() => setCheckPagePath(checkPage.previous)}>
+                Previous
+              </button>
+              <button type="button" className="btn-secondary" disabled={!checkPage.next} onClick={() => setCheckPagePath(checkPage.next)}>
+                Next
+              </button>
+            </nav>
+          )}
         </section>
       )}
     </div>

@@ -6,6 +6,16 @@ from rest_framework import serializers
 from .models import BiometricEnrollment, LivenessCheck
 
 
+class BiometricConsentStatusSerializer(serializers.Serializer):
+    active = serializers.BooleanField(read_only=True)
+
+
+class BiometricConsentSerializer(serializers.Serializer):
+    employee = serializers.PrimaryKeyRelatedField(queryset=Employee.objects.all())
+    lawful_basis = serializers.ChoiceField(choices=["consent"], default="consent")
+    text_version = serializers.CharField(max_length=50, default="biometric-v1")
+
+
 class BiometricEnrollmentSerializer(serializers.ModelSerializer):
     """Deliberately never exposes `descriptor` — the client writes a new
     one (via the create input serializer below) but has no reason to read

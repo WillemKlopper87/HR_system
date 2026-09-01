@@ -43,7 +43,7 @@ artifact/date here once each happens; until then this table itself **is** the ho
 |---|---|---|---|
 | Role-based stakeholder UAT (employee/manager/HR/recruiter/compensation/EE/auditor) | HR/talent/EE/compensation stakeholders | **Not started** | link the sign-off doc here |
 | Security review (auth, step-up, downloads, audit, lifecycle cascades) | Security reviewer | **Not started** | — |
-| Privacy review (biometrics, disability data, union representation, protected documents) | Privacy/legal reviewer | **Not started** | — |
+| Privacy review (biometrics, disability data, union representation, protected documents) | Privacy/legal reviewer | **Engineering review complete; independent review not started** | `docs/PILOT-PRIVACY-REVIEW.md` |
 | Non-biometric identity/check-in alternative + appeal procedure, verified in practice | HR | **Not started** | — |
 | Database + media restore rehearsal, into an isolated environment, with hash verification | Ops | **Not started** — `docs/RUNBOOK.md` documents the *procedure*; nobody has run it against this repo's actual data yet | — |
 | Load/capacity test at realistic employee/document/history volume | Ops | **Not started** | — |

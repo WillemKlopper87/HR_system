@@ -55,6 +55,34 @@ class IdentityVerificationApiTestCase(TestCase):
 
 
 class EnrollmentApiTests(IdentityVerificationApiTestCase):
+    def test_employee_can_check_own_biometric_consent_status(self):
+        self.client.force_authenticate(user=self.alice.user)
+        missing = self.client.get(f"/api/v1/liveness-checks/consent/?employee={self.alice.id}")
+        self.assertEqual(missing.status_code, 200)
+        self.assertEqual(missing.data, {"active": False})
+
+        self._grant_consent(self.alice)
+        active = self.client.get(f"/api/v1/liveness-checks/consent/?employee={self.alice.id}")
+        self.assertEqual(active.status_code, 200)
+        self.assertEqual(active.data, {"active": True})
+
+    def test_employee_cannot_check_a_colleagues_biometric_consent_status(self):
+        self.client.force_authenticate(user=self.alice.user)
+        response = self.client.get(f"/api/v1/liveness-checks/consent/?employee={self.bob.id}")
+        self.assertEqual(response.status_code, 403)
+
+    def test_biometric_consent_rejects_a_non_consent_lawful_basis(self):
+        self.client.force_authenticate(user=self.alice.user)
+        response = self.client.post(
+            "/api/v1/liveness-checks/consent/",
+            {"employee": self.alice.id, "lawful_basis": "legal_obligation_eea", "text_version": "biometric-v1"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            ConsentRecord.objects.filter(employee=self.alice, purpose=ConsentRecord.Purpose.BIOMETRIC).exists()
+        )
+
     def test_enroll_without_consent_is_rejected(self):
         self.client.force_authenticate(user=self.alice.user)
         response = self.client.post(
