@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly Sentech HCM backup
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 Africa/Johannesburg
+RandomizedDelaySec=20m
+Persistent=true
+Unit=hcm-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=Sentech HCM database and media backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=hcm
+Group=hcm
+WorkingDirectory=/opt/hcm/current/hcm
+EnvironmentFile=/etc/hcm/backup.env
+ExecStart=/opt/hcm/current/hcm/ops/backup.sh
+PrivateTmp=true
+NoNewPrivileges=true

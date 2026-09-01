@@ -42,10 +42,10 @@ artifact/date here once each happens; until then this table itself **is** the ho
 | Control | Owner | Status | Evidence location once done |
 |---|---|---|---|
 | Role-based stakeholder UAT (employee/manager/HR/recruiter/compensation/EE/auditor) | HR/talent/EE/compensation stakeholders | **Not started** | link the sign-off doc here |
-| Security review (auth, step-up, downloads, audit, lifecycle cascades) | Security reviewer | **Not started** | — |
+| Security review (auth, step-up, downloads, audit, lifecycle cascades) | Security reviewer | **Engineering review complete; independent review not started** | `docs/PILOT-SECURITY-REVIEW.md` |
 | Privacy review (biometrics, disability data, union representation, protected documents) | Privacy/legal reviewer | **Engineering review complete; independent review not started** | `docs/PILOT-PRIVACY-REVIEW.md` |
 | Non-biometric identity/check-in alternative + appeal procedure, verified in practice | HR | **Not started** | — |
-| Database + media restore rehearsal, into an isolated environment, with hash verification | Ops | **Not started** — `docs/RUNBOOK.md` documents the *procedure*; nobody has run it against this repo's actual data yet | — |
+| Database + media restore rehearsal, into an isolated environment, with hash verification | Ops | **Automation prepared; rehearsal not started** — `hcm/ops/restore-verify.sh` and the signed-artifact verifier are code-tested, but nobody has run them against an authorised backup | `docs/BACKUP-AUTOMATION.md` until dated rehearsal evidence exists |
 | Load/capacity test at realistic employee/document/history volume | Ops | **Not started** | — |
 | Accessibility audit (WCAG 2.2 AA) | Accessibility reviewer | **Not started** | — |
 | Formal pilot acceptance or rejection | Product owner | **Not started** | — |
@@ -62,4 +62,5 @@ artifact/date here once each happens; until then this table itself **is** the ho
 
 - `docs/RETENTION-MATRIX.md` — per-model/file-field retention status (M7).
 - `docs/RUNBOOK.md` — backup/restore/deploy *procedures* (the how); this file is the *status* (the whether-it-happened).
+- `docs/BACKUP-AUTOMATION.md` — scheduled backup and isolated restore-verification tooling, configuration and evidence boundary.
 - `docs/SESSION-STATE.md` — narrative history of what shipped, session by session.

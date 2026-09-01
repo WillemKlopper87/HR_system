@@ -241,8 +241,15 @@ manufactured by engineering.
 ### Operational evidence
 
 - [ ] Automate scheduled database and media backups with off-site retention.
+      Repository automation is prepared in `hcm/ops/backup.sh` with checksum verification, atomic off-site copy,
+      bounded retention and a hardened systemd timer template. This remains open until operations configures a genuine
+      separate-failure-domain target, enables the timer and supplies dated successful-run/alert evidence.
 - [ ] Restore both into an isolated environment.
+      `hcm/ops/restore-verify.sh` now creates a unique throwaway Compose project and fresh volumes, restores both
+      archives, migrates and verifies readiness. A real rehearsal against an authorised backup remains outstanding.
 - [ ] Verify recent signed artefact hashes after restore.
+      `manage.py verify_restored_artifacts --require-signed-document` fails on missing/tampered signed agreement PDFs
+      or signature-hash disagreement and is invoked by the restore verifier. Live restored-data evidence remains open.
 - [ ] Record restoration duration and define RPO/RTO ownership.
 - [ ] Add metrics for API errors, latency, task failures, notification failures and integration freshness.
 - [ ] Add dashboards and actionable alerts.
