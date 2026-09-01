@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import { useReferenceData } from '../api/useReferenceData'
+import { useAuth } from '../auth/useAuth'
+import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
 import {
   SUCCESSION_READINESS_LABELS,
   type CriticalPost,
-  type Employee,
   type Position,
   type SuccessionCandidate,
   type SuccessionReadiness,
@@ -39,11 +40,9 @@ export function TalentPoolsPage() {
   // reloads after a mutation.
   const { data: refData, error: refError } = useApiQuery(
     () =>
-      Promise.all([fetchAllPages<Position>('/positions/'), fetchAllPages<Employee>('/employees/')]).then(
-        ([positions, employees]) => ({ positions, employees }),
-      ),
+      fetchAllPages<Position>('/positions/').then((positions) => ({ positions })),
     [],
-    { errorMessage: 'Failed to load positions/employees.' },
+    { errorMessage: 'Failed to load positions.' },
   )
   const { data: liveData, error: liveError, reload: load } = useApiQuery(
     () =>
@@ -56,7 +55,6 @@ export function TalentPoolsPage() {
   const [showFlagForm, setShowFlagForm] = useState(false)
 
   const positions = refData?.positions ?? []
-  const employees = refData?.employees ?? []
   const criticalPosts = liveData?.criticalPosts ?? []
   const candidates = liveData?.candidates ?? []
 
@@ -64,12 +62,6 @@ export function TalentPoolsPage() {
   // change on reload), not the `?? []`-derived locals above -- those are a
   // fresh array literal every render, which would defeat the memoization.
   const positionById = useMemo(() => new Map((refData?.positions ?? []).map((p) => [p.id, p])), [refData])
-  const employeeById = useMemo(() => new Map((refData?.employees ?? []).map((e) => [e.id, e])), [refData])
-  const employeeName = (id: number | null) => {
-    if (id === null) return '—'
-    const e = employeeById.get(id)
-    return e ? `${e.employee_number} — ${e.first_name} ${e.last_name}` : `#${id}`
-  }
 
   const activeFlags = criticalPosts.filter((c) => c.active)
   const flaggedPositionIds = new Set(criticalPosts.filter((c) => c.active).map((c) => c.position))
@@ -113,8 +105,6 @@ export function TalentPoolsPage() {
               position={position}
               departmentName={position ? (ref.departments.get(position.department)?.name ?? '—') : '—'}
               candidates={candidates.filter((c) => c.critical_post === flag.id && c.active)}
-              employees={employees}
-              employeeName={employeeName}
               onChanged={load}
             />
           )
@@ -181,14 +171,12 @@ function FlagPositionForm({
 }
 
 function CriticalPostCard({
-  flag, position, departmentName, candidates, employees, employeeName, onChanged,
+  flag, position, departmentName, candidates, onChanged,
 }: {
   flag: CriticalPost
   position: Position | undefined
   departmentName: string
   candidates: SuccessionCandidate[]
-  employees: Employee[]
-  employeeName: (id: number | null) => string
   onChanged: () => void
 }) {
   const [error, setError] = useState<string | null>(null)
@@ -209,11 +197,7 @@ function CriticalPostCard({
     }
   }
 
-  const alreadyNominatedIds = new Set(candidates.map((c) => c.employee))
   const currentOccupantNumber = position?.current_incumbent_number ?? null
-  const nominatable = employees.filter(
-    (e) => !alreadyNominatedIds.has(e.id) && e.employee_number !== currentOccupantNumber,
-  )
 
   return (
     <section className="detail-card">
@@ -241,7 +225,7 @@ function CriticalPostCard({
       {showNominateForm && (
         <NominateForm
           criticalPostId={flag.id}
-          candidates={nominatable}
+          excludedIds={candidates.map((candidate) => candidate.employee)}
           onCreated={() => { setShowNominateForm(false); onChanged() }}
         />
       )}
@@ -263,7 +247,7 @@ function CriticalPostCard({
             </thead>
             <tbody>
               {candidates.map((c) => (
-                <CandidateRow key={c.id} candidate={c} employeeName={employeeName} onChanged={onChanged} />
+                <CandidateRow key={c.id} candidate={c} onChanged={onChanged} />
               ))}
             </tbody>
           </table>
@@ -274,9 +258,10 @@ function CriticalPostCard({
 }
 
 function NominateForm({
-  criticalPostId, candidates, onCreated,
-}: { criticalPostId: number; candidates: Employee[]; onCreated: () => void }) {
-  const [employeeId, setEmployeeId] = useState<number | ''>('')
+  criticalPostId, excludedIds, onCreated,
+}: { criticalPostId: number; excludedIds: number[]; onCreated: () => void }) {
+  const { user } = useAuth()
+  const [employeeId, setEmployeeId] = useState<number | null>(null)
   const [readiness, setReadiness] = useState<SuccessionReadiness>('development_needed')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -304,15 +289,12 @@ function NominateForm({
 
   return (
     <form className="inline-form" onSubmit={handleSubmit} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-      <label>
-        Employee
-        <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value ? Number(e.target.value) : '')} required>
-          <option value="">— Select —</option>
-          {candidates.map((e) => (
-            <option key={e.id} value={e.id}>{e.employee_number} — {e.first_name} {e.last_name}</option>
-          ))}
-        </select>
-      </label>
+      <EmployeeAsyncSelect
+        value={employeeId}
+        onChange={setEmployeeId}
+        excludeIds={user?.employee_id ? [...excludedIds, user.employee_id] : excludedIds}
+        required
+      />
       <label>
         Readiness
         <select value={readiness} onChange={(e) => setReadiness(e.target.value as SuccessionReadiness)}>
@@ -336,8 +318,8 @@ function NominateForm({
 }
 
 function CandidateRow({
-  candidate, employeeName, onChanged,
-}: { candidate: SuccessionCandidate; employeeName: (id: number | null) => string; onChanged: () => void }) {
+  candidate, onChanged,
+}: { candidate: SuccessionCandidate; onChanged: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -355,7 +337,7 @@ function CandidateRow({
   }
 
   async function handleWithdraw() {
-    if (!window.confirm(`Withdraw ${employeeName(candidate.employee)} as a successor candidate?`)) return
+    if (!window.confirm(`Withdraw ${candidate.employee_name} as a successor candidate?`)) return
     setError(null)
     setBusy(true)
     try {
@@ -371,7 +353,7 @@ function CandidateRow({
   return (
     <tr>
       <td>
-        <Link to={`/employees/${candidate.employee}`}>{employeeName(candidate.employee)}</Link>
+        <Link to={`/employees/${candidate.employee}`}>{candidate.employee_name}</Link>
       </td>
       <td>
         <select

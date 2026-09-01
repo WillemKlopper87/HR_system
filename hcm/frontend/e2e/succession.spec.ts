@@ -82,16 +82,20 @@ test.describe('Succession planning / talent pools (C6)', () => {
     // breaks a test that assumes whichever row it just created is visible
     // to the actor that created it. Exclude hradmin's own id explicitly.
     const me = await (await page.request.get('/api/v1/auth/me/')).json()
-    const ownId = String(me.employee_id)
+    const ownId = Number(me.employee_id)
+    const employeeSearch = await (await page.request.get('/api/v1/employees/search-summary/?q=E0')).json()
+    const candidate = employeeSearch.results.find((employee: { id: number }) => employee.id !== ownId)
+    expect(candidate).toBeTruthy()
     await criticalCard.getByRole('button', { name: '+ Nominate' }).click()
-    const employeeSelect = criticalCard.getByLabel('Employee')
-    const optionValues = await employeeSelect.locator('option').evaluateAll(
-      (opts) => opts.map((o) => (o as HTMLOptionElement).value),
-    )
-    const candidateId = optionValues.find((v) => v && v !== ownId)
-    expect(candidateId).toBeTruthy()
-    await employeeSelect.selectOption(candidateId!)
-    const candidateLabel = (await employeeSelect.locator(`option[value="${candidateId}"]`).textContent())?.trim() ?? ''
+    const employeeSelect = criticalCard.getByRole('combobox', { name: 'Employee' })
+    await employeeSelect.fill(candidate.employee_number)
+    const candidateOption = criticalCard.getByRole('option', {
+      name: `${candidate.employee_number} — ${candidate.display_name}`,
+    })
+    await expect(candidateOption).toBeVisible()
+    await candidateOption.click()
+    const candidateId = String(candidate.id)
+    const candidateLabel = `${candidate.employee_number} — ${candidate.display_name}`
     await criticalCard.getByLabel('Readiness').selectOption('ready_now')
     await criticalCard.getByLabel('Notes').fill('E2E: strong technical depth, ready today.')
     await criticalCard.getByRole('button', { name: 'Nominate' }).click()

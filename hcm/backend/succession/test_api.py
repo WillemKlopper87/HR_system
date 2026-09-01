@@ -122,6 +122,7 @@ class SuccessionCandidateApiTests(SuccessionApiTestCase):
         response = self._nominate(self.successor)
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data["nominated_by"], self.hr_admin.id)
+        self.assertEqual(response.data["employee_name"], "SUC1 — Successor Case")
 
     def test_cannot_nominate_the_current_occupant(self):
         version = self.successor.current_version

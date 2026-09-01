@@ -7,9 +7,12 @@ interface Props {
   onChange: (value: number | null) => void
   label?: string
   required?: boolean
+  excludeIds?: readonly number[]
 }
 
-export function EmployeeAsyncSelect({ value, onChange, label = 'Employee', required = false }: Props) {
+const NO_EXCLUDED_EMPLOYEES: readonly number[] = []
+
+export function EmployeeAsyncSelect({ value, onChange, label = 'Employee', required = false, excludeIds = NO_EXCLUDED_EMPLOYEES }: Props) {
   const id = useId()
   const [query, setQuery] = useState('')
   const [options, setOptions] = useState<EmployeeSearchSummary[]>([])
@@ -18,6 +21,7 @@ export function EmployeeAsyncSelect({ value, onChange, label = 'Employee', requi
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const selected = useRef<EmployeeSearchSummary | null>(null)
+  const excludedKey = excludeIds.join(',')
 
   useEffect(() => {
     const term = query.trim()
@@ -38,9 +42,11 @@ export function EmployeeAsyncSelect({ value, onChange, label = 'Employee', requi
           `/employees/search-summary/?q=${encodeURIComponent(term)}`,
           { signal: controller.signal },
         )
-        setOptions(page.results)
+        const excluded = new Set(excludedKey ? excludedKey.split(',').map(Number) : [])
+        const visible = page.results.filter((option) => !excluded.has(option.id))
+        setOptions(visible)
         setOpen(true)
-        setActiveIndex(page.results.length ? 0 : -1)
+        setActiveIndex(visible.length ? 0 : -1)
       } catch {
         if (!controller.signal.aborted) setError('Employee search failed. Please try again.')
       } finally {
@@ -51,7 +57,7 @@ export function EmployeeAsyncSelect({ value, onChange, label = 'Employee', requi
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [query, onChange])
+  }, [query, onChange, excludedKey])
 
   function choose(option: EmployeeSearchSummary) {
     selected.current = option

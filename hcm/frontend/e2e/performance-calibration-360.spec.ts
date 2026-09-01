@@ -94,14 +94,16 @@ test.describe('Performance calibration/moderation + 360 feedback (C6)', () => {
     await expect(feedbackSection).toContainText("isn't summarised yet")
 
     // Nominate a second peer while here -- exercises the nomination UI path
-    // the Head approves below. The dropdown already excludes the subject
+    // the Head approves below. The async search already excludes the subject
     // and every existing rater (self/manager/the seeded peer), so picking
     // the first real option is safe without hardcoding a name the RNG-seeded
     // bulk-hire could vary.
     await feedbackSection.getByRole('button', { name: '+ Nominate a rater' }).click()
-    const nominateSelect = feedbackSection.getByLabel('Nominate')
-    const firstRealOption = await nominateSelect.locator('option').nth(1).textContent()
-    await nominateSelect.selectOption({ label: firstRealOption ?? '' })
+    const nominateSelect = feedbackSection.getByRole('combobox', { name: 'Nominate' })
+    await nominateSelect.fill('E0')
+    const firstRealOption = feedbackSection.getByRole('option').first()
+    await expect(firstRealOption).toBeVisible()
+    await firstRealOption.click()
     await feedbackSection.getByRole('button', { name: 'Nominate' }).click()
     await settled(page)
     await expect(feedbackSection.locator('table.data-table tbody tr')).toHaveCount(4)

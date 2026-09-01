@@ -1857,6 +1857,7 @@ export interface SuccessionCandidate {
   id: number
   critical_post: number
   employee: number
+  employee_name: string
   readiness: SuccessionReadiness
   notes: string
   nominated_by: number | null

@@ -10007,6 +10007,7 @@ export interface components {
             readonly id?: number;
             critical_post?: number;
             employee?: number;
+            readonly employee_name?: string;
             readiness?: components["schemas"]["ReadinessEnum"];
             notes?: string;
             readonly nominated_by?: number | null;
@@ -10583,6 +10584,7 @@ export interface components {
             readonly id: number;
             critical_post: number;
             employee: number;
+            readonly employee_name: string;
             readiness: components["schemas"]["ReadinessEnum"];
             notes?: string;
             readonly nominated_by: number | null;

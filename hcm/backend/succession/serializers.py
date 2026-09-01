@@ -30,11 +30,12 @@ class SuccessionCandidateSerializer(serializers.ModelSerializer):
 
     skill_names = serializers.SerializerMethodField()
     latest_performance = serializers.SerializerMethodField()
+    employee_name = serializers.SerializerMethodField()
 
     class Meta:
         model = SuccessionCandidate
         fields = [
-            "id", "critical_post", "employee", "readiness", "notes", "nominated_by", "active",
+            "id", "critical_post", "employee", "employee_name", "readiness", "notes", "nominated_by", "active",
             "skill_names", "latest_performance", "created_at", "updated_at",
         ]
         read_only_fields = ["nominated_by"]
@@ -44,6 +45,11 @@ class SuccessionCandidateSerializer(serializers.ModelSerializer):
 
     def get_latest_performance(self, obj) -> dict | None:
         return performance_queries.latest_final_score(obj.employee_id)
+
+    def get_employee_name(self, obj) -> str:
+        employee = obj.employee
+        name = f"{employee.preferred_name or employee.first_name} {employee.last_name}".strip()
+        return f"{employee.employee_number} — {name}"
 
     def validate(self, attrs):
         critical_post = attrs.get("critical_post") or getattr(self.instance, "critical_post", None)

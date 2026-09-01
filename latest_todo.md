@@ -99,14 +99,21 @@ advisory remains. Other `fetchAllPages<Employee>` call sites remain queued under
       with each row-scoped employee-version response.
 - [x] Remove the full employee-directory join from reviews; the row-scoped review response now carries the reviewee's
       display name.
-- [ ] Replace the four remaining full employee-directory consumers: applicant interview panels, My Performance,
-      organisation chart and succession/talent pools. These require compact multi-select, feedback-recipient,
-      organisational-topology and succession-candidate contracts respectively.
+- [x] Replace My Performance's 360-rater directory download with the scoped async employee selector, including
+      client-side exclusion of the subject and existing raters while retaining server-side eligibility checks.
+- [x] Replace succession/talent-pool employee-directory downloads with the scoped async selector and a
+      privacy-minimal candidate display name supplied by the row-scoped succession response.
+- [ ] Replace the two remaining full employee-directory consumers: applicant interview panels and the organisation
+      chart. These require compact multi-select and organisational-topology contracts respectively.
 
 Verification for this partial tranche: 7 focused API tests passed; frontend lint/build, Django warning-level checks,
 migration-drift checks and the two contract-renewal browser journeys passed. The performance review journey also
 passed within the broader talent spec; that spec's unrelated recruitment journey timed out while the still-outstanding
 applicant page downloaded the full employee directory, reinforcing the priority of the next item.
+
+Verification for the My Performance/succession increment: all 10 focused succession API tests and all 6 focused
+performance-calibration/succession Playwright journeys passed. Generated API types were refreshed; frontend lint,
+contract-import checks, production build and `git diff --check` passed. The existing large-chunk build advisory remains.
 
 ## Execution principles
 

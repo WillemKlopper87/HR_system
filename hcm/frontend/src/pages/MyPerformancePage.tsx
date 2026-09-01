@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { api, fetchAllPages } from '../api/client'
+import { api } from '../api/client'
 import { useApiQuery, useMutation } from '../api/hooks'
 import { groupBySection } from '../lib/performance'
 import {
@@ -7,13 +7,13 @@ import {
   PHASE_STAGE_LABELS,
   type AgreementElement,
   type CanSignResponse,
-  type Employee,
   type Feedback360Rater,
   type Feedback360Request,
   type ImprovementPlan,
   type PerformanceAgreement,
   type PerformancePeriod,
 } from '../api/types'
+import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
 
 /** Employee-facing scorecard (PC-1): draft it with your Head, submit it, sign
  * it. The signature panel deliberately explains *why* a button is disabled —
@@ -1160,17 +1160,11 @@ function NominateForm({
   existingRaterIds: number[]
   onDone: () => void
 }) {
-  const { data: employees } = useApiQuery<Employee[]>(
-    () => fetchAllPages<Employee>('/employees/'),
-    [],
-    { errorMessage: 'Failed to load the employee list.' },
-  )
-  const [raterId, setRaterId] = useState('')
+  const [raterId, setRaterId] = useState<number | null>(null)
   const nominate = useMutation(
-    () => api.post('/feedback-360-raters/', { request: requestId, rater: Number(raterId) }),
-    { onSuccess: () => { setRaterId(''); onDone() }, errorMessage: 'That nomination could not be recorded.' },
+    () => api.post('/feedback-360-raters/', { request: requestId, rater: raterId }),
+    { onSuccess: () => { setRaterId(null); onDone() }, errorMessage: 'That nomination could not be recorded.' },
   )
-  const alreadyRaters = new Set(existingRaterIds)
 
   return (
     <form
@@ -1180,19 +1174,13 @@ function NominateForm({
         void nominate.run()
       }}
     >
-      <label>
-        Nominate
-        <select value={raterId} onChange={(e) => setRaterId(e.target.value)} required>
-          <option value="">— Select a colleague —</option>
-          {(employees ?? [])
-            .filter((e) => e.id !== agreement.employee && !alreadyRaters.has(e.id))
-            .map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.first_name} {e.last_name}
-              </option>
-            ))}
-        </select>
-      </label>
+      <EmployeeAsyncSelect
+        value={raterId}
+        onChange={setRaterId}
+        label="Nominate"
+        excludeIds={[agreement.employee, ...existingRaterIds]}
+        required
+      />
       <button type="submit" className="btn-secondary" disabled={nominate.busy || !raterId}>
         {nominate.busy ? 'Nominating…' : 'Nominate'}
       </button>
