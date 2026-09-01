@@ -11,6 +11,7 @@ test.describe('compensation (Sprint 10-11) + step-up MFA (ADR-009)', () => {
     await expect(page.locator('table')).toHaveCount(0)
 
     // enrol
+    await page.getByLabel('Current password').fill('compmanager123')
     await page.getByRole('button', { name: 'Set up authenticator' }).click()
     const secret = await page.getByLabel('Manual entry key').inputValue()
     expect(secret.length).toBeGreaterThan(10)

@@ -29,13 +29,18 @@ async function completePayrollStepUp(page: Page) {
   // challenge heading immediately after goto() would race that fetch
   // and could see neither the challenge nor the granted page yet.
   await expect(page.getByText('Checking access…')).toHaveCount(0, { timeout: 10_000 })
-  if ((await page.getByRole('heading', { name: 'Step-up authentication required' }).count()) === 0) return
+  const challengeHeading = page.getByRole('heading', { name: 'Step-up authentication required' })
+  await expect.poll(async () =>
+    (await challengeHeading.count()) + (await page.getByRole('heading', { level: 1 }).count()),
+  ).toBeGreaterThan(0)
+  if ((await challengeHeading.count()) === 0) return
   // StepUpChallenge has its OWN nested "Loading…" while it fetches TOTP
   // enrollment status, independent of the check above -- wait for that
   // too, or neither EnrollForm nor StepUpForm has rendered yet.
   await settled(page)
   const enrollButton = page.getByRole('button', { name: 'Set up authenticator' })
   if ((await enrollButton.count()) > 0) {
+    await page.getByLabel('Current password').fill('hradmin123')
     await enrollButton.click()
     const secret = await page.getByLabel('Manual entry key').inputValue()
     await page.getByLabel('6-digit code').fill(totp(secret))
@@ -96,9 +101,9 @@ test.describe('C6: salary-review/bonus cycles + total-rewards statement', () => 
   // test's job is the self-approval block plus the NEW budget flag.
   test('a proposal that would push a cycle over budget is flagged, not blocked, and needs an override reason to approve', async ({ page }) => {
     // A little more work than the 45s default budget covers comfortably
-    // on a loaded machine: a step-up enrollment round-trip plus several
-    // full ~150-employee-list loads (one per form open).
-    test.setTimeout(90_000)
+    // on a loaded machine: a step-up enrollment round-trip, cycle setup,
+    // two employee searches, and proposal approval checks.
+    test.setTimeout(180_000)
     await loginAsSecondHrAdmin(page)
 
     await page.goto('/comp-cycles')
@@ -139,8 +144,8 @@ test.describe('C6: salary-review/bonus cycles + total-rewards statement', () => 
     // First bonus (30000) fits comfortably inside the 50000 budget.
     await page.getByRole('button', { name: '+ New proposal' }).click()
     const newProposalForm = page.locator('form.inline-form')
-    await page.getByPlaceholder('Name or employee #…').fill('Renewal Contractor')
-    await newProposalForm.locator('select').nth(0).selectOption({ index: 1 })
+    await newProposalForm.getByRole('combobox', { name: 'Employee' }).fill('Renewal')
+    await newProposalForm.locator('.employee-search-results [role="option"]').first().click()
     await page.getByLabel('Type').selectOption('bonus')
     await page.getByLabel('Bonus amount (ZAR)').fill('30000')
     await page.getByLabel('Cycle (optional)').selectOption({ label: 'E2E Budget Race Cycle' })
@@ -156,8 +161,8 @@ test.describe('C6: salary-review/bonus cycles + total-rewards statement', () => 
 
     // Second bonus (30000): 30000 + 30000 = 60000 > 50000 -- flagged, not blocked.
     await page.getByRole('button', { name: '+ New proposal' }).click()
-    await page.getByPlaceholder('Name or employee #…').fill('Lapse Contractor')
-    await newProposalForm.locator('select').nth(0).selectOption({ index: 1 })
+    await newProposalForm.getByRole('combobox', { name: 'Employee' }).fill('Lapse')
+    await newProposalForm.locator('.employee-search-results [role="option"]').first().click()
     await page.getByLabel('Type').selectOption('bonus')
     await page.getByLabel('Bonus amount (ZAR)').fill('30000')
     await page.getByLabel('Cycle (optional)').selectOption({ label: 'E2E Budget Race Cycle' })

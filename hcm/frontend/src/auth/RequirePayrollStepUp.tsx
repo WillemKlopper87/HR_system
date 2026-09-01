@@ -71,6 +71,7 @@ function EnrollForm({ onEnrolled }: { onEnrolled: () => void }) {
   const [secret, setSecret] = useState<string | null>(null)
   const [uri, setUri] = useState<string | null>(null)
   const [code, setCode] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -78,7 +79,9 @@ function EnrollForm({ onEnrolled }: { onEnrolled: () => void }) {
     setError(null)
     setBusy(true)
     try {
-      const response = await api.post<{ secret: string; provisioning_uri: string }>('/auth/totp/enroll/')
+      const response = await api.post<{ secret: string; provisioning_uri: string }>('/auth/totp/enroll/', {
+        current_password: currentPassword,
+      })
       setSecret(response.secret)
       setUri(response.provisioning_uri)
     } catch (err) {
@@ -104,12 +107,27 @@ function EnrollForm({ onEnrolled }: { onEnrolled: () => void }) {
 
   if (secret === null) {
     return (
-      <div>
+      <form
+        className="inline-form"
+        onSubmit={(event) => { event.preventDefault(); void handleStartEnroll() }}
+        style={{ flexDirection: 'column', alignItems: 'stretch' }}
+      >
         <p className="hint-text">No authenticator device on file yet. You'll need one before you can access payroll data.</p>
-        <button type="button" className="btn-primary" disabled={busy} onClick={() => void handleStartEnroll()}>
+        <label>
+          Current password
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(event) => setCurrentPassword(event.target.value)}
+            required
+          />
+        </label>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <button type="submit" className="btn-primary" disabled={busy || !currentPassword}>
           {busy ? 'Starting…' : 'Set up authenticator'}
         </button>
-      </div>
+      </form>
     )
   }
 

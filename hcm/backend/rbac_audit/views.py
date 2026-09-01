@@ -114,6 +114,9 @@ def totp_enroll(request):
     demo/local-dev user without a real authenticator app on hand needs a
     way to compute codes manually (see hcm/README.md)."""
     employee = get_request_employee(request)
+    current_password = request.data.get("current_password", "")
+    if not current_password or not request.user.check_password(current_password):
+        return Response({"detail": "Current password verification failed."}, status=400)
     device = enroll_totp_device(employee)
     return Response({"secret": device.secret, "provisioning_uri": totp_provisioning_uri(device)})
 

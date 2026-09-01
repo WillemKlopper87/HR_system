@@ -224,6 +224,9 @@ manufactured by engineering.
       engineering script only; no stakeholder execution or acceptance is claimed.
 - [ ] Run HR/talent/EE/compensation stakeholder UAT.
 - [ ] Run security review of authentication, step-up, downloads, audit and lifecycle cascades.
+      Engineering review evidence is recorded in `docs/PILOT-SECURITY-REVIEW.md`. It resolved SR-001 (High): TOTP
+      authenticator replacement now requires current-password verification and revokes grants issued for the old
+      device. Independent review of a production-like pilot environment remains outstanding.
 - [ ] Run privacy review of biometrics, disability data, union representation and protected documents.
 - [ ] Verify non-biometric identity/check-in alternative and appeal procedure.
 - [ ] Record findings with severity, owner, target date and production-blocking flag.

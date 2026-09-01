@@ -24,6 +24,9 @@ def enroll_totp_device(employee) -> TOTPDevice:
     entered) never silently becomes a usable device. Re-enrolling replaces
     a prior confirmed device too (e.g. a lost phone), which is intentional:
     there's no separate "revoke my old device" step to forget."""
+    # Replacing a device invalidates every grant proven with the prior
+    # authenticator.
+    StepUpGrant.objects.filter(employee=employee).delete()
     device, _created = TOTPDevice.objects.update_or_create(
         employee=employee, defaults={"secret": pyotp.random_base32(), "confirmed_at": None},
     )

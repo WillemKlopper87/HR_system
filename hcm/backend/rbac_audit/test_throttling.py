@@ -77,7 +77,9 @@ class TotpThrottleTests(TestCase):
         self.client.force_authenticate(user=self.employee.user)
 
     def test_sixth_wrong_confirm_code_in_a_minute_is_throttled(self):
-        self.client.post("/api/v1/auth/totp/enroll/")
+        self.client.post(
+            "/api/v1/auth/totp/enroll/", {"current_password": "correct-password"}, format="json"
+        )
         for _ in range(5):
             self.assertEqual(
                 self.client.post("/api/v1/auth/totp/confirm/", {"code": "000000"}, format="json").status_code, 400
@@ -87,7 +89,9 @@ class TotpThrottleTests(TestCase):
         self.assertEqual(self.client.post("/api/v1/auth/totp/confirm/", {"code": code}, format="json").status_code, 429)
 
     def test_step_up_challenge_is_throttled_per_user_not_globally(self):
-        self.client.post("/api/v1/auth/totp/enroll/")
+        self.client.post(
+            "/api/v1/auth/totp/enroll/", {"current_password": "correct-password"}, format="json"
+        )
         device = TOTPDevice.objects.get(employee=self.employee)
         self.client.post("/api/v1/auth/totp/confirm/", {"code": pyotp.TOTP(device.secret).now()}, format="json")
         cache.clear()  # the confirm above consumed one slot; start the challenge count clean
@@ -101,5 +105,7 @@ class TotpThrottleTests(TestCase):
         RoleAssignment.objects.create(employee=other, role=Role.objects.get(name="employee"))
         other_client = APIClient()
         other_client.force_authenticate(user=other.user)
-        other_client.post("/api/v1/auth/totp/enroll/")
+        other_client.post(
+            "/api/v1/auth/totp/enroll/", {"current_password": "correct-password"}, format="json"
+        )
         self.assertEqual(other_client.post("/api/v1/auth/step-up/", payload, format="json").status_code, 400)

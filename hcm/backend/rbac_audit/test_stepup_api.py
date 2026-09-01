@@ -43,18 +43,18 @@ class TOTPEnrollmentApiTests(TestCase):
         self.assertEqual(response.data, {"enrolled": False, "pending_confirmation": False})
 
     def test_enroll_returns_secret_and_provisioning_uri(self):
-        response = self.client.post("/api/v1/auth/totp/enroll/")
+        response = self.client.post("/api/v1/auth/totp/enroll/", {"current_password": "x"}, format="json")
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["secret"])
         self.assertIn("otpauth://totp/", response.data["provisioning_uri"])
 
     def test_status_pending_after_enroll_before_confirm(self):
-        self.client.post("/api/v1/auth/totp/enroll/")
+        self.client.post("/api/v1/auth/totp/enroll/", {"current_password": "x"}, format="json")
         response = self.client.get("/api/v1/auth/totp/status/")
         self.assertEqual(response.data, {"enrolled": False, "pending_confirmation": True})
 
     def test_confirm_with_valid_code_activates_device(self):
-        self.client.post("/api/v1/auth/totp/enroll/")
+        self.client.post("/api/v1/auth/totp/enroll/", {"current_password": "x"}, format="json")
         device = TOTPDevice.objects.get(employee=self.employee)
         code = pyotp.TOTP(device.secret).now()
 
@@ -65,9 +65,18 @@ class TOTPEnrollmentApiTests(TestCase):
         self.assertEqual(status_response.data, {"enrolled": True, "pending_confirmation": False})
 
     def test_confirm_with_invalid_code_is_rejected(self):
-        self.client.post("/api/v1/auth/totp/enroll/")
+        self.client.post("/api/v1/auth/totp/enroll/", {"current_password": "x"}, format="json")
         response = self.client.post("/api/v1/auth/totp/confirm/", {"code": "000000"}, format="json")
         self.assertEqual(response.status_code, 400)
+
+    def test_enrollment_requires_current_password(self):
+        missing = self.client.post("/api/v1/auth/totp/enroll/", {}, format="json")
+        wrong = self.client.post(
+            "/api/v1/auth/totp/enroll/", {"current_password": "wrong"}, format="json"
+        )
+        self.assertEqual(missing.status_code, 400)
+        self.assertEqual(wrong.status_code, 400)
+        self.assertFalse(TOTPDevice.objects.filter(employee=self.employee).exists())
 
     def test_confirm_without_enrollment_is_rejected(self):
         response = self.client.post("/api/v1/auth/totp/confirm/", {"code": "123456"}, format="json")
@@ -139,3 +148,18 @@ class StepUpRequestApiTests(TestCase):
                 actor=self.employee, action=AuditLogEntry.Action.STEP_UP_GRANTED
             ).exists()
         )
+
+    def test_reenrollment_revokes_existing_step_up_grants(self):
+        granted = self.client.post(
+            "/api/v1/auth/step-up/",
+            {"code": self._code(), "scope": "payroll_data", "reason": "payroll_processing"},
+            format="json",
+        )
+        self.assertEqual(granted.status_code, 200, granted.data)
+        self.assertTrue(StepUpGrant.objects.filter(employee=self.employee).exists())
+
+        response = self.client.post(
+            "/api/v1/auth/totp/enroll/", {"current_password": "x"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(StepUpGrant.objects.filter(employee=self.employee).exists())
