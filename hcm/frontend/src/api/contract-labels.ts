@@ -4,6 +4,7 @@ import type {
   ExitInterviewReason,
   ProbationRecommendation,
   ProbationStatus,
+  LivenessOutcome,
 } from './contracts'
 
 // Presentation-only labels for generated-contract enums (api/contracts.ts).
@@ -45,4 +46,10 @@ export const COMP_PROPOSAL_STATUS_LABELS: Record<CompProposalStatus, string> = {
 export const COMP_PROPOSAL_TYPE_LABELS: Record<CompProposalType, string> = {
   increase: 'Salary increase',
   bonus: 'Bonus',
+}
+
+export const LIVENESS_OUTCOME_LABELS: Record<LivenessOutcome, string> = {
+  match: 'Matched enrolled identity',
+  no_match: 'Did not match',
+  no_face_detected: 'No face detected',
 }

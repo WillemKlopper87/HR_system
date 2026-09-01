@@ -31,6 +31,7 @@ const MIGRATED_MODULES = {
     'COMP_PROPOSAL_STATUS_LABELS',
     'COMP_PROPOSAL_TYPE_LABELS',
   ],
+  'pages/WorkforceIntegrityPage.tsx': ['LivenessCheck', 'LivenessOutcome', 'LIVENESS_OUTCOME_LABELS'],
 }
 
 const IMPORT_FROM_TYPES = /import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]\.\.\/api\/types['"]/g

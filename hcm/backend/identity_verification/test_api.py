@@ -173,6 +173,18 @@ class LivenessCheckApiTests(IdentityVerificationApiTestCase):
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data["outcome"], "no_face_detected")
         self.assertEqual(response.data["review_status"], "pending")
+        self.assertEqual(response.data["employee_display"], "E100 — Alice Test")
+
+    def test_hr_admin_can_filter_pending_review_queue(self):
+        run_liveness_check(employee=self.alice, descriptor=[0.9] * 128)
+        run_liveness_check(employee=self.alice, descriptor=self.descriptor)
+        self.client.force_authenticate(user=self.hr_admin.user)
+
+        response = self.client.get("/api/v1/liveness-checks/?review_status=pending")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["results"])
+        self.assertTrue(all(row["review_status"] == "pending" for row in response.data["results"]))
 
     def test_at_office_computed_from_geolocation(self):
         self.client.force_authenticate(user=self.alice.user)

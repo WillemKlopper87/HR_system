@@ -24,10 +24,12 @@ class BiometricEnrollmentCreateSerializer(serializers.Serializer):
 
 
 class LivenessCheckSerializer(serializers.ModelSerializer):
+    employee_display = serializers.SerializerMethodField()
+
     class Meta:
         model = LivenessCheck
         fields = [
-            "id", "employee", "trigger", "requested_by", "match_distance", "outcome",
+            "id", "employee", "employee_display", "trigger", "requested_by", "match_distance", "outcome",
             "latitude", "longitude", "distance_from_office_m", "at_office",
             "review_status", "reviewed_by", "reviewed_at", "review_notes", "created_at",
         ]
@@ -35,6 +37,9 @@ class LivenessCheckSerializer(serializers.ModelSerializer):
             "match_distance", "outcome", "distance_from_office_m", "at_office",
             "review_status", "reviewed_by", "reviewed_at", "review_notes",
         ]
+
+    def get_employee_display(self, obj) -> str:
+        return f"{obj.employee.employee_number} — {obj.employee.first_name} {obj.employee.last_name}"
 
 
 class LivenessCheckCreateSerializer(serializers.Serializer):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from core_hr.models import Employee
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rbac_audit.consent import record_consent
 from rbac_audit.drf import get_request_employee, int_query_param
 from rbac_audit.models import ConsentRecord
@@ -73,6 +73,14 @@ class BiometricEnrollmentViewSet(viewsets.ModelViewSet):
         return Response(BiometricEnrollmentSerializer(enrollment).data, status=201)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            OpenApiParameter("employee", OpenApiTypes.INT, description="Filter by employee id."),
+            OpenApiParameter("review_status", OpenApiTypes.STR, description="Filter by review status."),
+        ]
+    )
+)
 class LivenessCheckViewSet(viewsets.ModelViewSet):
     """No PATCH/DELETE on a check itself — the only mutation after
     creation is the dedicated review action, which enforces its own
@@ -88,6 +96,9 @@ class LivenessCheckViewSet(viewsets.ModelViewSet):
         target_id = int_query_param(self.request, "employee")
         if target_id is not None:
             base = base.filter(employee_id=target_id)
+        review_status = self.request.query_params.get("review_status")
+        if review_status in LivenessCheck.ReviewStatus.values:
+            base = base.filter(review_status=review_status)
         return _visible_queryset(self.request, base)
 
     def create(self, request, *args, **kwargs):

@@ -8008,6 +8008,7 @@ export interface components {
         LivenessCheck: {
             readonly id: number;
             employee: number;
+            readonly employee_display: string;
             trigger?: components["schemas"]["TriggerEnum"];
             requested_by?: number | null;
             /** Format: double */
@@ -18722,6 +18723,10 @@ export interface operations {
             query?: {
                 /** @description The pagination cursor value. */
                 cursor?: string;
+                /** @description Filter by employee id. */
+                employee?: number;
+                /** @description Filter by review status. */
+                review_status?: string;
             };
             header?: never;
             path?: never;

@@ -1,33 +1,31 @@
 import { useMemo, useState } from 'react'
-import { api, ApiError, fetchAllPages } from '../api/client'
+import { api, ApiError, type Paginated } from '../api/client'
 import { useApiQuery } from '../api/hooks'
-import {
-  LIVENESS_OUTCOME_LABELS,
-  type AttendanceSummaryRow,
-  type Employee,
-  type LivenessCheck,
-} from '../api/types'
+import { LIVENESS_OUTCOME_LABELS } from '../api/contract-labels'
+import type { LivenessCheck } from '../api/contracts'
+import type { AttendanceSummaryRow } from '../api/types'
 
 export function WorkforceIntegrityPage() {
+  const [pagePath, setPagePath] = useState<string | null>(null)
+  const requestPath = pagePath ?? '/liveness-checks/?review_status=pending'
 
-  const { data, error: loadError, reload: load } = useApiQuery(
-    () =>
-      Promise.all([
-        api.get<AttendanceSummaryRow[]>('/dashboards/attendance/'),
-        fetchAllPages<LivenessCheck>('/liveness-checks/'),
-        fetchAllPages<Employee>('/employees/'),
-      ]).then(([attendance, checks, employees]) => ({ attendance, checks, employees })),
+  const { data: attendance, error: attendanceError } = useApiQuery(
+    () => api.get<AttendanceSummaryRow[]>('/dashboards/attendance/'),
     [],
-    { errorMessage: 'Failed to load workforce integrity data.' },
+    { errorMessage: 'Failed to load attendance data.' },
   )
-  const attendance = data?.attendance ?? null
-  const checks = data?.checks ?? null
-  const employees = data?.employees ?? null
+  const { data: checkResponse, error: checksError, reload: load } = useApiQuery(
+    () =>
+      api.get<Paginated<LivenessCheck>>(requestPath).then((page) => ({ requestPath, page })),
+    [requestPath],
+    { errorMessage: 'Failed to load identity checks.' },
+  )
+  const checkPage = checkResponse?.requestPath === requestPath ? checkResponse.page : null
+  const checks = checkPage?.results ?? null
 
-
-  const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
-  const pendingChecks = useMemo(() => (checks ?? []).filter((c) => c.review_status === 'pending'), [checks])
+  const pendingChecks = checks ?? []
   const nonCompliant = useMemo(() => (attendance ?? []).filter((row) => !row.compliant), [attendance])
+  const loadError = attendanceError ?? checksError
 
   return (
     <div className="page">
@@ -43,7 +41,7 @@ export function WorkforceIntegrityPage() {
       {loadError && <p className="form-error">{loadError}</p>}
 
       <section className="detail-card">
-        <h2>Flagged for review ({pendingChecks.length})</h2>
+        <h2>Flagged for review ({pendingChecks.length} on this page)</h2>
         {pendingChecks.length === 0 ? (
           <p className="empty-state">Nothing pending review.</p>
         ) : (
@@ -60,12 +58,11 @@ export function WorkforceIntegrityPage() {
               </thead>
               <tbody>
                 {pendingChecks.map((c) => {
-                  const emp = employeeById.get(c.employee)
                   return (
                     <ReviewRow
                       key={c.id}
                       check={c}
-                      employeeName={emp ? `${emp.first_name} ${emp.last_name}` : `#${c.employee}`}
+                      employeeName={c.employee_display}
                       onChanged={load}
                     />
                   )
@@ -73,6 +70,16 @@ export function WorkforceIntegrityPage() {
               </tbody>
             </table>
           </div>
+        )}
+        {checkPage && (checkPage.previous || checkPage.next) && (
+          <nav className="form-actions" aria-label="Pending identity-check pages">
+            <button type="button" className="btn-secondary" disabled={!checkPage.previous} onClick={() => setPagePath(checkPage.previous)}>
+              Previous
+            </button>
+            <button type="button" className="btn-secondary" disabled={!checkPage.next} onClick={() => setPagePath(checkPage.next)}>
+              Next
+            </button>
+          </nav>
         )}
       </section>
 
