@@ -218,7 +218,10 @@ known regulatory browser-coverage gaps while establishing patterns reusable acro
 This is the highest-value organisational gate. It can be planned alongside P0, but stakeholder evidence cannot be
 manufactured by engineering.
 
-- [ ] Create role-based walkthroughs for employee, manager, HR, recruiter, compensation, EE and auditor personas.
+- [x] Create role-based walkthroughs for employee, manager, HR, recruiter, compensation, EE and auditor personas.
+      `docs/PILOT-UAT-WALKTHROUGHS.md` defines entry criteria, evidence handling, executable persona steps,
+      security/privacy prompts, finding severity/ownership fields and the formal exit decision. This completes the
+      engineering script only; no stakeholder execution or acceptance is claimed.
 - [ ] Run HR/talent/EE/compensation stakeholder UAT.
 - [ ] Run security review of authentication, step-up, downloads, audit and lifecycle cascades.
 - [ ] Run privacy review of biometrics, disability data, union representation and protected documents.
