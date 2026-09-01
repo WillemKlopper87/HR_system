@@ -7975,6 +7975,7 @@ export interface components {
             readonly id: number;
             session: number;
             readonly interviewer: number;
+            readonly interviewer_name: string;
             skill_rating: components["schemas"]["Rating1To5Enum"];
             communication_rating: components["schemas"]["Rating1To5Enum"];
             culture_fit_rating: components["schemas"]["Rating1To5Enum"];
@@ -8005,6 +8006,7 @@ export interface components {
             status?: components["schemas"]["InterviewSessionStatusEnum"];
             notes?: string;
             interviewers: number[];
+            readonly interviewer_summaries: components["schemas"]["InterviewerSummary"][];
             readonly created_by: number | null;
             /** Format: date-time */
             readonly created_at: string;
@@ -8016,6 +8018,11 @@ export interface components {
          * @enum {string}
          */
         InterviewSessionStatusEnum: "scheduled" | "completed" | "cancelled";
+        InterviewerSummary: {
+            readonly id: number;
+            readonly employee_number: string;
+            readonly display_name: string;
+        };
         JobGrade: {
             readonly id: number;
             name: string;
@@ -9780,6 +9787,7 @@ export interface components {
             readonly id?: number;
             session?: number;
             readonly interviewer?: number;
+            readonly interviewer_name?: string;
             skill_rating?: components["schemas"]["Rating1To5Enum"];
             communication_rating?: components["schemas"]["Rating1To5Enum"];
             culture_fit_rating?: components["schemas"]["Rating1To5Enum"];
@@ -9802,6 +9810,7 @@ export interface components {
             status?: components["schemas"]["InterviewSessionStatusEnum"];
             notes?: string;
             interviewers?: number[];
+            readonly interviewer_summaries?: components["schemas"]["InterviewerSummary"][];
             readonly created_by?: number | null;
             /** Format: date-time */
             readonly created_at?: string;

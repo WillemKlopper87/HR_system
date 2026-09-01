@@ -8,11 +8,12 @@ interface Props {
   label?: string
   required?: boolean
   excludeIds?: readonly number[]
+  onSelect?: (employee: EmployeeSearchSummary) => void
 }
 
 const NO_EXCLUDED_EMPLOYEES: readonly number[] = []
 
-export function EmployeeAsyncSelect({ value, onChange, label = 'Employee', required = false, excludeIds = NO_EXCLUDED_EMPLOYEES }: Props) {
+export function EmployeeAsyncSelect({ value, onChange, label = 'Employee', required = false, excludeIds = NO_EXCLUDED_EMPLOYEES, onSelect }: Props) {
   const id = useId()
   const [query, setQuery] = useState('')
   const [options, setOptions] = useState<EmployeeSearchSummary[]>([])
@@ -64,6 +65,7 @@ export function EmployeeAsyncSelect({ value, onChange, label = 'Employee', requi
     setQuery(`${option.employee_number} — ${option.display_name}`)
     setOpen(false)
     onChange(option.id)
+    onSelect?.(option)
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Field } from '../components/Field'
+import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useReferenceData } from '../api/useReferenceData'
@@ -19,13 +20,13 @@ import {
   type BackgroundCheck,
   type BackgroundCheckStatus,
   type BackgroundCheckType,
-  type Employee,
   type InterviewRecommendation,
   type InterviewScorecard,
   type InterviewSession,
   type Offer,
   type Requisition,
 } from '../api/types'
+import type { EmployeeSearchSummary } from '../api/contracts'
 
 const NEXT_STAGES: Record<ApplicantStage, ApplicantStage[]> = {
   applied: ['screened', 'rejected'],
@@ -45,7 +46,6 @@ export function ApplicantDetailPage() {
   const [assessments, setAssessments] = useState<AssessmentAssignment[] | null>(null)
   const [interviewSessions, setInterviewSessions] = useState<InterviewSession[] | null>(null)
   const [backgroundChecks, setBackgroundChecks] = useState<BackgroundCheck[] | null>(null)
-  const [employees, setEmployees] = useState<Employee[]>([])
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -79,10 +79,6 @@ export function ApplicantDetailPage() {
   // Interviewer picker + name resolution for the sections below — same
   // established (pre-C7-server-side-pagination) pattern every other
   // employee-picker page in this codebase already uses.
-  useEffect(() => {
-    fetchAllPages<Employee>('/employees/').then(setEmployees).catch(() => setEmployees([]))
-  }, [])
-
   useEffect(load, [id])
 
   async function handleTransition(toStage: ApplicantStage) {
@@ -225,7 +221,6 @@ export function ApplicantDetailPage() {
         <InterviewsSection
           applicant={applicant}
           sessions={interviewSessions}
-          employees={employees}
           onChanged={load}
         />
       </section>
@@ -610,15 +605,9 @@ function NewApplicantAssessmentForm({
 
 // --- C6: interviews (scheduling + panel scorecards) -----------------------
 
-function employeeName(employees: Employee[], id: number | null): string {
-  if (id === null) return '—'
-  const found = employees.find((e) => e.id === id)
-  return found ? `${found.first_name} ${found.last_name}` : `#${id}`
-}
-
 function InterviewsSection({
-  applicant, sessions, employees, onChanged,
-}: { applicant: Applicant; sessions: InterviewSession[] | null; employees: Employee[]; onChanged: () => void }) {
+  applicant, sessions, onChanged,
+}: { applicant: Applicant; sessions: InterviewSession[] | null; onChanged: () => void }) {
   const [showForm, setShowForm] = useState(false)
 
   if (applicant.current_stage !== 'interview' && (!sessions || sessions.length === 0)) {
@@ -630,7 +619,7 @@ function InterviewsSection({
       {sessions && sessions.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 12 }}>
           {sessions.map((session) => (
-            <InterviewSessionCard key={session.id} session={session} employees={employees} />
+            <InterviewSessionCard key={session.id} session={session} />
           ))}
         </div>
       )}
@@ -642,7 +631,6 @@ function InterviewsSection({
         ) : (
           <NewInterviewSessionForm
             applicantId={applicant.id}
-            employees={employees}
             nextRound={(sessions?.length ?? 0) + 1}
             onCreated={() => {
               setShowForm(false)
@@ -656,10 +644,9 @@ function InterviewsSection({
 }
 
 function NewInterviewSessionForm({
-  applicantId, employees, nextRound, onCreated, onCancel,
+  applicantId, nextRound, onCreated, onCancel,
 }: {
   applicantId: number
-  employees: Employee[]
   nextRound: number
   onCreated: () => void
   onCancel: () => void
@@ -670,6 +657,7 @@ function NewInterviewSessionForm({
   const [location, setLocation] = useState('')
   const [notes, setNotes] = useState('')
   const [interviewerIds, setInterviewerIds] = useState<number[]>([])
+  const [interviewers, setInterviewers] = useState<EmployeeSearchSummary[]>([])
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -717,23 +705,37 @@ function NewInterviewSessionForm({
         Location / video link
         <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Boardroom 2, or a video-call URL" />
       </label>
-      <label>
-        Interviewers (panel)
-        <select
-          multiple
-          value={interviewerIds.map(String)}
-          onChange={(e) =>
-            setInterviewerIds(Array.from(e.target.selectedOptions, (o) => Number(o.value)))
-          }
-          size={Math.min(6, Math.max(3, employees.length))}
-        >
-          {employees.map((emp) => (
-            <option key={emp.id} value={emp.id}>
-              {emp.first_name} {emp.last_name} ({emp.employee_number})
-            </option>
+      <EmployeeAsyncSelect
+        key={interviewers.length}
+        value={null}
+        onChange={() => undefined}
+        onSelect={(employee) => {
+          setInterviewers((current) => [...current, employee])
+          setInterviewerIds((current) => [...current, employee.id])
+        }}
+        label="Add interviewer"
+        excludeIds={interviewerIds}
+      />
+      {interviewers.length > 0 && (
+        <ul className="selected-employees" aria-label="Interview panel">
+          {interviewers.map((employee) => (
+            <li key={employee.id}>
+              {employee.employee_number} — {employee.display_name}{' '}
+              <button
+                type="button"
+                className="btn-link"
+                aria-label={`Remove ${employee.display_name}`}
+                onClick={() => {
+                  setInterviewers((current) => current.filter((item) => item.id !== employee.id))
+                  setInterviewerIds((current) => current.filter((id) => id !== employee.id))
+                }}
+              >
+                Remove
+              </button>
+            </li>
           ))}
-        </select>
-      </label>
+        </ul>
+      )}
       <label>
         Notes
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
@@ -752,8 +754,8 @@ function NewInterviewSessionForm({
 }
 
 function InterviewSessionCard({
-  session, employees,
-}: { session: InterviewSession; employees: Employee[] }) {
+  session,
+}: { session: InterviewSession }) {
   const [showScorecards, setShowScorecards] = useState(false)
   const [scorecards, setScorecards] = useState<InterviewScorecard[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -785,7 +787,7 @@ function InterviewSessionCard({
       </div>
       <p className="hint-text" style={{ margin: '4px 0' }}>
         {session.location || 'No location set'} · Panel:{' '}
-        {session.interviewers.map((id) => employeeName(employees, id)).join(', ') || '—'}
+        {session.interviewer_summaries.map((employee) => employee.display_name).join(', ') || '—'}
       </p>
       {session.notes && <p style={{ margin: '4px 0' }}>{session.notes}</p>}
 
@@ -822,7 +824,7 @@ function InterviewSessionCard({
                   <tbody>
                     {scorecards.map((sc) => (
                       <tr key={sc.id}>
-                        <td>{employeeName(employees, sc.interviewer)}</td>
+                        <td>{sc.interviewer_name}</td>
                         <td>{sc.skill_rating ?? '—'}</td>
                         <td>{sc.communication_rating ?? '—'}</td>
                         <td>{sc.culture_fit_rating ?? '—'}</td>

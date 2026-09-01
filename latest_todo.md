@@ -103,8 +103,10 @@ advisory remains. Other `fetchAllPages<Employee>` call sites remain queued under
       client-side exclusion of the subject and existing raters while retaining server-side eligibility checks.
 - [x] Replace succession/talent-pool employee-directory downloads with the scoped async selector and a
       privacy-minimal candidate display name supplied by the row-scoped succession response.
-- [ ] Replace the two remaining full employee-directory consumers: applicant interview panels and the organisation
-      chart. These require compact multi-select and organisational-topology contracts respectively.
+- [x] Replace applicant interview-panel directory downloads with async multi-select search; embed only panel identity
+      summaries and scorecard author names in the already row-scoped interview contracts.
+- [ ] Replace the final full employee-directory consumer, the organisation chart, with an organisational-topology
+      contract that preserves row scope without exposing unrelated employee detail fields.
 
 Verification for this partial tranche: 7 focused API tests passed; frontend lint/build, Django warning-level checks,
 migration-drift checks and the two contract-renewal browser journeys passed. The performance review journey also
@@ -114,6 +116,11 @@ applicant page downloaded the full employee directory, reinforcing the priority 
 Verification for the My Performance/succession increment: all 10 focused succession API tests and all 6 focused
 performance-calibration/succession Playwright journeys passed. Generated API types were refreshed; frontend lint,
 contract-import checks, production build and `git diff --check` passed. The existing large-chunk build advisory remains.
+
+Verification for the interview-panel increment: 14 focused scheduling/scorecard API tests and all 3 careers-portal
+Playwright journeys passed. Generated API types were refreshed; frontend lint, contract-import checks, production
+build and `git diff --check` passed. The browser trace confirms panel selection calls only `search-summary` and does
+not request the detailed employee collection.
 
 ## Execution principles
 

@@ -584,6 +584,7 @@ export interface InterviewSession {
   status: InterviewSessionStatus
   notes: string
   interviewers: number[]
+  interviewer_summaries: Array<{ id: number; employee_number: string; display_name: string }>
   created_by: number | null
   created_at: string
 }
@@ -600,6 +601,7 @@ export interface InterviewScorecard {
   id: number
   session: number
   interviewer: number
+  interviewer_name: string
   // Blind-review masked (design spec §2.2): a scorecard whose content isn't
   // yet visible to the viewer omits these five fields entirely rather than
   // sending null — treat their absence as "not visible yet", not "unrated".

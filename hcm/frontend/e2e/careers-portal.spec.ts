@@ -52,7 +52,6 @@ test.describe('External careers portal (C6)', () => {
     // have no login account to score with afterward.
     await login(page, 'auditor')
     const me = await (await page.request.get('/api/v1/auth/me/')).json()
-    const auditorId = String(me.employee_id)
     await page.getByRole('button', { name: 'Sign out' }).click()
     await page.waitForURL(/\/login$/)
 
@@ -94,7 +93,14 @@ test.describe('External careers portal (C6)', () => {
     await page.getByRole('button', { name: '+ Schedule interview' }).click()
     await page.getByLabel('Date & time').fill('2026-09-15T10:00')
     await page.getByLabel('Location / video link').fill('Video call: https://meet.example.com/e2e')
-    await page.getByLabel('Interviewers (panel)').selectOption(auditorId)
+    const interviewerSearch = page.getByRole('combobox', { name: 'Add interviewer' })
+    await interviewerSearch.fill(me.employee_number)
+    const auditorOption = page.getByRole('option', {
+      name: `${me.employee_number} — ${me.first_name} ${me.last_name}`,
+    })
+    await expect(auditorOption).toBeVisible()
+    await auditorOption.click()
+    await expect(page.getByRole('list', { name: 'Interview panel' })).toContainText(me.employee_number)
     await page.getByRole('button', { name: 'Schedule interview', exact: true }).click()
     await settled(page)
     await expect(page.locator('div.detail-card', { hasText: 'Round 1' })).toBeVisible()

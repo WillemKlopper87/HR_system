@@ -457,6 +457,10 @@ class InterviewSessionApiTests(InterviewSchedulingApiTestCase):
         }, format="json")
         self.assertEqual(response.status_code, 201, response.data)
         summary = response.data["applicant_summary"]
+        self.assertEqual(response.data["interviewer_summaries"], [
+            {"id": self.interviewer1.id, "employee_number": "E200", "display_name": "Ivy Interviewer"},
+            {"id": self.interviewer2.id, "employee_number": "E201", "display_name": "Ian Panelist"},
+        ])
         self.assertEqual(summary["first_name"], "Alex")
         self.assertEqual(summary["current_stage"], "interview")
         # Deliberately narrow -- no demographics, no email/phone/date_of_birth,
@@ -651,6 +655,7 @@ class InterviewScorecardApiTests(InterviewSchedulingApiTestCase):
         response = self._submit(self.interviewer1.user, extra={"interviewer": self.interviewer2.id})
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data["interviewer"], self.interviewer1.id)
+        self.assertEqual(response.data["interviewer_name"], "Ivy Interviewer")
 
     def test_duplicate_scorecard_for_same_session_rejected(self):
         first = self._submit(self.interviewer1.user)

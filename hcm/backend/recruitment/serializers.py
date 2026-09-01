@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core_hr.models import Employee
 from rbac_audit.audit import log_access
 from rbac_audit.consent import has_active_consent
 from rbac_audit.drf import get_request_employee
@@ -245,14 +246,27 @@ class InterviewApplicantSummarySerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class InterviewerSummarySerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Employee
+        fields = ["id", "employee_number", "display_name"]
+        read_only_fields = fields
+
+    def get_display_name(self, obj) -> str:
+        return f"{obj.preferred_name or obj.first_name} {obj.last_name}".strip()
+
+
 class InterviewSessionSerializer(serializers.ModelSerializer):
     applicant_summary = InterviewApplicantSummarySerializer(source="applicant", read_only=True)
+    interviewer_summaries = InterviewerSummarySerializer(source="interviewers", many=True, read_only=True)
 
     class Meta:
         model = InterviewSession
         fields = [
             "id", "applicant", "applicant_summary", "round_number", "scheduled_at", "duration_minutes",
-            "location", "status", "notes", "interviewers", "created_by", "created_at",
+            "location", "status", "notes", "interviewers", "interviewer_summaries", "created_by", "created_at",
         ]
         read_only_fields = ["created_by"]
 
@@ -276,13 +290,18 @@ class InterviewScorecardSerializer(serializers.ModelSerializer):
     same session) lives in to_representation, not in the permission class —
     the permission class only decides whether the ROW is reachable at all."""
 
+    interviewer_name = serializers.SerializerMethodField()
+
     class Meta:
         model = InterviewScorecard
         fields = [
-            "id", "session", "interviewer", "skill_rating", "communication_rating",
+            "id", "session", "interviewer", "interviewer_name", "skill_rating", "communication_rating",
             "culture_fit_rating", "comments", "recommendation", "created_at",
         ]
         read_only_fields = ["interviewer"]
+
+    def get_interviewer_name(self, obj) -> str:
+        return f"{obj.interviewer.preferred_name or obj.interviewer.first_name} {obj.interviewer.last_name}".strip()
 
     def validate(self, attrs):
         session = attrs.get("session", self.instance.session if self.instance else None)
