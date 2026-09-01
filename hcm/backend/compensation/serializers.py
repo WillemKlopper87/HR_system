@@ -101,6 +101,12 @@ class BenefitSerializer(serializers.ModelSerializer):
 
 
 class BenefitsElectionSerializer(serializers.ModelSerializer):
+    employee_name = serializers.SerializerMethodField()
+
     class Meta:
         model = BenefitsElection
-        fields = ["id", "employee", "benefit", "status", "effective_date", "notes"]
+        fields = ["id", "employee", "employee_name", "benefit", "status", "effective_date", "notes"]
+
+    def get_employee_name(self, obj) -> str:
+        employee = obj.employee
+        return f"{employee.preferred_name or employee.first_name} {employee.last_name}".strip()

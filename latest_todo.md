@@ -75,6 +75,24 @@ migration-drift checks passed. The production build continues to report the know
 The broad high-volume-screen and selector-summary items below remain open because other screens still use
 `fetchAllPages`; this slice closes the named workflows, not the repository-wide migration.
 
+## Employee-selector follow-up — 2026-09-01
+
+Completed the next privacy/scale tranche:
+
+- [x] Replace the full employee-directory download in employment-change proposals with the scoped async selector.
+- [x] Replace the full employee-directory download in employee-assessment assignment with the scoped async selector.
+- [x] Replace the full employee-directory download in benefits administration with the scoped async selector.
+- [x] Replace the full employee-directory download in EE plan-measure ownership with the scoped async selector.
+- [x] Add purpose-specific display-name fields to employment-change, assessment-assignment and benefits-election
+      responses so list tables no longer need a separate employee-directory join.
+- [x] Regenerate the OpenAPI TypeScript contract and assert the new response fields in focused API tests.
+- [x] Extend browser selector coverage across all four workflows, checking the privacy-minimal response shape and
+      proving that none requests the detailed `/employees/` collection.
+
+Verification: 44 focused backend tests and 6 Playwright selector journeys passed; frontend lint/build, Django
+warning-level system checks, migration-drift checks and `git diff --check` passed. The existing large-chunk build
+advisory remains. Other `fetchAllPages<Employee>` call sites remain queued under the repository-wide scale item.
+
 ## Execution principles
 
 - Preserve effective dating, audit history, row scope, field tiers and protected-download controls.

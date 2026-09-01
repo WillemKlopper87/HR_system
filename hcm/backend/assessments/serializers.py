@@ -23,16 +23,22 @@ class AssessmentAssignmentSerializer(serializers.ModelSerializer):
     call result) or process_webhook_result (status/completion)."""
 
     result = AssessmentResultSerializer(read_only=True)
+    employee_name = serializers.SerializerMethodField()
 
     class Meta:
         model = AssessmentAssignment
         fields = [
-            "id", "employee", "applicant_id", "assessment_type", "provider_key", "provider_reference",
+            "id", "employee", "employee_name", "applicant_id", "assessment_type", "provider_key", "provider_reference",
             "access_url", "status", "assigned_by", "completed_at", "result", "created_at",
         ]
         read_only_fields = [
             "provider_key", "provider_reference", "access_url", "status", "assigned_by", "completed_at",
         ]
+
+    def get_employee_name(self, obj) -> str | None:
+        if obj.employee is None:
+            return None
+        return f"{obj.employee.preferred_name or obj.employee.first_name} {obj.employee.last_name}".strip()
 
     def validate(self, attrs):
         request = self.context.get("request")

@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import {
@@ -6,29 +6,22 @@ import {
   ASSESSMENT_TYPE_LABELS,
   type AssessmentAssignment,
   type AssessmentType,
-  type Employee,
 } from '../api/types'
+import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
 
 export function AssessmentsPage() {
   const [showForm, setShowForm] = useState(false)
 
   const { data, error: loadError, reload: load } = useApiQuery(
     () =>
-      Promise.all([
-        fetchAllPages<AssessmentAssignment>('/assessment-assignments/'),
-        fetchAllPages<Employee>('/employees/'),
-      ]).then(([assignments, employees]) => {
+      fetchAllPages<AssessmentAssignment>('/assessment-assignments/').then((assignments) => {
         assignments = assignments.filter((row) => row.employee !== null)
-        return { assignments, employees }
+        return assignments
       }),
     [],
     { errorMessage: 'Failed to load assessment assignments.' },
   )
-  const assignments = data?.assignments ?? null
-  const employees = data?.employees ?? null
-
-
-  const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
+  const assignments = data
 
   return (
     <div className="page">
@@ -49,7 +42,6 @@ export function AssessmentsPage() {
 
       {showForm && (
         <NewAssignmentForm
-          employees={employees ?? []}
           onCreated={() => {
             setShowForm(false)
             load()
@@ -75,12 +67,11 @@ export function AssessmentsPage() {
             </thead>
             <tbody>
               {assignments.map((assignment) => {
-                const emp = assignment.employee !== null ? employeeById.get(assignment.employee) : undefined
                 return (
                   <AssignmentRow
                     key={assignment.id}
                     assignment={assignment}
-                    subjectName={emp ? `${emp.first_name} ${emp.last_name}` : `#${assignment.employee}`}
+                    subjectName={assignment.employee_name ?? `#${assignment.employee}`}
                     onChanged={load}
                   />
                 )
@@ -141,23 +132,12 @@ function AssignmentRow({
   )
 }
 
-function NewAssignmentForm({ employees, onCreated }: { employees: Employee[]; onCreated: () => void }) {
-  const [search, setSearch] = useState('')
-  const [employee, setEmployee] = useState<number | ''>('')
+function NewAssignmentForm({ onCreated }: { onCreated: () => void }) {
+  const [employee, setEmployee] = useState<number | null>(null)
   const [assessmentType, setAssessmentType] = useState<AssessmentType>('cognitive')
   const [error, setError] = useState<string | null>(null)
   const [needsConsent, setNeedsConsent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    if (!term) return employees
-    return employees.filter(
-      (e) =>
-        e.employee_number.toLowerCase().includes(term) ||
-        `${e.first_name} ${e.last_name}`.toLowerCase().includes(term),
-    )
-  }, [employees, search])
 
   async function attemptAssign() {
     await api.post('/assessment-assignments/', { employee, assessment_type: assessmentType })
@@ -203,28 +183,14 @@ function NewAssignmentForm({ employees, onCreated }: { employees: Employee[]; on
 
   return (
     <form className="inline-form" onSubmit={handleSubmit}>
-      <label>
-        Search employee
-        <input placeholder="Name or employee #…" value={search} onChange={(e) => setSearch(e.target.value)} />
-      </label>
-      <label>
-        Employee
-        <select
-          value={employee}
-          onChange={(e) => {
-            setEmployee(e.target.value ? Number(e.target.value) : '')
-            setNeedsConsent(false)
-          }}
-          required
-        >
-          <option value="">— Select —</option>
-          {filtered.map((emp) => (
-            <option key={emp.id} value={emp.id}>
-              {emp.employee_number} — {emp.first_name} {emp.last_name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <EmployeeAsyncSelect
+        value={employee}
+        onChange={(value) => {
+          setEmployee(value)
+          setNeedsConsent(false)
+        }}
+        required
+      />
       <label>
         Assessment type
         <select value={assessmentType} onChange={(e) => setAssessmentType(e.target.value as AssessmentType)}>

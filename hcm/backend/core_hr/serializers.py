@@ -342,11 +342,15 @@ class EmploymentChangeSerializer(serializers.ModelSerializer):
     with today's date regardless (spec §4.2) — nothing to enforce here,
     that rule lives in exits.py alongside the rest of the state machine."""
 
+    employee_name = serializers.SerializerMethodField()
+    proposed_by_name = serializers.SerializerMethodField()
+    confirmed_by_name = serializers.SerializerMethodField()
+
     class Meta:
         model = EmploymentChange
         fields = [
-            "id", "employee", "change_type", "state", "effective_date", "reason",
-            "proposed_by", "proposed_at", "confirmed_by", "confirmed_at", "executed_at",
+            "id", "employee", "employee_name", "change_type", "state", "effective_date", "reason",
+            "proposed_by", "proposed_by_name", "proposed_at", "confirmed_by", "confirmed_by_name", "confirmed_at", "executed_at",
             "cancelled_by", "cancelled_at", "cancellation_reason",
             "lifts_suspension", "resulting_event",
         ]
@@ -355,6 +359,21 @@ class EmploymentChangeSerializer(serializers.ModelSerializer):
             "cancelled_by", "cancelled_at", "cancellation_reason",
             "lifts_suspension", "resulting_event",
         ]
+
+    @staticmethod
+    def _employee_name(employee) -> str | None:
+        if employee is None:
+            return None
+        return f"{employee.preferred_name or employee.first_name} {employee.last_name}".strip()
+
+    def get_employee_name(self, obj) -> str:
+        return self._employee_name(obj.employee) or ""
+
+    def get_proposed_by_name(self, obj) -> str | None:
+        return self._employee_name(obj.proposed_by)
+
+    def get_confirmed_by_name(self, obj) -> str | None:
+        return self._employee_name(obj.confirmed_by)
 
 
 class DataQualityExceptionSerializer(serializers.ModelSerializer):

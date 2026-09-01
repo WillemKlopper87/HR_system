@@ -1229,6 +1229,9 @@ class EmploymentChangeApiTests(TestCase):
     def test_hr_admin_can_propose(self):
         response = self._propose(EmploymentChange.ChangeType.SUSPENSION)
         self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["employee_name"], "Departing Person")
+        self.assertEqual(response.data["proposed_by_name"], "First Admin")
+        self.assertIsNone(response.data["confirmed_by_name"])
         self.assertEqual(EmploymentChange.objects.filter(employee=self.staff).count(), 1)
 
     def test_auditor_can_read_but_not_propose(self):

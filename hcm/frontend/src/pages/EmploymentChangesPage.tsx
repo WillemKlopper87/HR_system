@@ -1,15 +1,15 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { api, ApiError, fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import {
   EMPLOYMENT_CHANGE_TYPE_LABELS,
   PROPOSABLE_CHANGE_TYPES,
   TIERED_CHANGE_TYPES,
-  type Employee,
   type EmploymentChange,
   type EmploymentChangeType,
 } from '../api/types'
 import { useAuth } from '../auth/useAuth'
+import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
 
 const OPEN_STATES = ['proposed', 'confirmed'] as const
 
@@ -19,30 +19,12 @@ function isOpen(change: EmploymentChange): boolean {
 
 export function EmploymentChangesPage() {
   const { hasRole, user } = useAuth()
-  // One fetch, matching CompProposalsPage/BenefitsPage/ContractRenewalsPage:
-  // a single loading state and error surface, and the name lookup lands with
-  // the changes rather than racing them on first paint.
-  const { data, error: loadError, reload: load } = useApiQuery(
-    () =>
-      Promise.all([
-        fetchAllPages<EmploymentChange>('/employment-changes/'),
-        fetchAllPages<Employee>('/employees/'),
-      ]).then(([changes, employees]) => ({ changes, employees })),
+  const { data: changes, error: loadError, reload: load } = useApiQuery(
+    () => fetchAllPages<EmploymentChange>('/employment-changes/'),
     [],
     { errorMessage: 'Failed to load employment changes.' },
   )
-  const changes = data?.changes ?? null
-  const employees = data?.employees ?? null
   const [showForm, setShowForm] = useState(false)
-
-  const nameFor = useMemo(() => {
-    const byId = new Map((employees ?? []).map((e) => [e.id, e]))
-    return (id: number | null) => {
-      if (id === null) return '—'
-      const employee = byId.get(id)
-      return employee ? `${employee.first_name} ${employee.last_name}` : `#${id}`
-    }
-  }, [employees])
 
   const canWrite = hasRole('hr_admin')
 
@@ -88,7 +70,6 @@ export function EmploymentChangesPage() {
 
       {showForm && canWrite && (
         <ProposeChangeForm
-          employees={employees ?? []}
           onDone={() => {
             setShowForm(false)
             load()
@@ -121,9 +102,9 @@ export function EmploymentChangesPage() {
                 <ChangeRow
                   key={change.id}
                   change={change}
-                  employeeName={nameFor(change.employee)}
-                  proposedByName={nameFor(change.proposed_by)}
-                  confirmedByName={nameFor(change.confirmed_by)}
+                  employeeName={change.employee_name}
+                  proposedByName={change.proposed_by_name ?? '—'}
+                  confirmedByName={change.confirmed_by_name ?? '—'}
                   currentEmployeeId={user?.employee_id ?? null}
                   onChanged={load}
                 />
@@ -209,10 +190,8 @@ function ChangeRow({
   )
 }
 
-function ProposeChangeForm({
-  employees, onDone,
-}: { employees: Employee[]; onDone: () => void }) {
-  const [employee, setEmployee] = useState<number | ''>('')
+function ProposeChangeForm({ onDone }: { onDone: () => void }) {
+  const [employee, setEmployee] = useState<number | null>(null)
   const [changeType, setChangeType] = useState<EmploymentChangeType>('suspension')
   const [effectiveDate, setEffectiveDate] = useState('')
   const [reason, setReason] = useState('')
@@ -243,17 +222,7 @@ function ProposeChangeForm({
 
   return (
     <form className="inline-form" onSubmit={(e) => void handleSubmit(e)}>
-      <label>
-        Employee
-        <select value={employee} onChange={(e) => setEmployee(Number(e.target.value) || '')}>
-          <option value="">Select…</option>
-          {employees.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.employee_number} — {e.first_name} {e.last_name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <EmployeeAsyncSelect value={employee} onChange={setEmployee} required />
       <label>
         Change
         <select

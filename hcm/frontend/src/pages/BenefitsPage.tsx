@@ -8,8 +8,8 @@ import {
   type BenefitCategory,
   type BenefitsElection,
   type BenefitsElectionStatus,
-  type Employee,
 } from '../api/types'
+import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
 
 const CATEGORY_OPTIONS = Object.entries(BENEFIT_CATEGORY_LABELS) as [BenefitCategory, string][]
 const ELECTION_STATUS_OPTIONS = Object.entries(BENEFITS_ELECTION_STATUS_LABELS) as [BenefitsElectionStatus, string][]
@@ -23,17 +23,12 @@ export function BenefitsPage() {
       Promise.all([
         fetchAllPages<Benefit>('/benefits/'),
         fetchAllPages<BenefitsElection>('/benefits-elections/'),
-        fetchAllPages<Employee>('/employees/'),
-      ]).then(([benefits, elections, employees]) => ({ benefits, elections, employees })),
+      ]).then(([benefits, elections]) => ({ benefits, elections })),
     [],
     { errorMessage: 'Failed to load benefits.' },
   )
   const benefits = data?.benefits ?? null
   const elections = data?.elections ?? null
-  const employees = data?.employees ?? null
-
-
-  const employeeById = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e])), [employees])
   const benefitById = useMemo(() => new Map((benefits ?? []).map((b) => [b.id, b])), [benefits])
 
   return (
@@ -101,7 +96,6 @@ export function BenefitsPage() {
 
         {showElectionForm && (
           <NewElectionForm
-            employees={employees ?? []}
             benefits={benefits ?? []}
             onCreated={() => {
               setShowElectionForm(false)
@@ -127,10 +121,9 @@ export function BenefitsPage() {
               </thead>
               <tbody>
                 {elections.map((el) => {
-                  const emp = employeeById.get(el.employee)
                   return (
                     <tr key={el.id}>
-                      <td>{emp ? `${emp.first_name} ${emp.last_name}` : `#${el.employee}`}</td>
+                      <td>{el.employee_name}</td>
                       <td>{benefitById.get(el.benefit)?.name ?? `#${el.benefit}`}</td>
                       <td>
                         <span className="status-badge">{BENEFITS_ELECTION_STATUS_LABELS[el.status]}</span>
@@ -202,25 +195,14 @@ function NewBenefitForm({ onCreated }: { onCreated: () => void }) {
 }
 
 function NewElectionForm({
-  employees, benefits, onCreated,
-}: { employees: Employee[]; benefits: Benefit[]; onCreated: () => void }) {
-  const [search, setSearch] = useState('')
-  const [employee, setEmployee] = useState<number | ''>('')
+  benefits, onCreated,
+}: { benefits: Benefit[]; onCreated: () => void }) {
+  const [employee, setEmployee] = useState<number | null>(null)
   const [benefit, setBenefit] = useState<number | ''>('')
   const [status, setStatus] = useState<BenefitsElectionStatus>('enrolled')
   const [effectiveDate, setEffectiveDate] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    if (!term) return employees
-    return employees.filter(
-      (e) =>
-        e.employee_number.toLowerCase().includes(term) ||
-        `${e.first_name} ${e.last_name}`.toLowerCase().includes(term),
-    )
-  }, [employees, search])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -244,21 +226,7 @@ function NewElectionForm({
 
   return (
     <form className="inline-form" onSubmit={handleSubmit}>
-      <label>
-        Search employee
-        <input placeholder="Name or employee #…" value={search} onChange={(e) => setSearch(e.target.value)} />
-      </label>
-      <label>
-        Employee
-        <select value={employee} onChange={(e) => setEmployee(e.target.value ? Number(e.target.value) : '')} required>
-          <option value="">— Select —</option>
-          {filtered.map((emp) => (
-            <option key={emp.id} value={emp.id}>
-              {emp.employee_number} — {emp.first_name} {emp.last_name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <EmployeeAsyncSelect value={employee} onChange={setEmployee} required />
       <label>
         Benefit
         <select value={benefit} onChange={(e) => setBenefit(e.target.value ? Number(e.target.value) : '')} required>

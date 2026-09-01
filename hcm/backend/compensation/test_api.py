@@ -273,6 +273,7 @@ class BenefitsElectionApiTests(CompensationApiTestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["employee_name"], "Plain Employee")
 
     def test_duplicate_election_for_same_employee_and_benefit_is_rejected(self):
         benefit = Benefit.objects.create(name="Medical Aid", category=Benefit.Category.MEDICAL)

@@ -6754,6 +6754,7 @@ export interface components {
         AssessmentAssignment: {
             readonly id: number;
             employee?: number | null;
+            readonly employee_name: string | null;
             /** Format: int64 */
             applicant_id?: number | null;
             assessment_type: components["schemas"]["AssessmentTypeEnum"];
@@ -6851,6 +6852,7 @@ export interface components {
         BenefitsElection: {
             readonly id: number;
             employee: number;
+            readonly employee_name: string;
             benefit: number;
             status?: components["schemas"]["BenefitsElectionStatusEnum"];
             /** Format: date */
@@ -7702,15 +7704,18 @@ export interface components {
         EmploymentChange: {
             readonly id: number;
             employee: number;
+            readonly employee_name: string;
             change_type: components["schemas"]["ChangeTypeEnum"];
             readonly state: components["schemas"]["StateEnum"];
             /** Format: date */
             effective_date: string;
             reason: string;
             readonly proposed_by: number;
+            readonly proposed_by_name: string | null;
             /** Format: date-time */
             readonly proposed_at: string;
             readonly confirmed_by: number | null;
+            readonly confirmed_by_name: string | null;
             /** Format: date-time */
             readonly confirmed_at: string | null;
             /** Format: date-time */
@@ -9277,6 +9282,7 @@ export interface components {
         PatchedBenefitsElection: {
             readonly id?: number;
             employee?: number;
+            readonly employee_name?: string;
             benefit?: number;
             status?: components["schemas"]["BenefitsElectionStatusEnum"];
             /** Format: date */

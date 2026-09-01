@@ -4,9 +4,10 @@ import { useApiQuery } from '../api/hooks'
 import { useAuth } from '../auth/useAuth'
 import { RequirePayrollStepUp } from '../auth/RequirePayrollStepUp'
 import type {
-  EEPlan, EEPlanMeasure, EEPlanMeasureStatus, EEPlanProgressSnapshot, EEQuestionnaire, EESector, Employee, EmployerConfig, RemunerationRecord,
+  EEPlan, EEPlanMeasure, EEPlanMeasureStatus, EEPlanProgressSnapshot, EEQuestionnaire, EESector, EmployerConfig, RemunerationRecord,
 } from '../api/types'
 import { EE_PLAN_MEASURE_STATUS_LABELS } from '../api/types'
+import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
 import {
   BARRIER_CATEGORIES,
   BUSINESS_TYPES,
@@ -476,7 +477,6 @@ function PlanMeasuresSection({ canWrite }: { canWrite: boolean }) {
     () => fetchAllPages<EEPlanMeasure>(`/ee-plan-measures/?plan=${planId}`), [planId],
     { errorMessage: 'Failed to load plan measures.', enabled: planId !== null },
   )
-  const employees = useApiQuery(() => fetchAllPages<Employee>('/employees/'), [], { errorMessage: 'Failed to load employees.', enabled: canWrite })
 
   if (plan.error) return <p className="form-error">{plan.error}</p>
   if (plan.data === null) return <p className="empty-state">{plan.loading ? 'Loading…' : 'No EE Plan exists yet — create one first.'}</p>
@@ -526,7 +526,7 @@ function PlanMeasuresSection({ canWrite }: { canWrite: boolean }) {
           </table>
         </div>
       )}
-      {canWrite && <AddMeasureForm plan={plan.data} employees={employees.data ?? []} onSaved={measures.reload} />}
+      {canWrite && <AddMeasureForm plan={plan.data} onSaved={measures.reload} />}
     </div>
   )
 }
@@ -551,11 +551,11 @@ function MeasureStatusSelect({ measure, onChanged }: { measure: EEPlanMeasure; o
   )
 }
 
-function AddMeasureForm({ plan, employees, onSaved }: { plan: EEPlan; employees: Employee[]; onSaved: () => void }) {
+function AddMeasureForm({ plan, onSaved }: { plan: EEPlan; onSaved: () => void }) {
   const [category, setCategory] = useState(BARRIER_CATEGORIES[0][0])
   const [barrier, setBarrier] = useState('')
   const [measure, setMeasure] = useState('')
-  const [owner, setOwner] = useState('')
+  const [owner, setOwner] = useState<number | null>(null)
   const [start, setStart] = useState(plan.plan_period_start)
   const [end, setEnd] = useState(plan.plan_period_end)
   const [error, setError] = useState<string | null>(null)
@@ -568,7 +568,7 @@ function AddMeasureForm({ plan, employees, onSaved }: { plan: EEPlan; employees:
     try {
       await api.post('/ee-plan-measures/', {
         plan: plan.id, category, barrier_description: barrier, measure_description: measure,
-        owner: Number(owner), target_start: start, target_end: end,
+        owner, target_start: start, target_end: end,
       })
       setBarrier('')
       setMeasure('')
@@ -598,15 +598,7 @@ function AddMeasureForm({ plan, employees, onSaved }: { plan: EEPlan; employees:
         Measure
         <input value={measure} onChange={(e) => setMeasure(e.target.value)} required />
       </label>
-      <label>
-        Responsible person
-        <select value={owner} onChange={(e) => setOwner(e.target.value)} required>
-          <option value="">— Select —</option>
-          {employees.map((emp) => (
-            <option key={emp.id} value={emp.id}>{emp.employee_number} — {emp.first_name} {emp.last_name}</option>
-          ))}
-        </select>
-      </label>
+      <EmployeeAsyncSelect value={owner} onChange={setOwner} label="Responsible person" required />
       <label>
         Start
         <input type="date" value={start} onChange={(e) => setStart(e.target.value)} required />

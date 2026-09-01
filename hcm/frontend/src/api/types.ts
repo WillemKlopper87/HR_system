@@ -144,13 +144,16 @@ export type EmploymentChangeState = 'proposed' | 'confirmed' | 'executed' | 'can
 export interface EmploymentChange {
   id: number
   employee: number
+  employee_name: string
   change_type: EmploymentChangeType
   state: EmploymentChangeState
   effective_date: string
   reason: string
   proposed_by: number | null
+  proposed_by_name: string | null
   proposed_at: string | null
   confirmed_by: number | null
+  confirmed_by_name: string | null
   confirmed_at: string | null
   executed_at: string | null
   cancelled_by: number | null
@@ -949,6 +952,7 @@ export type BenefitsElectionStatus = 'enrolled' | 'waived' | 'pending'
 export interface BenefitsElection {
   id: number
   employee: number
+  employee_name: string
   benefit: number
   status: BenefitsElectionStatus
   effective_date: string | null
@@ -974,6 +978,7 @@ export interface AssessmentResult {
 export interface AssessmentAssignment {
   id: number
   employee: number | null
+  employee_name: string | null
   applicant_id: number | null
   assessment_type: AssessmentType
   provider_key: string

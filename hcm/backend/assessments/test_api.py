@@ -86,6 +86,7 @@ class ModuleWidePermissionTests(AssessmentsApiTestCase):
             format="json",
         )
         assert response.status_code == 201, response.data
+        assert response.data["employee_name"] == "Plain Employee"
         self.assignment_id = response.data["id"]
 
     def test_line_manager_gets_empty_list(self):
