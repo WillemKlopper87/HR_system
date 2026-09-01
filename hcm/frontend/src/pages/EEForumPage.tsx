@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react'
-import { api, ApiError, fetchAllPages } from '../api/client'
+import { api, ApiError, fetchAllPages, type Paginated } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import { useAuth } from '../auth/useAuth'
-import type { EEForumComposition, EEForumMeeting, EEForumMember, EEForumRepresentation, EEForumRole, Employee } from '../api/types'
+import { EmployeeAsyncSelect } from '../components/EmployeeAsyncSelect'
+import type { EEForumComposition, EEForumMeeting, EEForumMember, EEForumRepresentation, EEForumRole } from '../api/types'
 import { EE_FORUM_REPRESENTATION_LABELS, EE_FORUM_ROLE_LABELS } from '../api/types'
 import { OCCUPATIONAL_LEVEL_LABELS } from '../ee-reporting/constants'
 
@@ -15,11 +16,17 @@ const CURRENT_YEAR = new Date().getFullYear()
 export function EEForumPage() {
   const { hasRole } = useAuth()
   const canWrite = hasRole('hr_admin') || hasRole('ee_manager')
+  const [meetingPagePath, setMeetingPagePath] = useState<string | null>(null)
+  const meetingRequestPath = meetingPagePath ?? '/ee-forum-meetings/'
 
   const members = useApiQuery(() => fetchAllPages<EEForumMember>('/ee-forum-members/'), [], { errorMessage: 'Failed to load forum members.' })
   const composition = useApiQuery(() => api.get<EEForumComposition>('/ee-forum-members/composition/'), [], { errorMessage: 'Failed to load the composition check.' })
-  const meetings = useApiQuery(() => fetchAllPages<EEForumMeeting>('/ee-forum-meetings/'), [], { errorMessage: 'Failed to load forum meetings.' })
-  const employees = useApiQuery(() => fetchAllPages<Employee>('/employees/'), [], { errorMessage: 'Failed to load employees.', enabled: canWrite })
+  const meetings = useApiQuery(
+    () => api.get<Paginated<EEForumMeeting>>(meetingRequestPath).then((page) => ({ meetingRequestPath, page })),
+    [meetingRequestPath],
+    { errorMessage: 'Failed to load forum meetings.' },
+  )
+  const meetingPage = meetings.data?.meetingRequestPath === meetingRequestPath ? meetings.data.page : null
 
   function reloadAll() {
     members.reload()
@@ -81,15 +88,15 @@ export function EEForumPage() {
             </table>
           </div>
         )}
-        {canWrite && <AddMemberForm employees={employees.data ?? []} onSaved={reloadAll} />}
+        {canWrite && <AddMemberForm onSaved={reloadAll} />}
       </section>
 
       <section className="detail-card">
         <h2>Meetings</h2>
         {meetings.error && <p className="form-error">{meetings.error}</p>}
-        {meetings.data === null ? (
+        {meetingPage === null ? (
           !meetings.error && <p className="empty-state">Loading…</p>
-        ) : meetings.data.length === 0 ? (
+        ) : meetingPage.results.length === 0 ? (
           <p className="empty-state">No forum meetings recorded yet.</p>
         ) : (
           <div className="table-scroll">
@@ -105,7 +112,7 @@ export function EEForumPage() {
                 </tr>
               </thead>
               <tbody>
-                {meetings.data.map((mt) => (
+                {meetingPage.results.map((mt) => (
                   <tr key={mt.id}>
                     <td>{mt.meeting_date}</td>
                     <td>{mt.title}</td>
@@ -126,6 +133,16 @@ export function EEForumPage() {
               </tbody>
             </table>
           </div>
+        )}
+        {meetingPage && (meetingPage.previous || meetingPage.next) && (
+          <nav className="form-actions" aria-label="EE forum meeting pages">
+            <button type="button" className="btn-secondary" disabled={!meetingPage.previous} onClick={() => setMeetingPagePath(meetingPage.previous)}>
+              Previous
+            </button>
+            <button type="button" className="btn-secondary" disabled={!meetingPage.next} onClick={() => setMeetingPagePath(meetingPage.next)}>
+              Next
+            </button>
+          </nav>
         )}
         {canWrite && <AddMeetingForm members={(members.data ?? []).filter((m) => m.is_active)} onSaved={reloadAll} />}
       </section>
@@ -180,8 +197,8 @@ function EndTermButton({ member, onDone }: { member: EEForumMember; onDone: () =
   )
 }
 
-function AddMemberForm({ employees, onSaved }: { employees: Employee[]; onSaved: () => void }) {
-  const [employee, setEmployee] = useState('')
+function AddMemberForm({ onSaved }: { onSaved: () => void }) {
+  const [employee, setEmployee] = useState<number | null>(null)
   const [representation, setRepresentation] = useState<EEForumRepresentation>('employee_nominated')
   const [role, setRole] = useState<EEForumRole>('member')
   const [termStart, setTermStart] = useState(new Date().toISOString().slice(0, 10))
@@ -194,8 +211,8 @@ function AddMemberForm({ employees, onSaved }: { employees: Employee[]; onSaved:
     setError(null)
     setSaving(true)
     try {
-      await api.post('/ee-forum-members/', { employee: Number(employee), representation, role, term_start: termStart, notes })
-      setEmployee('')
+      await api.post('/ee-forum-members/', { employee, representation, role, term_start: termStart, notes })
+      setEmployee(null)
       setNotes('')
       onSaved()
     } catch (err) {
@@ -207,15 +224,7 @@ function AddMemberForm({ employees, onSaved }: { employees: Employee[]; onSaved:
 
   return (
     <form className="inline-form" onSubmit={handleSubmit} aria-label="Add forum member">
-      <label>
-        Employee
-        <select value={employee} onChange={(e) => setEmployee(e.target.value)} required>
-          <option value="">— Select —</option>
-          {employees.map((emp) => (
-            <option key={emp.id} value={emp.id}>{emp.employee_number} — {emp.first_name} {emp.last_name}</option>
-          ))}
-        </select>
-      </label>
+      <EmployeeAsyncSelect value={employee} onChange={setEmployee} required />
       <label>
         Represents
         <select value={representation} onChange={(e) => setRepresentation(e.target.value as EEForumRepresentation)}>
