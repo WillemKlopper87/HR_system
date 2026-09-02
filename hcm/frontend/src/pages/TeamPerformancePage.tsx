@@ -3,7 +3,7 @@ import { api } from '../api/client'
 import { useApiQuery, useMutation } from '../api/hooks'
 import { useAuth } from '../auth/useAuth'
 import type { PerformanceAgreement, PerformancePeriod, SigningDelegation } from '../api/types'
-import { AgreementCard } from './MyPerformancePage'
+import { AgreementCard } from './performance/AgreementCard'
 
 /** Head's view (PC-1): who on my team is outstanding, review/approve/sign one
  * of them, and hand signing over before I go on leave (the user's rule:
