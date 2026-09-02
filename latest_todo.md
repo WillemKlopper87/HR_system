@@ -425,6 +425,11 @@ Apply these to every completed slice:
 
 ## Recommended starting point
 
-Begin with **P0.1–P0.4 as one bounded tranche**. It is the strongest immediate win because it improves frontend/backend
-contract integrity, removes organisation-wide employee downloads, reduces bundle/warning debt and closes known
-regulatory browser gaps without waiting for SAP, Entra, legal policy or an external vendor.
+~~Begin with P0.1–P0.4 as one bounded tranche.~~ **Done** — every P0.1–P0.4 checkbox above is closed, along with the
+full scale/privacy follow-up (employee-selector rollout, employee-directory removal) and several P1 items (backup
+automation, operational metrics, ADR-012 deploy/rollback, the org chart focused view, contract-to-permanent
+conversion linked to a real position, and the policy committee approval gate) — see the follow-up sections above and
+commit history from 2026-09-01 onward. This paragraph itself was the stale-roadmap example P3 calls out below; the
+current starting point is **P3's architecture/documentation cleanup**, since none of P1's remaining items (pilot UAT,
+identity/SSO, employee-relations case management, statutory workflow depth) can be unblocked by more engineering
+alone — they need human decisions (legal policy, SAP/Entra ownership, UAT scheduling) this repo can't make for itself.
