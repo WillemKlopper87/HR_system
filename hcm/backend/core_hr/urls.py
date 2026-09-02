@@ -1,25 +1,20 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import (
-    DataQualityExceptionViewSet,
-    DependantViewSet,
+from .views import EmployeeVersionViewSet, EmployeeViewSet
+from .views_data_quality import DataQualityExceptionViewSet
+from .views_dashboards import headcount_dashboard
+from .views_dependants import DependantViewSet, EmergencyContactViewSet
+from .views_employment_changes import EmploymentChangeViewSet
+from .views_exit_interviews import ExitInterviewViewSet, exit_interview_dashboard
+from .views_overview import overview_dashboard
+from .views_probation import ProbationPeriodViewSet, ProbationReviewViewSet, probation_completion_dashboard
+from .views_reference_data import (
     DepartmentViewSet,
-    EmergencyContactViewSet,
-    EmployeeVersionViewSet,
-    EmployeeViewSet,
-    EmploymentChangeViewSet,
     JobGradeViewSet,
     LocationViewSet,
     OccupationalLevelViewSet,
-    ExitInterviewViewSet,
-    ProbationPeriodViewSet,
-    ProbationReviewViewSet,
-    exit_interview_dashboard,
-    headcount_dashboard,
-    probation_completion_dashboard,
 )
-from .views_overview import overview_dashboard
 
 router = DefaultRouter()
 router.register("employees", EmployeeViewSet, basename="employee")
