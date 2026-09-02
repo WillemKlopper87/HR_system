@@ -1,10 +1,14 @@
 import logging
+import secrets
 
 from django.contrib import admin
 from django.core.cache import cache
 from django.db import connections
 from django.http import JsonResponse
+from django.http import HttpResponse
+from django.conf import settings
 from django.urls import include, path
+from django.views.decorators.http import require_GET
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rbac_audit.drf import get_request_employee
 from rbac_audit.permissions import has_role
@@ -70,10 +74,26 @@ def readyz(_request):
     return JsonResponse({"status": "ready" if ready else "not_ready", "checks": checks}, status=200 if ready else 503)
 
 
+@require_GET
+def metrics(request):
+    """Prometheus text, disabled unless a dedicated scrape token is set."""
+    configured = settings.METRICS_BEARER_TOKEN
+    supplied = request.headers.get("Authorization", "")
+    expected = f"Bearer {configured}"
+    if len(configured) < 32 or not secrets.compare_digest(supplied, expected):
+        # Do not advertise the operational surface when it is disabled or
+        # probed without its machine credential.
+        return HttpResponse(status=404)
+    from config.operational_metrics import render_prometheus
+
+    return HttpResponse(render_prometheus(), content_type="text/plain; version=0.0.4; charset=utf-8")
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("healthz", healthz),
     path("readyz", readyz),
+    path("metrics", metrics),
     # Module APIs mount under /api/v1/ as sprints deliver them.
     path("api/v1/auth/", include("rbac_audit.urls")),
     path("api/v1/", include("core_hr.urls")),

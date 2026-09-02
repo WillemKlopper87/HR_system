@@ -1,0 +1,50 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "API request rate by status class",
+      "type": "timeseries",
+      "targets": [{"expr": "sum by (status_class) (rate(hcm_api_requests_total[5m]))", "legendFormat": "{{status_class}}"}]
+    },
+    {
+      "id": 2,
+      "title": "Average API latency",
+      "type": "timeseries",
+      "targets": [{"expr": "rate(hcm_api_request_duration_seconds_sum[5m]) / clamp_min(rate(hcm_api_request_duration_seconds_count[5m]), 0.001)", "legendFormat": "seconds"}]
+    },
+    {
+      "id": 3,
+      "title": "Background task failures",
+      "type": "timeseries",
+      "targets": [{"expr": "sum by (task) (increase(hcm_background_task_runs_total{outcome=\"failure\"}[1h]))", "legendFormat": "{{task}}"}]
+    },
+    {
+      "id": 4,
+      "title": "Scheduled task age",
+      "type": "timeseries",
+      "targets": [{"expr": "time() - hcm_background_task_last_success_timestamp_seconds", "legendFormat": "{{task}}"}]
+    },
+    {
+      "id": 5,
+      "title": "Notification email outcomes",
+      "type": "timeseries",
+      "targets": [{"expr": "sum by (outcome) (increase(hcm_notification_email_total[1h]))", "legendFormat": "{{outcome}}"}]
+    },
+    {
+      "id": 6,
+      "title": "Collaboration integration freshness",
+      "type": "stat",
+      "targets": [{"expr": "time() - hcm_integration_last_success_timestamp_seconds{integration=\"collab\"}", "legendFormat": "seconds since success"}]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["hcm", "operations"],
+  "templating": {"list": []},
+  "time": {"from": "now-24h", "to": "now"},
+  "timezone": "browser",
+  "title": "Sentech HCM Operations",
+  "uid": "sentech-hcm-ops",
+  "version": 1
+}

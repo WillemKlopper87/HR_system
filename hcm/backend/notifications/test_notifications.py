@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
@@ -13,6 +14,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
+from config.operational_metrics import render_prometheus
 from performance.test_reviews import ReviewTestCase
 from rbac_audit.models import Role, RoleAssignment
 
@@ -55,6 +57,16 @@ class ServiceTests(NotificationsTestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Test", mail.outbox[0].subject)
         self.assertEqual(mail.outbox[0].to, [self.employee.work_email])
+        self.assertIn('hcm_notification_email_total{outcome="success"} 1', render_prometheus())
+
+    @patch("notifications.services.send_mail", side_effect=RuntimeError("SMTP unavailable"))
+    def test_email_failure_is_counted_without_breaking_in_app_delivery(self, _send_mail):
+        notification = notify(recipient=self.employee, kind="pc_reminder", title="Still in app")
+        self.assertIsNone(notification.emailed_at)
+        self.assertTrue(Notification.objects.filter(pk=notification.pk).exists())
+        metrics = render_prometheus()
+        self.assertIn('hcm_notification_email_total{outcome="attempt"} 1', metrics)
+        self.assertIn('hcm_notification_email_total{outcome="failure"} 1', metrics)
 
     def test_notify_without_email_flag_skips_sending(self):
         notify(recipient=self.employee, kind="pc_reminder", title="Silent", email=False)

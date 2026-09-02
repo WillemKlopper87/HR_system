@@ -92,6 +92,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "config.middleware.ContentSecurityPolicyMiddleware",
+    "config.metrics_middleware.OperationalMetricsMiddleware",
     # records the acting user on every simple-history change record
     "simple_history.middleware.HistoryRequestMiddleware",
 ]
@@ -406,6 +407,7 @@ LOGGING = {
 # level, so a venv that hasn't installed it (nothing else here requires
 # it) still boots cleanly with SENTRY_DSN unset.
 SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+METRICS_BEARER_TOKEN = os.environ.get("METRICS_BEARER_TOKEN", "")
 if SENTRY_DSN:
     try:
         import sentry_sdk

@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from core_hr.models import Employee
 from rbac_audit.models import RoleAssignment
+from config.operational_metrics import record_notification_email
 
 from .models import Notification
 
@@ -53,6 +54,7 @@ def employees_with_role(role_name: str):
 
 
 def _send_email(notification: Notification) -> None:
+    record_notification_email("attempt")
     try:
         send_mail(
             subject=f"[Sentech HCM] {notification.title}",
@@ -68,6 +70,8 @@ def _send_email(notification: Notification) -> None:
         # A misconfigured/unreachable mail server must never break the
         # caller's own transaction -- the in-app row already exists.
         logger.exception("notification email failed for notification %s", notification.pk)
+        record_notification_email("failure")
         return
     notification.emailed_at = timezone.now()
     notification.save(update_fields=["emailed_at"])
+    record_notification_email("success")

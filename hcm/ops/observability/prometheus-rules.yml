@@ -1,0 +1,59 @@
+groups:
+  - name: hcm-operational
+    rules:
+      - alert: HcmMetricsTargetDown
+        expr: up{job="hcm"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: HCM metrics target is unavailable
+          runbook: docs/OBSERVABILITY.md#alert-response
+      - alert: HcmApiFiveXxRatioHigh
+        expr: sum(rate(hcm_api_requests_total{status_class="5xx"}[5m])) / clamp_min(sum(rate(hcm_api_requests_total[5m])), 0.001) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than 5 percent of HCM API requests are failing
+          runbook: docs/OBSERVABILITY.md#alert-response
+      - alert: HcmApiAverageLatencyHigh
+        expr: rate(hcm_api_request_duration_seconds_sum[5m]) / clamp_min(rate(hcm_api_request_duration_seconds_count[5m]), 0.001) > 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: HCM average API latency exceeds one second
+          runbook: docs/OBSERVABILITY.md#alert-response
+      - alert: HcmBackgroundTaskFailed
+        expr: increase(hcm_background_task_runs_total{outcome="failure"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: An HCM background task failed
+          runbook: docs/OBSERVABILITY.md#alert-response
+      - alert: HcmScheduledTaskStale
+        expr: hcm_background_task_last_success_timestamp_seconds{task!="integrations.tasks.sync_collab_ids_task"} > 0 and time() - hcm_background_task_last_success_timestamp_seconds{task!="integrations.tasks.sync_collab_ids_task"} > 93600
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: A daily HCM scheduled task has not succeeded for 26 hours
+          runbook: docs/OBSERVABILITY.md#alert-response
+      - alert: HcmNotificationEmailFailures
+        expr: increase(hcm_notification_email_total{outcome="failure"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: HCM notification email delivery failed
+          runbook: docs/OBSERVABILITY.md#alert-response
+      - alert: HcmCollabIntegrationStale
+        expr: hcm_integration_last_success_timestamp_seconds{integration="collab"} > 0 and time() - hcm_integration_last_success_timestamp_seconds{integration="collab"} > 93600
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: The enabled HCM collaboration integration is stale
+          runbook: docs/OBSERVABILITY.md#alert-response

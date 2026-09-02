@@ -33,6 +33,7 @@ the change).
 | Dependency currency | `.github/dependabot.yml` (weekly, grouped minor/patch; security patches immediate) | Enforced (added 2026-08-28) |
 | Container base-image provenance | Every base image in `hcm/backend/Dockerfile`, `hcm/frontend/Dockerfile`, `hcm/docker-compose.yml` pinned by digest | Enforced at build time (added 2026-08-28) |
 | Celery worker/beat liveness | `docker-compose.yml` healthchecks (`celery inspect ping`; schedule-store freshness) | Verified against a real running stack 2026-08-28, not just YAML |
+| Privacy-safe operational metrics and monitoring artifacts | `config.test_operational_metrics`, token-protected `/metrics`, `hcm/ops/observability/` | Repository behavior and artifact structure enforced; live scrape/dashboard/alert drill still external |
 
 ## Needs a human — not yet performed
 
@@ -47,6 +48,7 @@ artifact/date here once each happens; until then this table itself **is** the ho
 | Non-biometric identity/check-in alternative + appeal procedure, verified in practice | HR | **Not started** | — |
 | Database + media restore rehearsal, into an isolated environment, with hash verification | Ops | **Automation prepared; rehearsal not started** — `hcm/ops/restore-verify.sh` and the signed-artifact verifier are code-tested, but nobody has run them against an authorised backup | `docs/BACKUP-AUTOMATION.md` until dated rehearsal evidence exists |
 | Load/capacity test at realistic employee/document/history volume | Ops | **Not started** | — |
+| Metrics scrape, dashboard provisioning and alert-delivery drill | Ops | **Repository artifacts ready; deployment not started** | `docs/OBSERVABILITY.md` until dated live evidence exists |
 | Accessibility audit (WCAG 2.2 AA) | Accessibility reviewer | **Not started** | — |
 | Formal pilot acceptance or rejection | Product owner | **Not started** | — |
 

@@ -1,9 +1,9 @@
 # Operations Runbook (H3 ops/observability)
 
-Concrete procedures for the things ADR-005 states as policy but doesn't spell
-out: backup, restore, and reading whether an instance is actually healthy.
-Everything below assumes the `docker-compose.yml` topology in `hcm/` —
-service names and volume names come straight from it.
+Concrete procedures for the things ADR-005 and ADR-012 state as policy but
+don't spell out: backup, restore, deploy/rollback, and reading whether an
+instance is actually healthy. Everything below assumes the `docker-compose.yml`
+topology in `hcm/` — service names and volume names come straight from it.
 
 ## Health vs. readiness
 
@@ -98,6 +98,50 @@ environment (not staging/prod) and verify:
    `AgreementSignature` — this is the actual test that both the database
    *and* the media volume restored consistently with each other, not just
    that either one individually "looks fine".
+
+## Deploy & rollback (ADR-012)
+
+Single-node Compose has no second warm instance to route traffic to — deploy and rollback here are
+both **redeploys**, on the order of minutes, not the instant traffic-shift a revision-based platform
+gets. Say so out loud to whoever's running the rollback under pressure; don't let them expect an
+instant fix.
+
+**Deploy** (production host, `hcm/` directory, `docker-compose.prod.yml` per ADR-012):
+
+```bash
+export IMAGE_TAG=<git-sha-of-the-build-that-passed-CI>
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+`backend`'s container command runs `python manage.py migrate` automatically on start — this is why
+ADR-012 requires every migration to be expand/contract (backward-compatible with the *previous*
+release). There is no separate "run migrations" step to remember, and no way to opt out of it per
+deploy.
+
+**Before any deploy whose migration touches an existing column or table**, take a fresh backup —
+don't rely solely on the nightly cron for this one:
+
+```bash
+docker compose exec -T db pg_dump -U "${POSTGRES_USER:-hcm}" -Fc "${POSTGRES_DB:-hcm}" > hcm-pre-deploy-$(date +%Y%m%d%H%M).dump
+```
+
+**Rollback** — re-pin `IMAGE_TAG` to the previous known-good SHA and redeploy:
+
+```bash
+export IMAGE_TAG=<previous-git-sha>
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+Keep the last 3 `IMAGE_TAG` values' images present in the host's local Docker cache
+(`docker image ls | grep hcm-`) specifically so this doesn't depend on registry reachability during
+an incident. If the migration that shipped with the bad release was expand/contract-compliant (it
+must be, per ADR-012), the old code keeps working against the current schema with no schema-side
+rollback needed — that compliance is what makes this rollback safe, not optional cleanup.
+
+If the bad release's data corruption goes deeper than "roll the code back" fixes — not just a bad
+migration, but bad writes from the bad release — that's the Restore procedure above, not this one:
+this section undoes a code deploy, Restore undoes data damage.
 
 ## What this runbook deliberately does not cover
 

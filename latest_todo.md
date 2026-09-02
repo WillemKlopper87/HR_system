@@ -252,7 +252,13 @@ manufactured by engineering.
       or signature-hash disagreement and is invoked by the restore verifier. Live restored-data evidence remains open.
 - [ ] Record restoration duration and define RPO/RTO ownership.
 - [ ] Add metrics for API errors, latency, task failures, notification failures and integration freshness.
+      Repository instrumentation is complete: Redis-backed, low-cardinality counters/freshness timestamps are exposed
+      at token-protected `/metrics`, with no employee, route, recipient or payload labels. This remains open until a
+      production monitoring system scrapes it and dated evidence confirms continuity across the deployed topology.
 - [ ] Add dashboards and actionable alerts.
+      Importable Grafana panels and Prometheus rules for target availability, API error ratio/latency, task failure/
+      freshness, email failure and enabled-integration staleness are in `hcm/ops/observability/`. This remains open until
+      the selected platform imports them, routes severities to named owners and completes an alert drill.
 - [ ] Run load tests with realistic employee versions, documents and reporting data.
 - [ ] Document production topology, secrets storage, rotation and rollback.
 

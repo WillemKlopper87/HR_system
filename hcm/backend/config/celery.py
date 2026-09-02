@@ -15,3 +15,8 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 app = Celery("hcm")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
+
+# Register privacy-safe success/failure/freshness counters for the fixed set
+# of scheduled/integration tasks. Import after app setup so receivers attach
+# exactly once in web, worker and eager-test processes.
+from config import task_metrics  # noqa: E402,F401
