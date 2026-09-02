@@ -395,10 +395,10 @@ Start with shared versioned obligations and filing evidence. Do not build each d
 
 ## P3 — Controlled architecture and documentation cleanup
 
-- [ ] Split `EmployeeDetailPage.tsx` by domain panel.
-- [ ] Split `MyPerformancePage.tsx` by workflow stage.
-- [ ] Split `ApplicantDetailPage.tsx` by recruitment subdomain.
-- [ ] Split `EEConfigurationPage.tsx` by statutory/configuration concern.
+- [x] Split `EmployeeDetailPage.tsx` by domain panel (2026-09-02, 1253 -> 141 lines, pages/employee-detail/).
+- [x] Split `MyPerformancePage.tsx` by workflow stage (2026-09-02, 1190 -> 87 lines, pages/performance/).
+- [x] Split `ApplicantDetailPage.tsx` by recruitment subdomain (2026-09-02, 990 -> 219 lines, pages/applicant-detail/).
+- [x] Split `EEConfigurationPage.tsx` by statutory/configuration concern (2026-09-02, 802 -> 82 lines, pages/ee-configuration/).
 - [ ] Split backend core/performance hotspots without changing transaction semantics.
 - [ ] Decompose `seed_demo_data.py` into deterministic domain seeders.
 - [ ] Reconcile stale roadmap and sprint status claims against current code.
