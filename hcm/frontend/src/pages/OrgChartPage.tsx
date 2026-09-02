@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { fetchAllPages } from '../api/client'
 import { useApiQuery } from '../api/hooks'
 import { useReferenceData } from '../api/useReferenceData'
-import type { OrgChartNodeSummary } from '../api/types'
+import type { Department, OrgChartNodeSummary } from '../api/types'
 
 interface OrgNode {
   employeeId: number
@@ -172,6 +172,7 @@ function computeSearchVisibility(roots: OrgNode[], query: string): { visible: Se
 
 export function OrgChartPage() {
   const { departments, loading: refLoading } = useReferenceData()
+  const [viewMode, setViewMode] = useState<'tree' | 'focused'>('tree')
   const [search, setSearch] = useState('')
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
 
@@ -220,18 +221,43 @@ export function OrgChartPage() {
     <div className="page">
       <div className="page-header">
         <h1>Org Chart</h1>
-        <input
-          className="search-input"
-          placeholder="Search by name, title, or department…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        {viewMode === 'tree' && (
+          <input
+            className="search-input"
+            placeholder="Search by name, title, or department…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        )}
+      </div>
+
+      <div className="tab-row" role="tablist" aria-label="Org chart view">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={viewMode === 'tree'}
+          className={`tab-button${viewMode === 'tree' ? ' tab-button-active' : ''}`}
+          onClick={() => setViewMode('tree')}
+        >
+          Tree view
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={viewMode === 'focused'}
+          className={`tab-button${viewMode === 'focused' ? ' tab-button-active' : ''}`}
+          onClick={() => setViewMode('focused')}
+        >
+          Focused view
+        </button>
       </div>
 
       {error && <p className="form-error">{error}</p>}
 
       {loading ? (
         <p className="empty-state">Loading…</p>
+      ) : viewMode === 'focused' ? (
+        data && <FocusedView rows={data} departmentName={departmentName} />
       ) : forest && forest.totalShown === 0 ? (
         <p className="empty-state">No employees with a current record are visible to you.</p>
       ) : forest ? (
@@ -271,6 +297,219 @@ export function OrgChartPage() {
       ) : null}
     </div>
   )
+}
+
+/** Per-department, Teams-"reports to"-style drill-down: one focused person
+ * at a time (their manager above, their direct reports below) instead of
+ * the tree view's whole-company expandable tree. Department is a hard
+ * boundary (design choice, not a limitation of the data) -- a manager or
+ * report outside the selected department simply doesn't appear, the same
+ * way buildForest already treats "manager not in this fetch" as a root. */
+function FocusedView({ rows, departmentName }: { rows: OrgChartNodeSummary[]; departmentName: (id: number) => string }) {
+  const { departmentList } = useReferenceData()
+  const departmentIdsPresent = useMemo(() => new Set(rows.map((r) => r.department)), [rows])
+  const availableDepartments = useMemo(
+    () =>
+      departmentList
+        .filter((d) => departmentIdsPresent.has(d.id))
+        .sort((a: Department, b: Department) => a.name.localeCompare(b.name)),
+    [departmentList, departmentIdsPresent],
+  )
+
+  const [departmentId, setDepartmentId] = useState<number | null>(availableDepartments[0]?.id ?? null)
+  const [focusedId, setFocusedId] = useState<number | null>(null)
+  const [search, setSearch] = useState('')
+
+  const departmentRows = useMemo(
+    () => (departmentId === null ? [] : rows.filter((r) => r.department === departmentId)),
+    [rows, departmentId],
+  )
+  const forest = useMemo(() => buildForest(departmentRows, departmentName), [departmentRows, departmentName])
+  const nodeById = useMemo(() => flattenNodes(forest.roots), [forest])
+  const parentOf = useMemo(() => flattenParents(forest.roots), [forest])
+
+  function selectDepartment(id: number) {
+    setDepartmentId(id)
+    setFocusedId(null)
+    setSearch('')
+  }
+
+  const searchMatches = useMemo(() => {
+    const trimmed = search.trim().toLowerCase()
+    if (!trimmed) return []
+    return [...nodeById.values()].filter((n) => matchesQuery(n, trimmed)).slice(0, 8)
+  }, [nodeById, search])
+
+  const focused = focusedId !== null ? nodeById.get(focusedId) ?? null : null
+  const manager = focused ? parentOf.get(focused.employeeId) ?? null : null
+
+  // Breadcrumb: department name, then the chain of managers down to the
+  // focused person — clicking any crumb (including the department name,
+  // which clears focus back to "all top-level people") jumps straight there.
+  const breadcrumb = useMemo(() => {
+    const chain: OrgNode[] = []
+    let cursor = focused
+    while (cursor) {
+      chain.unshift(cursor)
+      cursor = parentOf.get(cursor.employeeId) ?? null
+    }
+    return chain
+  }, [focused, parentOf])
+
+  return (
+    <div>
+      <div className="detail-card" style={{ marginBottom: 16 }}>
+        <label>
+          Department
+          <select
+            value={departmentId ?? ''}
+            onChange={(e) => selectDepartment(Number(e.target.value))}
+          >
+            {availableDepartments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {departmentId === null || availableDepartments.length === 0 ? (
+        <p className="empty-state">No employees with a current record are visible to you.</p>
+      ) : forest.totalShown === 0 ? (
+        <p className="empty-state">No employees in this department are visible to you.</p>
+      ) : (
+        <>
+          <div className="page-header" style={{ marginBottom: 8 }}>
+            <input
+              className="search-input"
+              placeholder="Jump to someone…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          {search.trim() && (
+            <ul className="org-search-results">
+              {searchMatches.length === 0 ? (
+                <li className="hint-text">No matches for &ldquo;{search.trim()}&rdquo;.</li>
+              ) : (
+                searchMatches.map((n) => (
+                  <li key={n.employeeId}>
+                    <button
+                      type="button"
+                      className="btn-link"
+                      onClick={() => {
+                        setFocusedId(n.employeeId)
+                        setSearch('')
+                      }}
+                    >
+                      {n.name} <span className="hint-text">· {n.jobTitle}</span>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
+
+          <nav className="breadcrumb-trail" aria-label="Reporting line">
+            <button type="button" className="btn-link" onClick={() => setFocusedId(null)}>
+              {departmentName(departmentId)}
+            </button>
+            {breadcrumb.map((n) => (
+              <span key={n.employeeId}>
+                {' '}
+                &rsaquo;{' '}
+                <button type="button" className="btn-link" onClick={() => setFocusedId(n.employeeId)}>
+                  {n.name}
+                </button>
+              </span>
+            ))}
+          </nav>
+
+          {focused === null ? (
+            <>
+              <p className="hint-text">{forest.roots.length} at the top level of this department.</p>
+              <OrgCardGrid nodes={forest.roots} onSelect={setFocusedId} />
+            </>
+          ) : (
+            <>
+              {manager && (
+                <div style={{ marginBottom: 8 }}>
+                  <p className="hint-text" style={{ marginBottom: 4 }}>
+                    Reports to
+                  </p>
+                  <OrgCardGrid nodes={[manager]} onSelect={setFocusedId} />
+                </div>
+              )}
+              <OrgFocusCard node={focused} />
+              <p className="hint-text" style={{ margin: '16px 0 4px' }}>
+                {focused.children.length === 0
+                  ? 'No direct reports.'
+                  : `${focused.children.length} direct report${focused.children.length === 1 ? '' : 's'}`}
+              </p>
+              <OrgCardGrid nodes={focused.children} onSelect={setFocusedId} />
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function OrgFocusCard({ node }: { node: OrgNode }) {
+  return (
+    <div className="detail-card org-focus-card">
+      <div className="org-node-name" style={{ fontSize: 18 }}>
+        {node.name} <span className="hint-text">#{node.employeeNumber}</span>
+      </div>
+      <div className="hint-text">
+        {node.jobTitle} · {node.departmentName}
+      </div>
+      {node.brokenLoopManagerName && (
+        <span className="warning-badge">
+          Reporting loop detected — link to manager &ldquo;{node.brokenLoopManagerName}&rdquo; was cut to show this
+          person
+        </span>
+      )}
+    </div>
+  )
+}
+
+function OrgCardGrid({ nodes, onSelect }: { nodes: OrgNode[]; onSelect: (id: number) => void }) {
+  if (nodes.length === 0) return null
+  return (
+    <div className="org-card-grid">
+      {nodes.map((n) => (
+        <button key={n.employeeId} type="button" className="org-card" onClick={() => onSelect(n.employeeId)}>
+          <div className="org-node-name">{n.name}</div>
+          <div className="hint-text">{n.jobTitle}</div>
+          <div className="hint-text">
+            {n.children.length} direct report{n.children.length === 1 ? '' : 's'}
+          </div>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function flattenNodes(roots: OrgNode[]): Map<number, OrgNode> {
+  const byId = new Map<number, OrgNode>()
+  const walk = (node: OrgNode) => {
+    byId.set(node.employeeId, node)
+    node.children.forEach(walk)
+  }
+  roots.forEach(walk)
+  return byId
+}
+
+function flattenParents(roots: OrgNode[]): Map<number, OrgNode | null> {
+  const parentOf = new Map<number, OrgNode | null>()
+  const walk = (node: OrgNode, parent: OrgNode | null) => {
+    parentOf.set(node.employeeId, parent)
+    node.children.forEach((child) => walk(child, node))
+  }
+  roots.forEach((root) => walk(root, null))
+  return parentOf
 }
 
 function OrgNodeItem({

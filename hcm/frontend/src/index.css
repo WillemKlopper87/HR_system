@@ -960,3 +960,52 @@ textarea:focus {
   color: var(--text-h);
   font-size: 14px;
 }
+
+/* ---- Org chart: focused view ---- */
+
+.breadcrumb-trail {
+  margin: 4px 0 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.org-search-results {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--bg-subtle);
+}
+
+.org-focus-card {
+  border-color: var(--accent-border);
+  max-width: 320px;
+}
+
+.org-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.org-card {
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.org-card:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
