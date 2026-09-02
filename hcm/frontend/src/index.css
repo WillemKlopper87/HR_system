@@ -493,6 +493,31 @@ textarea:focus {
   font-size: 12px;
 }
 
+.tab-row {
+  display: flex;
+  gap: 4px;
+  margin: 12px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+.tab-button {
+  border: none;
+  background: transparent;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab-button:hover {
+  color: var(--text-h);
+}
+.tab-button-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
 .restricted-badge,
 .warning-badge {
   display: inline-block;

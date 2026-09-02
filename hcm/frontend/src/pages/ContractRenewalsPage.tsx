@@ -25,6 +25,19 @@ function daysUntil(dateStr: string): number {
   return Math.round((target.getTime() - today.getTime()) / 86_400_000)
 }
 
+// Clamps to the target month's actual length (Jan 31 + 1 month -> Feb 28/29,
+// not the JS Date default of overflowing into March) -- a quick-pick
+// convenience only, the resulting date stays freely editable afterward.
+function addMonths(dateStr: string, months: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const target = new Date(Date.UTC(y, m - 1 + months, 1))
+  const daysInTargetMonth = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate()
+  target.setUTCDate(Math.min(d, daysInTargetMonth))
+  return target.toISOString().slice(0, 10)
+}
+
+const EXTENSION_PRESETS_MONTHS = [3, 6, 12]
+
 export function ContractRenewalsPage() {
   // Combined into one fetch (matching CompProposalsPage/BenefitsPage/
   // EmployeeListPage's established pattern) rather than independent
@@ -235,6 +248,7 @@ function ContractRow({
             submitLabel="Submit recommendation"
             initialAction={null}
             initialEndDate={null}
+            currentEndDate={version.contract_end_date}
             onCancel={() => setMode('none')}
             onDone={handleDone}
           />
@@ -245,6 +259,7 @@ function ContractRow({
             submitLabel="Submit decision"
             initialAction={decision?.recommended_action ?? null}
             initialEndDate={decision?.recommended_end_date ?? null}
+            currentEndDate={version.contract_end_date}
             onCancel={() => setMode('none')}
             onDone={handleDone}
           />
@@ -255,12 +270,15 @@ function ContractRow({
 }
 
 function ContractActionForm({
-  endpoint, submitLabel, initialAction, initialEndDate, onCancel, onDone,
+  endpoint, submitLabel, initialAction, initialEndDate, currentEndDate, onCancel, onDone,
 }: {
   endpoint: string
   submitLabel: string
   initialAction: ContractAction | null
   initialEndDate: string | null
+  /** The contract's current end date -- extension presets add months to
+   * this, not to whatever's already typed into the end-date field. */
+  currentEndDate: string | null
   onCancel: () => void
   onDone: () => void
 }) {
@@ -310,10 +328,26 @@ function ContractActionForm({
         </select>
       </label>
       {action === 'renew' && (
-        <label>
-          New end date
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
-        </label>
+        <>
+          {currentEndDate && (
+            <div className="form-actions" role="group" aria-label="Extend by">
+              {EXTENSION_PRESETS_MONTHS.map((months) => (
+                <button
+                  key={months}
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setEndDate(addMonths(currentEndDate, months))}
+                >
+                  +{months} month{months === 1 ? '' : 's'}
+                </button>
+              ))}
+            </div>
+          )}
+          <label>
+            New end date
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
+          </label>
+        </>
       )}
       <label>
         Comment

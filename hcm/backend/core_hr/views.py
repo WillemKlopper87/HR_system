@@ -369,6 +369,12 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 | Q(work_email__icontains=search)
             )
 
+        employment_status = self.request.query_params.get("employment_status")
+        if employment_status:
+            queryset = queryset.filter(
+                versions__in=EmployeeVersion.objects.current().filter(employment_status=employment_status)
+            )
+
         if self.action != "list":
             return queryset
         employee = get_request_employee(self.request)

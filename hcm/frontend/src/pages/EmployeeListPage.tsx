@@ -5,12 +5,28 @@ import { useApiQuery } from '../api/hooks'
 import { useReferenceData } from '../api/useReferenceData'
 import type { Employee } from '../api/types'
 
+// Matches core_hr.EmployeeVersion.EmploymentStatus exactly (RBAC-Roles.md /
+// Data-Dictionary.md don't need a change for this -- it's a read-side filter
+// over an existing field, not a new one).
+const EMPLOYMENT_STATUS_TABS: { value: string; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'permanent', label: 'Permanent' },
+  { value: 'fixed_term', label: 'Fixed-term' },
+  { value: 'temporary', label: 'Temporary' },
+  { value: 'learner', label: 'Learner' },
+]
+
 export function EmployeeListPage() {
   const [search, setSearch] = useState('')
+  const [employmentStatus, setEmploymentStatus] = useState('')
   const [pagePath, setPagePath] = useState<string | null>(null)
   const { departments, occupationalLevels } = useReferenceData()
   // useApiQuery's stale-response guard replaces the hand-rolled `cancelled` flag this page used to carry.
-  const initialPath = `/employees/${search ? `?search=${encodeURIComponent(search)}` : ''}`
+  const initialParams = new URLSearchParams()
+  if (search) initialParams.set('search', search)
+  if (employmentStatus) initialParams.set('employment_status', employmentStatus)
+  const initialQuery = initialParams.toString()
+  const initialPath = `/employees/${initialQuery ? `?${initialQuery}` : ''}`
   const requestPath = pagePath ?? initialPath
   const { data, error } = useApiQuery(
     () => api.get<Paginated<Employee>>(requestPath),
@@ -32,6 +48,24 @@ export function EmployeeListPage() {
             setPagePath(null)
           }}
         />
+      </div>
+
+      <div className="tab-row" role="tablist" aria-label="Filter by employment type">
+        {EMPLOYMENT_STATUS_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            role="tab"
+            aria-selected={employmentStatus === tab.value}
+            className={`tab-button${employmentStatus === tab.value ? ' tab-button-active' : ''}`}
+            onClick={() => {
+              setEmploymentStatus(tab.value)
+              setPagePath(null)
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {error && <p className="form-error">{error}</p>}

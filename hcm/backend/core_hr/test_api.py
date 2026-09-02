@@ -135,6 +135,34 @@ class EmployeeApiTests(TestCase):
         returned_ids = {row["id"] for row in response.data["results"]}
         self.assertEqual(returned_ids, {self.staff.id})
 
+    def test_employment_status_filters_the_directory_by_contract_type(self):
+        # setUp already seeded reference data via _seed_reference_data() --
+        # reuse it rather than calling that again, which would try to
+        # create a second Department with the same unique `code`.
+        dept = Department.objects.get(code="ENG")
+        level = OccupationalLevel.objects.get(code="TOP")
+        grade = JobGrade.objects.get(code="G1")
+        location = Location.objects.get(code="HO")
+        contractor = Employee.objects.hire(
+            employee_number="E200", first_name="Fixed", last_name="Termer", date_of_birth=date(1990, 1, 1),
+            work_email="fixedterm@example.com", hire_date=date(2023, 1, 1), department=dept,
+            occupational_level=level, job_grade=grade, location=location,
+            employment_status=EmployeeVersion.EmploymentStatus.FIXED_TERM,
+            user=User.objects.create_user(username="fixedterm", password="x"),
+        )
+        self.client.force_authenticate(user=self.hr_admin.user)
+
+        response = self.client.get("/api/v1/employees/?employment_status=fixed_term")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({row["id"] for row in response.data["results"]}, {contractor.id})
+
+        response = self.client.get("/api/v1/employees/?employment_status=permanent")
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {row["id"] for row in response.data["results"]}
+        self.assertIn(self.hr_admin.id, returned_ids)
+        self.assertIn(self.staff.id, returned_ids)
+        self.assertNotIn(contractor.id, returned_ids)
+
     def test_search_summary_is_scoped_and_privacy_minimal(self):
         self.client.force_authenticate(user=self.staff.user)
         response = self.client.get("/api/v1/employees/search-summary/?q=Staff")
