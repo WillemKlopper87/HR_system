@@ -607,6 +607,13 @@ class ContractLapseRoutesThroughCascadeTests(ExitTestCase):
         version.contract_end_date = timezone.localdate() + timedelta(days=30)
         version.save(update_fields=["employment_status", "contract_end_date"])
         self.version = self.employee.current_version
+        from establishment.models import Position
+
+        self.vacant_position = Position.objects.create(
+            post_number="P-CONV-700", title="Converted Role", department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location,
+            status=Position.Status.APPROVED,
+        )
 
     def _decide(self, action, **kwargs):
         from .contracts import decide_contract_action
@@ -653,7 +660,7 @@ class ContractLapseRoutesThroughCascadeTests(ExitTestCase):
         self.assertFalse(EmploymentChange.objects.filter(employee=self.employee).exists())
 
     def test_convert_permanent_leaves_access_untouched(self):
-        self._decide(ContractRenewalDecision.Action.CONVERT_PERMANENT)
+        self._decide(ContractRenewalDecision.Action.CONVERT_PERMANENT, position_id=self.vacant_position.id)
         self.assertEqual(active_roles_for(self.employee).count(), 2)
         self.employee.user.refresh_from_db()
         self.assertTrue(self.employee.user.is_active)

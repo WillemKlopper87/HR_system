@@ -53,6 +53,10 @@ class ContractActionInputSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=ContractRenewalDecision.Action.choices)
     end_date = serializers.DateField(required=False, allow_null=True)
     comment = serializers.CharField(required=False, allow_blank=True, default="")
+    # Only meaningful (and required) for decide_contract with
+    # action=convert_permanent -- core_hr/contracts.py::decide_contract_action
+    # enforces that, the same way it enforces end_date for action=renew.
+    position_id = serializers.IntegerField(required=False, allow_null=True)
 
 
 class ContractRenewalDecisionSerializer(serializers.ModelSerializer):

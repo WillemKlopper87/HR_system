@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
+from establishment.models import Position
 from rbac_audit.models import AuditLogEntry, Role, RoleAssignment
 from rbac_audit.permissions import active_roles_for
 from rest_framework.test import APIClient
@@ -724,6 +725,15 @@ class ContractActionApiTests(TestCase):
         version.manager = self.manager
         version.save()
 
+        # convert_permanent now requires naming a real vacancy (Wireframe
+        # follow-up 2026-09-02) -- an approved, unoccupied Position every
+        # convert_permanent test below can point at.
+        self.vacant_position = Position.objects.create(
+            post_number="P-CONV-3", title="Converted Role", department=dept,
+            occupational_level=level, job_grade=grade, location=location,
+            status=Position.Status.APPROVED,
+        )
+
     def test_manager_can_recommend_for_own_report(self):
         self.client.force_authenticate(user=self.manager.user)
         response = self.client.post(
@@ -749,10 +759,39 @@ class ContractActionApiTests(TestCase):
         self.client.force_authenticate(user=self.hr_admin.user)
         response = self.client.post(
             f"/api/v1/employee-versions/{self.employee.current_version.id}/decide_contract/",
-            {"action": "convert_permanent"}, format="json",
+            {"action": "convert_permanent", "position_id": self.vacant_position.id}, format="json",
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["status"], "decided")
+
+    def test_convert_permanent_requires_a_position(self):
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.employee.current_version.id}/decide_contract/",
+            {"action": "convert_permanent"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(ContractRenewalDecision.objects.filter(employee_version=self.employee.current_version).exists())
+
+    def test_convert_permanent_rejects_an_already_occupied_position(self):
+        occupied_position = Position.objects.create(
+            post_number="P-OCCUPIED", title="Taken Role", department=self.vacant_position.department,
+            occupational_level=self.vacant_position.occupational_level, location=self.vacant_position.location,
+            status=Position.Status.APPROVED,
+        )
+        Employee.objects.hire(
+            employee_number="E302", first_name="Already", last_name="Occupying", date_of_birth=date(1991, 1, 1),
+            work_email="occupying@example.com", hire_date=date(2022, 1, 1),
+            department=self.vacant_position.department, occupational_level=self.vacant_position.occupational_level,
+            location=self.vacant_position.location, position=occupied_position,
+        )
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(
+            f"/api/v1/employee-versions/{self.employee.current_version.id}/decide_contract/",
+            {"action": "convert_permanent", "position_id": occupied_position.id}, format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(ContractRenewalDecision.objects.filter(employee_version=self.employee.current_version).exists())
 
     def test_manager_cannot_decide(self):
         self.client.force_authenticate(user=self.manager.user)
@@ -773,7 +812,7 @@ class ContractActionApiTests(TestCase):
         version_id = self.employee.current_version.id
         first = self.client.post(
             f"/api/v1/employee-versions/{version_id}/decide_contract/",
-            {"action": "convert_permanent"}, format="json",
+            {"action": "convert_permanent", "position_id": self.vacant_position.id}, format="json",
         )
         self.assertEqual(first.status_code, 200, first.data)
         response = self.client.post(
@@ -849,7 +888,11 @@ class ContractActionApiTests(TestCase):
         version_id = self.employee.current_version.id
         decide_response = self.client.post(
             f"/api/v1/employee-versions/{version_id}/decide_contract/",
-            {"action": "convert_permanent", "comment": "Approved after performance review."}, format="json",
+            {
+                "action": "convert_permanent",
+                "comment": "Approved after performance review.",
+                "position_id": self.vacant_position.id,
+            }, format="json",
         )
         self.assertEqual(decide_response.status_code, 200, decide_response.data)
 
@@ -887,7 +930,11 @@ class ContractActionApiTests(TestCase):
         version_id = self.employee.current_version.id
         decide_response = self.client.post(
             f"/api/v1/employee-versions/{version_id}/decide_contract/",
-            {"action": "convert_permanent", "comment": "Approved after performance review."}, format="json",
+            {
+                "action": "convert_permanent",
+                "comment": "Approved after performance review.",
+                "position_id": self.vacant_position.id,
+            }, format="json",
         )
         self.assertEqual(decide_response.status_code, 200, decide_response.data)
 
@@ -906,7 +953,11 @@ class ContractActionApiTests(TestCase):
         version_id = self.employee.current_version.id
         decide_response = self.client.post(
             f"/api/v1/employee-versions/{version_id}/decide_contract/",
-            {"action": "convert_permanent", "comment": "Approved after performance review."}, format="json",
+            {
+                "action": "convert_permanent",
+                "comment": "Approved after performance review.",
+                "position_id": self.vacant_position.id,
+            }, format="json",
         )
         self.assertEqual(decide_response.status_code, 200, decide_response.data)
 
@@ -935,7 +986,11 @@ class ContractActionApiTests(TestCase):
 
         decide_response = self.client.post(
             f"/api/v1/employee-versions/{version_id}/decide_contract/",
-            {"action": "convert_permanent", "comment": "Self-approved, no conflict of interest here."},
+            {
+                "action": "convert_permanent",
+                "comment": "Self-approved, no conflict of interest here.",
+                "position_id": self.vacant_position.id,
+            },
             format="json",
         )
         self.assertEqual(decide_response.status_code, 200, decide_response.data)

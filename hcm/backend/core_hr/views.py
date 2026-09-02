@@ -160,6 +160,7 @@ class EmployeeVersionViewSet(viewsets.ReadOnlyModelViewSet):
             decision = decide_contract_action(
                 version, actor=actor, action=payload.validated_data["action"],
                 comment=payload.validated_data["comment"], end_date=payload.validated_data.get("end_date"),
+                position_id=payload.validated_data.get("position_id"),
             )
         except ContractDecisionError as exc:
             return Response({"detail": str(exc)}, status=400)

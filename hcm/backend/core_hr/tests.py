@@ -587,6 +587,10 @@ class ContractDecisionServiceTests(TestCase):
             contract_end_date=date(2026, 12, 31), manager=self.manager,
         )
         self.version = self.employee.current_version
+        self.vacant_position = Position.objects.create(
+            post_number="P-CONV-800", title="Converted Role", department=self.dept,
+            occupational_level=self.level, location=self.location, status=Position.Status.APPROVED,
+        )
 
     def test_recommend_creates_a_recommended_row(self):
         decision = recommend_contract_action(
@@ -605,6 +609,7 @@ class ContractDecisionServiceTests(TestCase):
     def test_decide_without_a_prior_recommendation_is_allowed(self):
         decision = decide_contract_action(
             self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.CONVERT_PERMANENT,
+            position_id=self.vacant_position.id,
         )
         self.assertEqual(decision.status, ContractRenewalDecision.Status.DECIDED)
         self.assertIsNone(decision.recommended_action)
@@ -625,7 +630,10 @@ class ContractDecisionServiceTests(TestCase):
         self.assertEqual(event.event_type, EmploymentEvent.EventType.CONTRACT_RENEWAL)
 
     def test_decide_convert_permanent_clears_the_end_date(self):
-        decide_contract_action(self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.CONVERT_PERMANENT)
+        decide_contract_action(
+            self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.CONVERT_PERMANENT,
+            position_id=self.vacant_position.id,
+        )
         new_version = self.employee.current_version
         self.assertEqual(new_version.employment_status, EmployeeVersion.EmploymentStatus.PERMANENT)
         self.assertIsNone(new_version.contract_end_date)
@@ -642,7 +650,10 @@ class ContractDecisionServiceTests(TestCase):
         self.assertIsNone(decision.resulting_employee_version)
 
     def test_decide_twice_raises(self):
-        decide_contract_action(self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.CONVERT_PERMANENT)
+        decide_contract_action(
+            self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.CONVERT_PERMANENT,
+            position_id=self.vacant_position.id,
+        )
         with self.assertRaises(ContractDecisionError):
             decide_contract_action(self.version, actor=self.hr_admin, action=ContractRenewalDecision.Action.LET_LAPSE)
 

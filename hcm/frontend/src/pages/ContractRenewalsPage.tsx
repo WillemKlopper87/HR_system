@@ -5,6 +5,7 @@ import {
   CONTRACT_ACTION_LABELS,
   type ContractAction,
   type EmployeeVersion,
+  type Position,
 } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 
@@ -260,6 +261,7 @@ function ContractRow({
             initialAction={decision?.recommended_action ?? null}
             initialEndDate={decision?.recommended_end_date ?? null}
             currentEndDate={version.contract_end_date}
+            requiresPosition
             onCancel={() => setMode('none')}
             onDone={handleDone}
           />
@@ -270,7 +272,7 @@ function ContractRow({
 }
 
 function ContractActionForm({
-  endpoint, submitLabel, initialAction, initialEndDate, currentEndDate, onCancel, onDone,
+  endpoint, submitLabel, initialAction, initialEndDate, currentEndDate, requiresPosition, onCancel, onDone,
 }: {
   endpoint: string
   submitLabel: string
@@ -279,14 +281,26 @@ function ContractActionForm({
   /** The contract's current end date -- extension presets add months to
    * this, not to whatever's already typed into the end-date field. */
   currentEndDate: string | null
+  /** True only for the HR decide form -- a manager's recommendation names
+   * no specific position (they're proposing an outcome, not a budgeted
+   * post); HR's decision must name the real vacancy it fills. */
+  requiresPosition?: boolean
   onCancel: () => void
   onDone: () => void
 }) {
   const [action, setAction] = useState<ContractAction | ''>(initialAction ?? '')
   const [endDate, setEndDate] = useState(initialEndDate ?? '')
+  const [positionId, setPositionId] = useState('')
   const [comment, setComment] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const needsPosition = requiresPosition && action === 'convert_permanent'
+  const { data: vacantPositions } = useApiQuery(
+    () => fetchAllPages<Position>('/positions/?vacant=true'),
+    [],
+    { errorMessage: 'Failed to load vacant positions.', enabled: !!needsPosition },
+  )
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -299,11 +313,16 @@ function ContractActionForm({
       setError('A new end date is required when renewing.')
       return
     }
+    if (needsPosition && !positionId) {
+      setError('Choose which vacant position this converts into.')
+      return
+    }
     setSubmitting(true)
     try {
       await api.post(endpoint, {
         action,
         end_date: action === 'renew' ? endDate : null,
+        position_id: needsPosition ? Number(positionId) : null,
         comment,
       })
       onDone()
@@ -348,6 +367,22 @@ function ContractActionForm({
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
           </label>
         </>
+      )}
+      {needsPosition && (
+        <label>
+          Converts into position
+          <select value={positionId} onChange={(e) => setPositionId(e.target.value)} required>
+            <option value="">— Select a vacant position —</option>
+            {(vacantPositions ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.post_number} · {p.title}
+              </option>
+            ))}
+          </select>
+          {vacantPositions !== null && vacantPositions.length === 0 && (
+            <span className="hint-text">No approved, vacant positions are available to convert into.</span>
+          )}
+        </label>
       )}
       <label>
         Comment

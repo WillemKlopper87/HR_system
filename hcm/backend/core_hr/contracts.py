@@ -5,7 +5,7 @@ this codebase's established 403-vs-400 split: wrong role is a view-layer
 403, wrong state is a service-layer ContractDecisionError -> 400."""
 from __future__ import annotations
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from . import exits
@@ -136,13 +136,25 @@ def recommend_contract_action(employee_version, *, actor, action, comment="", en
 
 
 @transaction.atomic
-def decide_contract_action(employee_version, *, actor, action, comment="", end_date=None):
+def decide_contract_action(employee_version, *, actor, action, comment="", end_date=None, position_id=None):
     _assert_actionable(employee_version)
     if action == ContractRenewalDecision.Action.RENEW:
         _validate_renewal_end_date(
             employee_version, end_date,
             required_message="end_date is required when deciding to renew.",
         )
+
+    position = None
+    if action == ContractRenewalDecision.Action.CONVERT_PERMANENT:
+        # establishment.queries, not establishment.models -- core_hr may not
+        # import another app's models directly (Architecture-Design.md §4).
+        from establishment.queries import get_vacant_position
+
+        if position_id is None:
+            raise ContractDecisionError("position_id is required when converting to a permanent position.")
+        position = get_vacant_position(position_id)
+        if position is None:
+            raise ContractDecisionError("That position is not an approved, currently vacant post.")
 
     decision, _ = ContractRenewalDecision.objects.get_or_create(
         employee_version=employee_version,
@@ -172,6 +184,7 @@ def decide_contract_action(employee_version, *, actor, action, comment="", end_d
             event = employee.apply_lifecycle_event(
                 event_type=EmploymentEvent.EventType.CONTRACT_CONVERSION, effective_date=effective_date,
                 employment_status=EmployeeVersion.EmploymentStatus.PERMANENT, contract_end_date=None,
+                position=position,
             )
             decision.resulting_employee_version = event.to_version
         elif action == ContractRenewalDecision.Action.LET_LAPSE:
@@ -207,6 +220,14 @@ def decide_contract_action(employee_version, *, actor, action, comment="", end_d
         # must not fall into the generic ValueError handling below and get
         # double-wrapped with a misleading message.
         raise
+    except IntegrityError as exc:
+        # The vacancy check above and the DB's "one current occupant per
+        # position" constraint (0007_employeeversion_...) are separated by
+        # this function's own work -- a second decision landing on the same
+        # freshly-vacated position in that window trips the constraint
+        # rather than the earlier get_vacant_position() check. Same 400
+        # treatment as every other state-machine violation here, not a 500.
+        raise ContractDecisionError("That position was just filled by another decision — choose a different one.") from exc
     except EmploymentChangeError as exc:
         # Same hazard, different exception: EmploymentChangeError is also a
         # ValueError subclass, so without this clause the generic handler

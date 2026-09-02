@@ -31,3 +31,13 @@ def establishment_summary() -> dict:
         "vacant": vacant,
         "vacancy_rate_pct": round(vacant / funded * 100, 1) if funded else 0.0,
     }
+
+
+def get_vacant_position(position_id: int):
+    """Returns the Position if it is approved and currently unoccupied,
+    else None. The picker itself is just GET /positions/?vacant=true
+    (PositionViewSet already supports that filter); this is the matching
+    write-path validation for core_hr.contracts.decide_contract_action's
+    convert-to-permanent action, which cannot import establishment.models
+    directly (Architecture-Design.md §4)."""
+    return Position.objects.vacant().filter(id=position_id).first()
