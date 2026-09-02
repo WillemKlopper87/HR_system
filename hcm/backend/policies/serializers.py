@@ -2,7 +2,19 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from .models import Policy, PolicyAcknowledgment, PolicyChunk
+from .models import Policy, PolicyAcknowledgment, PolicyApproval, PolicyChunk
+
+
+class PolicyApprovalSerializer(serializers.ModelSerializer):
+    approved_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PolicyApproval
+        fields = ["id", "approved_by", "approved_by_name", "comment", "approved_at"]
+        read_only_fields = ["approved_by", "approved_at"]
+
+    def get_approved_by_name(self, obj) -> str:
+        return f"{obj.approved_by.first_name} {obj.approved_by.last_name}"
 
 
 class PolicySerializer(serializers.ModelSerializer):
@@ -18,12 +30,15 @@ class PolicySerializer(serializers.ModelSerializer):
     has_source_file = serializers.SerializerMethodField()
     download_url = serializers.SerializerMethodField()
     chunk_count = serializers.IntegerField(source="chunks.count", read_only=True)
+    approvals = PolicyApprovalSerializer(many=True, read_only=True)
+    pending_committee_approvals = serializers.SerializerMethodField()
 
     class Meta:
         model = Policy
         fields = [
             "id", "code", "title", "category", "body", "source_file", "has_source_file", "download_url",
             "chunk_count", "version", "status", "effective_date", "created_by", "published_by", "published_at",
+            "approvals", "pending_committee_approvals",
         ]
         # code/version/status are server-computed (services.py) — never
         # client-set directly; publishing/versioning go through the
@@ -39,6 +54,23 @@ class PolicySerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         path = f"/api/v1/policies/{obj.pk}/download/"
         return request.build_absolute_uri(path) if request is not None else path
+
+    def get_pending_committee_approvals(self, obj) -> list[str]:
+        """Names of every committee member who hasn't approved this draft
+        yet — empty once published/archived, since a settled policy has
+        nothing left pending. Committee membership is cached on `context`
+        (shared across every row in a `many=True` list serialization) so
+        listing N drafts costs one committee query, not N."""
+        if obj.status != Policy.Status.DRAFT:
+            return []
+        if "committee_members" not in self.context:
+            from .services import current_committee_members
+
+            self.context["committee_members"] = list(current_committee_members())
+        approved_ids = {a.approved_by_id for a in obj.approvals.all()}
+        return [
+            f"{e.first_name} {e.last_name}" for e in self.context["committee_members"] if e.id not in approved_ids
+        ]
 
 
 class PolicyChunkSerializer(serializers.ModelSerializer):

@@ -26,10 +26,13 @@ def _seed_reference_data():
 
 
 class RoleSeedTests(TestCase):
-    def test_nine_roles_seeded_with_expected_row_scope(self):
+    def test_ten_roles_seeded_with_expected_row_scope(self):
         # accounting_officer added Sprint 13-14 (EEA-Form-Spec-Notes.md:
         # EEA2/EEA4 sign-off must end at CEO/Accounting Officer, not just
         # ee_manager) — see rbac_audit/migrations/0005_seed_accounting_officer_role.py.
+        # policy_committee_member added 2026-09-02 (policies/services.py::
+        # publish_policy's committee-approval gate) — see rbac_audit/
+        # migrations/0010_seed_policy_committee_member_role.py.
         expected_scopes = {
             "employee": "self",
             "line_manager": "own_team",
@@ -40,8 +43,9 @@ class RoleSeedTests(TestCase):
             "auditor": "all",
             "sysadmin": "all",
             "accounting_officer": "all",
+            "policy_committee_member": "all",
         }
-        self.assertEqual(Role.objects.count(), 9)
+        self.assertEqual(Role.objects.count(), 10)
         for name, scope in expected_scopes.items():
             self.assertEqual(Role.objects.get(name=name).row_scope, scope)
 

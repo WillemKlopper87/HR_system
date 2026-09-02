@@ -10,7 +10,7 @@ from rbac_audit.models import Role, RoleAssignment
 from rest_framework.test import APIClient
 
 from .models import Policy, PolicyAcknowledgment, PolicyChunk
-from .services import create_policy, publish_policy
+from .services import create_policy, publish_policy, record_policy_approval
 
 User = get_user_model()
 
@@ -52,6 +52,23 @@ class PolicyApiTestCase(TestCase):
         )
         RoleAssignment.objects.create(employee=self.other_employee, role=Role.objects.get(name="employee"))
 
+        self.committee_member = Employee.objects.hire(
+            employee_number="E102", first_name="Committee", last_name="Member", date_of_birth=date(1988, 1, 1),
+            work_email="committee@example.com", hire_date=date(2019, 1, 1), department=self.dept,
+            occupational_level=self.level, job_grade=self.grade, location=self.location,
+            user=User.objects.create_user(username="committee", password="x"),
+        )
+        RoleAssignment.objects.create(
+            employee=self.committee_member, role=Role.objects.get(name="policy_committee_member")
+        )
+
+    def _approve(self, policy):
+        """publish_policy now requires every current policy_committee_member
+        to have approved the exact draft first -- shared setup step for
+        every test in this file that isn't itself testing the approval
+        gate (see PolicyCommitteeApprovalApiTests below)."""
+        record_policy_approval(policy, approver=self.committee_member)
+
 
 class PolicyPermissionApiTests(PolicyApiTestCase):
     def test_plain_employee_can_read_but_not_create_policies(self):
@@ -82,6 +99,7 @@ class PolicyPermissionApiTests(PolicyApiTestCase):
 class PolicyWorkflowApiTests(PolicyApiTestCase):
     def test_hr_admin_can_publish_a_draft_policy(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
+        self._approve(policy)
         self.client.force_authenticate(user=self.hr_admin.user)
         response = self.client.post(f"/api/v1/policies/{policy.id}/publish/")
         self.assertEqual(response.status_code, 200, response.data)
@@ -95,13 +113,16 @@ class PolicyWorkflowApiTests(PolicyApiTestCase):
 
     def test_publishing_twice_is_rejected(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
+        self._approve(policy)
         self.client.force_authenticate(user=self.hr_admin.user)
-        self.client.post(f"/api/v1/policies/{policy.id}/publish/")
+        first = self.client.post(f"/api/v1/policies/{policy.id}/publish/")
+        self.assertEqual(first.status_code, 200, first.data)
         response = self.client.post(f"/api/v1/policies/{policy.id}/publish/")
         self.assertEqual(response.status_code, 400)
 
     def test_new_version_action_creates_a_draft_under_the_same_code(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
+        self._approve(policy)
         publish_policy(policy, actor=self.hr_admin)
         self.client.force_authenticate(user=self.hr_admin.user)
         response = self.client.post(f"/api/v1/policies/{policy.id}/new_version/", {"body": "v2"}, format="json")
@@ -112,6 +133,7 @@ class PolicyWorkflowApiTests(PolicyApiTestCase):
 
     def test_published_policy_cannot_be_patched_directly(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
+        self._approve(policy)
         publish_policy(policy, actor=self.hr_admin)
         self.client.force_authenticate(user=self.hr_admin.user)
         response = self.client.patch(f"/api/v1/policies/{policy.id}/", {"body": "sneaky edit"}, format="json")
@@ -129,6 +151,7 @@ class PolicyAcknowledgmentApiTests(PolicyApiTestCase):
     def setUp(self):
         super().setUp()
         self.policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
+        self._approve(self.policy)
         publish_policy(self.policy, actor=self.hr_admin)
 
     def test_employee_can_acknowledge_a_published_policy(self):
@@ -193,6 +216,7 @@ class PolicyAcknowledgmentDashboardApiTests(PolicyApiTestCase):
 
     def test_dashboard_reports_acknowledgment_percentage(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
+        self._approve(policy)
         publish_policy(policy, actor=self.hr_admin)
         PolicyAcknowledgment.objects.create(employee=self.plain_employee, policy=policy)
 
@@ -201,9 +225,9 @@ class PolicyAcknowledgmentDashboardApiTests(PolicyApiTestCase):
         self.assertEqual(response.status_code, 200)
         row = next(r for r in response.data["policies"] if r["policy_id"] == policy.id)
         self.assertEqual(row["acknowledged_count"], 1)
-        # 3 employees seeded in setUp (hr_admin, plain_employee, other_employee).
-        self.assertEqual(row["total_employees"], 3)
-        self.assertAlmostEqual(row["acknowledged_pct"], round(1 / 3 * 100, 1))
+        # 4 employees seeded in setUp (hr_admin, plain_employee, other_employee, committee_member).
+        self.assertEqual(row["total_employees"], 4)
+        self.assertAlmostEqual(row["acknowledged_pct"], round(1 / 4 * 100, 1))
 
 
 class PolicyDocumentUploadApiTests(PolicyApiTestCase):
@@ -281,6 +305,7 @@ class PolicyDocumentUploadApiTests(PolicyApiTestCase):
 
     def test_plain_employee_can_view_chunks_of_a_published_policy(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
+        self._approve(policy)
         publish_policy(policy, actor=self.hr_admin)
         self.client.force_authenticate(user=self.plain_employee.user)
         response = self.client.get(f"/api/v1/policies/{policy.id}/chunks/")
@@ -289,6 +314,7 @@ class PolicyDocumentUploadApiTests(PolicyApiTestCase):
     def test_plain_employee_does_not_see_draft_policies_in_list(self):
         create_policy(title="Draft Only", category=Policy.Category.OTHER, body="...")
         published = create_policy(title="Published One", category=Policy.Category.OTHER, body="...")
+        self._approve(published)
         publish_policy(published, actor=self.hr_admin)
         self.client.force_authenticate(user=self.plain_employee.user)
         response = self.client.get("/api/v1/policies/")
@@ -328,6 +354,7 @@ class PolicyDocumentUploadApiTests(PolicyApiTestCase):
             "/api/v1/policies/", {"title": "Attendance Policy", "category": "other", "source_file": upload}, format="multipart",
         )
         policy = Policy.objects.get(pk=create.data["id"])
+        self._approve(policy)
         publish_policy(policy, actor=self.hr_admin)
 
         self.client.force_authenticate(user=self.plain_employee.user)
@@ -348,3 +375,54 @@ class PolicyDocumentUploadApiTests(PolicyApiTestCase):
         self.assertEqual(response.data["chunk_count"], 1)
         chunk = PolicyChunk.objects.get(policy=policy)
         self.assertIn("two paragraphs", chunk.text)
+
+
+class PolicyCommitteeApprovalApiTests(PolicyApiTestCase):
+    def test_committee_member_can_approve_a_draft(self):
+        policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
+        self.client.force_authenticate(user=self.committee_member.user)
+        response = self.client.post(f"/api/v1/policies/{policy.id}/approve/", {"comment": "Looks good."}, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["approved_by"], self.committee_member.id)
+
+    def test_non_committee_member_cannot_approve(self):
+        # hr_admin authors and publishes policies but isn't automatically a
+        # committee member -- the two are separate roles by design.
+        policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
+        self.client.force_authenticate(user=self.hr_admin.user)
+        response = self.client.post(f"/api/v1/policies/{policy.id}/approve/", {}, format="json")
+        self.assertEqual(response.status_code, 403)
+
+    def test_committee_member_can_read_a_draft_policy(self):
+        # get_queryset() widens draft visibility to committee members
+        # specifically so they can review what they're being asked to
+        # approve -- a plain employee still gets a 404 on the same URL.
+        policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
+        self.client.force_authenticate(user=self.committee_member.user)
+        response = self.client.get(f"/api/v1/policies/{policy.id}/")
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_approving_via_the_api_is_idempotent(self):
+        policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
+        self.client.force_authenticate(user=self.committee_member.user)
+        first = self.client.post(f"/api/v1/policies/{policy.id}/approve/", {}, format="json")
+        second = self.client.post(f"/api/v1/policies/{policy.id}/approve/", {}, format="json")
+        self.assertEqual(first.data["id"], second.data["id"])
+        self.assertEqual(policy.approvals.count(), 1)
+
+    def test_publish_reports_who_is_still_pending_then_succeeds_once_approved(self):
+        policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
+        self.client.force_authenticate(user=self.hr_admin.user)
+        blocked = self.client.post(f"/api/v1/policies/{policy.id}/publish/")
+        self.assertEqual(blocked.status_code, 400)
+        self.assertIn("Committee Member", blocked.data["detail"])
+
+        detail = self.client.get(f"/api/v1/policies/{policy.id}/").data
+        self.assertEqual(detail["pending_committee_approvals"], ["Committee Member"])
+
+        self.client.force_authenticate(user=self.committee_member.user)
+        self.client.post(f"/api/v1/policies/{policy.id}/approve/", {}, format="json")
+
+        self.client.force_authenticate(user=self.hr_admin.user)
+        published = self.client.post(f"/api/v1/policies/{policy.id}/publish/")
+        self.assertEqual(published.status_code, 200, published.data)

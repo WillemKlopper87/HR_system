@@ -5,14 +5,14 @@ import os
 from django.http import FileResponse
 from rbac_audit.drf import get_request_employee
 from rbac_audit.permissions import has_role
-from rest_framework import viewsets
+from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .models import Policy, PolicyAcknowledgment
 from .permissions import IsHRAdminOrReadOnly, IsSelfOrHRAdmin
-from .serializers import PolicyAcknowledgmentSerializer, PolicyChunkSerializer, PolicySerializer
+from .serializers import PolicyAcknowledgmentSerializer, PolicyApprovalSerializer, PolicyChunkSerializer, PolicySerializer
 from .services import (
     PolicyWorkflowError,
     acknowledge_policy,
@@ -20,6 +20,7 @@ from .services import (
     create_new_version,
     create_policy,
     publish_policy,
+    record_policy_approval,
     update_draft,
 )
 
@@ -30,15 +31,27 @@ class PolicyViewSet(viewsets.ModelViewSet):
     real (PROTECT on PolicyAcknowledgment.policy already enforces this at
     the DB layer; http_method_names keeps the API surface honest about it)."""
 
-    queryset = Policy.objects.select_related("created_by", "published_by")
+    queryset = Policy.objects.select_related("created_by", "published_by").prefetch_related("approvals__approved_by")
     serializer_class = PolicySerializer
     permission_classes = [IsHRAdminOrReadOnly]
     http_method_names = ["get", "post", "patch", "head", "options"]
 
+    def get_permissions(self):
+        # `approve` is the one write action a policy_committee_member (who
+        # usually isn't hr_admin) must reach -- IsHRAdminOrReadOnly would
+        # 403 their POST before the role-specific check inside the action
+        # ever ran. Every other action keeps the class-level gate.
+        if self.action == "approve":
+            return [permissions.IsAuthenticated()]
+        return super().get_permissions()
+
     def get_queryset(self):
         queryset = super().get_queryset()
         employee = get_request_employee(self.request)
-        if employee is None or not has_role(employee, "hr_admin"):
+        can_see_unpublished = employee is not None and (
+            has_role(employee, "hr_admin") or has_role(employee, "policy_committee_member")
+        )
+        if not can_see_unpublished:
             # Draft/archived policies aren't just "hr_admin write, everyone
             # read" — a plain employee has no business seeing an
             # in-progress or retired policy at all, including via direct
@@ -46,7 +59,9 @@ class PolicyViewSet(viewsets.ModelViewSet):
             # this overrides whatever ?status= the client asked for rather
             # than trusting it. A 404 here (not 403) is deliberate: the
             # existence of an unpublished policy isn't information a
-            # non-hr_admin should have confirmed to them either.
+            # non-hr_admin/non-committee-member should have confirmed to
+            # them either. A committee member needs to see (and approve)
+            # exactly the drafts hr_admin does, so they share this branch.
             queryset = queryset.filter(status=Policy.Status.PUBLISHED)
         else:
             status_param = self.request.query_params.get("status")
@@ -122,6 +137,23 @@ class PolicyViewSet(viewsets.ModelViewSet):
             return Response({"detail": "This policy has no uploaded source document."}, status=404)
         filename = os.path.basename(policy.source_file.name)
         return FileResponse(policy.source_file.open("rb"), as_attachment=True, filename=filename)
+
+    @action(detail=True, methods=["post"])
+    def approve(self, request, pk=None):
+        """A policy_committee_member's sign-off on this draft — see
+        get_permissions() for why this action alone allows a non-hr_admin
+        through the class-level gate, and services.py::publish_policy for
+        what this unlocks (every current committee member must approve
+        before Publish becomes available)."""
+        policy = self.get_object()
+        actor = get_request_employee(request)
+        if actor is None or not has_role(actor, "policy_committee_member"):
+            return Response({"detail": "Only a policy committee member can approve a draft."}, status=403)
+        try:
+            approval = record_policy_approval(policy, approver=actor, comment=request.data.get("comment", ""))
+        except PolicyWorkflowError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return Response(PolicyApprovalSerializer(approval).data, status=201)
 
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):

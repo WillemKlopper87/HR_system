@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api/client'
 import { useAllPages } from '../api/hooks'
 import { POLICY_CATEGORY_LABELS, POLICY_STATUS_LABELS, type Policy, type PolicyCategory } from '../api/types'
+import { useAuth } from '../auth/useAuth'
 
 export function PolicyLibraryPage() {
   const { data: policies, error: loadError, reload: load } = useAllPages<Policy>('/policies/', [], 'Failed to load the policy library.')
@@ -70,6 +71,7 @@ export function PolicyLibraryPage() {
 function PolicyRow({
   policy, expanded, onToggleExpand, onChanged,
 }: { policy: Policy; expanded: boolean; onToggleExpand: () => void; onChanged: () => void }) {
+  const { user, hasRole } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -86,6 +88,23 @@ function PolicyRow({
     }
   }
 
+  async function approve() {
+    setError(null)
+    setBusy(true)
+    try {
+      await api.post(`/policies/${policy.id}/approve/`)
+      onChanged()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Approval failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const isDraft = policy.status === 'draft'
+  const hasPendingApprovals = isDraft && policy.pending_committee_approvals.length > 0
+  const alreadyApproved = policy.approvals.some((a) => a.approved_by === (user?.employee_id ?? null))
+
   return (
     <>
       <tr>
@@ -98,12 +117,26 @@ function PolicyRow({
         <td>{policy.chunk_count}</td>
         <td>
           {error && <p className="form-error">{error}</p>}
+          {hasPendingApprovals && (
+            <p className="hint-text">Waiting on committee approval: {policy.pending_committee_approvals.join(', ')}</p>
+          )}
           <div className="form-actions">
             <button type="button" className="btn-link" onClick={onToggleExpand}>
               {expanded ? 'Hide detail' : 'View detail'}
             </button>
-            {policy.status === 'draft' && (
-              <button type="button" className="btn-secondary" disabled={busy} onClick={() => void act('publish')}>
+            {isDraft && hasRole('policy_committee_member') && (
+              <button type="button" className="btn-secondary" disabled={busy || alreadyApproved} onClick={() => void approve()}>
+                {alreadyApproved ? 'Approved' : 'Approve'}
+              </button>
+            )}
+            {isDraft && (
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={busy || hasPendingApprovals}
+                title={hasPendingApprovals ? 'Every policy committee member must approve first.' : undefined}
+                onClick={() => void act('publish')}
+              >
                 Publish
               </button>
             )}
@@ -124,10 +157,15 @@ function PolicyRow({
       {expanded && (
         <tr>
           <td colSpan={6}>
-            {policy.status === 'draft' ? (
+            {isDraft ? (
               <EditDraftForm policy={policy} onSaved={onChanged} />
             ) : (
               <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 300, overflow: 'auto' }}>{policy.body}</pre>
+            )}
+            {policy.approvals.length > 0 && (
+              <div className="hint-text" style={{ marginTop: 8 }}>
+                Approved by: {policy.approvals.map((a) => a.approved_by_name).join(', ')}
+              </div>
             )}
           </td>
         </tr>

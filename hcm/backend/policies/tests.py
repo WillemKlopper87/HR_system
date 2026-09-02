@@ -6,6 +6,7 @@ from datetime import date
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from rbac_audit.models import Role, RoleAssignment
 
 from .chunking import chunk_text
 from .extraction import UnsupportedDocumentError, extract_text
@@ -17,6 +18,7 @@ from .services import (
     create_new_version,
     create_policy,
     publish_policy,
+    record_policy_approval,
     update_draft,
 )
 
@@ -37,6 +39,23 @@ class PolicyServiceTests(TestCase):
             work_email="test@example.com", hire_date=date(2020, 1, 1), department=dept,
             occupational_level=level, job_grade=grade, location=location,
         )
+        self.committee_member = Employee.objects.hire(
+            employee_number="E101", first_name="Committee", last_name="Member", date_of_birth=date(1988, 1, 1),
+            work_email="committee@example.com", hire_date=date(2019, 1, 1), department=dept,
+            occupational_level=level, job_grade=grade, location=location,
+        )
+        RoleAssignment.objects.create(
+            employee=self.committee_member, role=Role.objects.get(name="policy_committee_member")
+        )
+
+    def _publish(self, policy, actor=None):
+        """publish_policy now requires every current policy_committee_member
+        to have approved the exact draft first -- this is the "someone
+        already reviewed it" setup step every OTHER test in this file
+        needs, so it lives here rather than being repeated at each
+        call site. Tests of the approval gate itself skip this helper."""
+        record_policy_approval(policy, approver=self.committee_member)
+        return publish_policy(policy, actor=actor or self.employee)
 
     def test_create_policy_derives_code_from_title(self):
         policy = create_policy(title="Code of Conduct", category=Policy.Category.CODE_OF_CONDUCT, body="Behave.")
@@ -55,7 +74,7 @@ class PolicyServiceTests(TestCase):
 
     def test_acknowledge_is_idempotent(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="...")
-        publish_policy(policy, actor=self.employee)
+        self._publish(policy)
         ack1 = acknowledge_policy(policy, employee=self.employee)
         ack2 = acknowledge_policy(policy, employee=self.employee)
         self.assertEqual(ack1.id, ack2.id)
@@ -63,11 +82,11 @@ class PolicyServiceTests(TestCase):
 
     def test_publishing_a_new_version_archives_the_prior_published_version(self):
         v1 = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
-        publish_policy(v1, actor=self.employee)
+        self._publish(v1)
         v2 = create_new_version(v1, body="v2", actor=self.employee)
         self.assertEqual(v2.code, v1.code)
         self.assertEqual(v2.version, 2)
-        publish_policy(v2, actor=self.employee)
+        self._publish(v2)
 
         v1.refresh_from_db()
         v2.refresh_from_db()
@@ -76,20 +95,57 @@ class PolicyServiceTests(TestCase):
 
     def test_acknowledgment_is_pinned_to_the_specific_version(self):
         v1 = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
-        publish_policy(v1, actor=self.employee)
+        self._publish(v1)
         acknowledge_policy(v1, employee=self.employee)
 
         v2 = create_new_version(v1, body="v2", actor=self.employee)
-        publish_policy(v2, actor=self.employee)
+        self._publish(v2)
 
         self.assertTrue(PolicyAcknowledgment.objects.filter(employee=self.employee, policy=v1).exists())
         self.assertFalse(PolicyAcknowledgment.objects.filter(employee=self.employee, policy=v2).exists())
 
     def test_cannot_publish_a_non_draft_policy(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
-        publish_policy(policy, actor=self.employee)
+        self._publish(policy)
         with self.assertRaises(PolicyWorkflowError):
             publish_policy(policy, actor=self.employee)
+
+    def test_publish_blocked_until_the_committee_member_approves(self):
+        policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
+        with self.assertRaises(PolicyWorkflowError):
+            publish_policy(policy, actor=self.employee)
+        record_policy_approval(policy, approver=self.committee_member)
+        publish_policy(policy, actor=self.employee)
+        policy.refresh_from_db()
+        self.assertEqual(policy.status, Policy.Status.PUBLISHED)
+
+    def test_publish_blocked_when_no_committee_members_are_configured(self):
+        RoleAssignment.objects.filter(employee=self.committee_member).delete()
+        policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
+        with self.assertRaises(PolicyWorkflowError):
+            publish_policy(policy, actor=self.employee)
+
+    def test_a_new_draft_version_needs_its_own_fresh_approval(self):
+        # Points at PolicyApproval's own reasoning (models.py): a new draft
+        # version does not inherit the previous version's approvals.
+        v1 = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
+        self._publish(v1)
+        v2 = create_new_version(v1, body="v2", actor=self.employee)
+        with self.assertRaises(PolicyWorkflowError):
+            publish_policy(v2, actor=self.employee)
+
+    def test_approving_a_non_draft_policy_is_rejected(self):
+        policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
+        self._publish(policy)
+        with self.assertRaises(PolicyWorkflowError):
+            record_policy_approval(policy, approver=self.committee_member)
+
+    def test_approval_is_idempotent(self):
+        policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
+        approval1 = record_policy_approval(policy, approver=self.committee_member, comment="Looks fine.")
+        approval2 = record_policy_approval(policy, approver=self.committee_member, comment="Different text ignored.")
+        self.assertEqual(approval1.id, approval2.id)
+        self.assertEqual(policy.approvals.count(), 1)
 
     def test_cannot_archive_a_draft_policy(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
@@ -98,7 +154,7 @@ class PolicyServiceTests(TestCase):
 
     def test_new_version_can_be_drafted_from_an_archived_policy(self):
         v1 = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
-        publish_policy(v1, actor=self.employee)
+        self._publish(v1)
         archive_policy(v1, actor=self.employee)
         v2 = create_new_version(v1, body="v2", actor=self.employee)
         self.assertEqual(v2.version, 2)
@@ -127,7 +183,7 @@ class PolicyServiceTests(TestCase):
 
     def test_update_draft_rejects_non_draft_policy(self):
         policy = create_policy(title="Leave Policy", category=Policy.Category.LEAVE, body="v1")
-        publish_policy(policy, actor=self.employee)
+        self._publish(policy)
         with self.assertRaises(PolicyWorkflowError):
             update_draft(policy, body="sneaky edit")
 

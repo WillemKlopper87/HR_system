@@ -1383,6 +1383,14 @@ export const POLICY_STATUS_LABELS: Record<PolicyStatus, string> = {
   archived: 'Archived',
 }
 
+export interface PolicyApproval {
+  id: number
+  approved_by: number
+  approved_by_name: string
+  comment: string
+  approved_at: string
+}
+
 export interface Policy {
   id: number
   code: string
@@ -1398,6 +1406,10 @@ export interface Policy {
   created_by: number | null
   published_by: number | null
   published_at: string | null
+  approvals: PolicyApproval[]
+  /** Names of policy_committee_member role holders who haven't approved
+   * this draft yet -- always empty once published/archived. */
+  pending_committee_approvals: string[]
 }
 
 export interface PolicyChunk {

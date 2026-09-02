@@ -96,7 +96,7 @@ from learning.models import Certification, Course, CourseRequirement, EmployeeSk
 from performance.models import Feedback, Goal, Review, ReviewCycle
 from performance.services import launch_review_cycle
 from policies.models import Policy
-from policies.services import acknowledge_policy, create_policy, publish_policy
+from policies.services import acknowledge_policy, create_policy, publish_policy, record_policy_approval
 from django.core.files.uploadedfile import SimpleUploadedFile
 from recruitment.models import Applicant, BackgroundCheck, InterviewScorecard, InterviewSession, Offer, Requisition
 from recruitment.services import submit_portal_application, transition_applicant
@@ -303,6 +303,15 @@ class Command(BaseCommand):
 
             hr_head = dept_heads[dept_codes.index("HR")]
             RoleAssignment.objects.create(employee=hr_head, role=hr_admin_role)
+            # Demo-only overlap: a real deployment would name a separate
+            # committee (that's the whole point of the gate in
+            # policies/services.py::publish_policy), but the seeded org
+            # chart's shape isn't guaranteed to hand this method a second
+            # employee to use instead -- see hr_second below, which is
+            # conditional on hr_head actually having a direct report.
+            RoleAssignment.objects.create(
+                employee=hr_head, role=Role.objects.get(name="policy_committee_member")
+            )
             hr_head.user = User.objects.create_user(username="hradmin", password="hradmin123")
             hr_head.save(update_fields=["user"])
 
@@ -1319,6 +1328,7 @@ class Command(BaseCommand):
             ),
             effective_date=date(2024, 1, 1), actor=hr_admin,
         )
+        record_policy_approval(conduct, approver=hr_admin)
         publish_policy(conduct, actor=hr_admin)
 
         leave_body = (
@@ -1334,6 +1344,7 @@ class Command(BaseCommand):
             title="Leave Policy", category=Policy.Category.LEAVE, file=leave_upload,
             effective_date=date(2024, 1, 1), actor=hr_admin,
         )
+        record_policy_approval(leave, approver=hr_admin)
         publish_policy(leave, actor=hr_admin)
 
         popia = create_policy(
@@ -1348,6 +1359,7 @@ class Command(BaseCommand):
             ),
             effective_date=date(2024, 6, 1), actor=hr_admin,
         )
+        record_policy_approval(popia, approver=hr_admin)
         publish_policy(popia, actor=hr_admin)
 
         create_policy(

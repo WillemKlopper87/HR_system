@@ -151,10 +151,15 @@ class ConsumerWiringTests(NotificationsTestCase):
 
     def test_policy_publish_notifies_every_current_employee(self):
         from policies.models import Policy
-        from policies.services import publish_policy
+        from policies.services import publish_policy, record_policy_approval
 
         other = self._hire("E002", "Other", "Person", "otherperson")
+        committee_member = self._hire("E003", "Committee", "Member", "committeemember")
+        RoleAssignment.objects.create(
+            employee=committee_member, role=Role.objects.get(name="policy_committee_member")
+        )
         policy = Policy.objects.create(code="leave", title="Leave Policy", version=1, status=Policy.Status.DRAFT)
+        record_policy_approval(policy, approver=committee_member)
         publish_policy(policy)
         self.assertTrue(Notification.objects.filter(recipient=self.employee, kind="policy_publish").exists())
         self.assertTrue(Notification.objects.filter(recipient=other, kind="policy_publish").exists())

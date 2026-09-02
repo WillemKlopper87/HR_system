@@ -8,7 +8,7 @@ from notifications.services import notify_many
 
 from .chunking import chunk_text
 from .extraction import UnsupportedDocumentError, extract_text
-from .models import Policy, PolicyAcknowledgment, PolicyChunk
+from .models import Policy, PolicyAcknowledgment, PolicyApproval, PolicyChunk
 
 
 class PolicyWorkflowError(ValueError):
@@ -118,10 +118,47 @@ def update_draft(policy: Policy, *, title=None, category=None, body=None, file=N
     return policy
 
 
+def current_committee_members():
+    """Employees currently holding policy_committee_member -- a live role
+    check (same semantics as rbac_audit.permissions.active_roles_for),
+    not a snapshot, so adding or revoking a committee member mid-review
+    changes what publish_policy requires next."""
+    return Employee.objects.filter(
+        role_assignments__role__name="policy_committee_member",
+        role_assignments__revoked_at__isnull=True,
+        role_assignments__role__active=True,
+    ).distinct()
+
+
+def record_policy_approval(policy: Policy, *, approver, comment: str = "") -> PolicyApproval:
+    """A committee member's sign-off on this exact draft. Idempotent by
+    design (get_or_create, not create) — matching acknowledge_policy's own
+    reasoning: re-submitting an already-recorded approval is a no-op, not
+    a 400, since the client has no reliable way to know it already
+    succeeded (e.g. a page refresh after the request landed)."""
+    if policy.status != Policy.Status.DRAFT:
+        raise PolicyWorkflowError("Only a draft policy can be approved.")
+    approval, _created = PolicyApproval.objects.get_or_create(
+        policy=policy, approved_by=approver, defaults={"comment": comment},
+    )
+    return approval
+
+
 @transaction.atomic
 def publish_policy(policy: Policy, *, actor=None) -> Policy:
     if policy.status != Policy.Status.DRAFT:
         raise PolicyWorkflowError("Only a draft policy can be published.")
+    committee = current_committee_members()
+    if not committee.exists():
+        raise PolicyWorkflowError(
+            "No policy committee members are configured — assign the policy_committee_member "
+            "role to at least one employee before any policy can be published."
+        )
+    approved_ids = set(policy.approvals.values_list("approved_by_id", flat=True))
+    missing = committee.exclude(id__in=approved_ids)
+    if missing.exists():
+        names = ", ".join(f"{e.first_name} {e.last_name}" for e in missing)
+        raise PolicyWorkflowError(f"Every policy committee member must approve first. Still waiting on: {names}.")
     Policy.objects.filter(code=policy.code, status=Policy.Status.PUBLISHED).update(status=Policy.Status.ARCHIVED)
     policy.status = Policy.Status.PUBLISHED
     policy.published_by = actor

@@ -88,6 +88,34 @@ class PolicyAcknowledgment(TimestampedModel):
         return f"{self.employee.employee_number} acknowledged {self.policy.title} v{self.policy.version}"
 
 
+class PolicyApproval(TimestampedModel):
+    """One committee member's sign-off on a specific draft (services.py::
+    publish_policy requires every CURRENT holder of the
+    policy_committee_member role to have one of these before that draft
+    can publish -- a live role check, not a roster snapshot, so someone
+    added to or removed from the committee mid-review changes what
+    publish requires next). Scoped to the exact Policy row (a specific
+    version), matching PolicyAcknowledgment's own "points at an exact,
+    immutable version" reasoning -- a new draft version needs fresh
+    approvals, it does not inherit the previous version's."""
+
+    policy = models.ForeignKey(Policy, on_delete=models.CASCADE, related_name="approvals")
+    approved_by = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="+")
+    comment = models.TextField(blank=True)
+    approved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-approved_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["policy", "approved_by"], name="one_approval_per_committee_member_per_policy"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.approved_by.employee_number} approved {self.policy.title} v{self.policy.version}"
+
+
 class PolicyChunk(TimestampedModel):
     """A retrievable passage of one Policy version's body — the concrete
     data plumbing a future RAG/chatbot phase would embed and search over
