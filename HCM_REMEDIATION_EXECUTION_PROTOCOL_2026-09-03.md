@@ -1298,14 +1298,14 @@ Maintain this table as work proceeds.
 
 | ID | Finding | Scope | Severity | Evidence | Status | Tests added | Commit/PR | Residual risk |
 |---|---|---|---:|---|---|---|---|---|
-| H-1 | Suspension lift can reactivate independently disabled access | MASTER | P1 | Static verified | OPEN | | | |
-| H-2 | Exit can report completion despite failed domain revocation | MASTER | P1 | Static verified | OPEN | | | |
-| H-3 | Subject-data export is partial but can be marked completed | MASTER | P1 | Static verified | OPEN | | | |
-| H-4 | Restricted identifiers and TOTP seeds lack app-layer encryption | MASTER | P1 | Static verified | OPEN | | | |
-| M-1 | Compensation proposal approval needs stronger serialization | MASTER | P2 / P1 candidate | Static verified | OPEN | | | |
-| M-2 | Retention execution lacks durable evidence/failure state | MASTER | P2 | Static/design | OPEN | | | |
-| M-3 | Webhook replay resistance should be persistent | MASTER | P2 | Design risk | OPEN | | | |
-| R-1 | Primary-branch release baseline and required checks must be verified/enforced | REPO | P1 release | Verify current state | OPEN | | | |
+| H-1 | Suspension lift can reactivate independently disabled access | MASTER | P1 | Static verified | DONE | 2 (core_hr) | bf6008d | None known |
+| H-2 | Exit can report completion despite failed domain revocation | MASTER | P1 | Static verified | DONE | 5 (core_hr) | bf6008d | None known |
+| H-3 | Subject-data export is partial but can be marked completed | MASTER | P1 | Static verified | DONE (partial domain coverage) | 11+4 (rbac_audit, documents) | 54a9b08 | Only documents/compensation/learning domains registered; performance, recruitment, assessments, identity_verification, onboarding, succession, ee_reporting not yet wired into the registry — each is a tracked follow-up, not silently missing (absent from export_manifest, not falsely reported as covered) |
+| H-4 | Restricted identifiers and TOTP seeds lack app-layer encryption | MASTER | P1 | Static verified | IN PROGRESS — phase 1 DONE | 17 (rbac_audit, core_hr) | 75d9663 | Phase 1 only: national_id_number/passport_number/TOTPDevice.secret still readable as plaintext from the original columns — *_encrypted mirror fields exist and are backfillable/verifiable but nothing reads from them yet. Phase 2 (switch reads/writes to the encrypted fields, then drop the plaintext columns) is a deliberate follow-up requiring a production backfill + verification window before cutover. HistoricalEmployee's plaintext audit-trail rows are also not yet backfilled. |
+| M-1 | Compensation proposal approval needs stronger serialization | MASTER | P2 / P1 candidate | Static verified | DONE | 2 (compensation) | 262d976 | None known |
+| M-2 | Retention execution lacks durable evidence/failure state | MASTER | P2 | Static/design | DONE | 5 (rbac_audit) | 18618a2 | None known |
+| M-3 | Webhook replay resistance should be persistent | MASTER | P2 | Design risk | DONE | 4 (assessments) | 099a0ed | No retention sweep yet on WebhookDelivery rows (deferred, noted in the model docstring; not a correctness issue at pilot scale) |
+| R-1 | Primary-branch release baseline and required checks must be verified/enforced | REPO | P1 release | Verify current state | PARTIALLY DONE | — | 8ee9ae7 | hcm-ci's Postgres job fails deterministically (reproduced on rerun) at learning.views.download_evidence with `psycopg.OperationalError: the connection is closed` and no preceding SQL error — looks structural (e.g. an idle worker's DB connection dropped while waiting on siblings under GitHub Actions' parallel test runner), not an application bug; not yet root-caused. E2E job has 4 pre-existing failures in performance.spec.ts/notifications.spec.ts, confirmed identical on a pre-remediation baseline commit. Both are CI-infrastructure issues outside this remediation's domains — fixed what was fixable (a real Postgres-length bug in test fixtures, and Contract-drift regeneration) and left these two flagged rather than pushed further. |
 
 Re-rank findings if runtime evidence changes impact or confidence.
 
