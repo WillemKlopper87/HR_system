@@ -95,9 +95,11 @@ def temporary_restore_handler(name: str, handler: Handler):
             _RESTORE_HANDLERS[name] = previous
 
 
-def _run(handlers: dict[str, Handler], employee) -> dict[str, int]:
+def _run(handlers: dict[str, Handler], employee, *, only: set[str] | None = None) -> dict[str, int]:
     results: dict[str, int] = {}
     for name, handler in handlers.items():
+        if only is not None and name not in only:
+            continue
         try:
             results[name] = int(handler(employee) or 0)
         except Exception:  # noqa: BLE001 -- isolate per handler, keep going
@@ -108,14 +110,26 @@ def _run(handlers: dict[str, Handler], employee) -> dict[str, int]:
     return results
 
 
-def run_exit_handlers(employee) -> dict[str, int]:
-    """Run every registered exit handler for `employee`. Returns
+def run_exit_handlers(employee, *, only: set[str] | None = None) -> dict[str, int]:
+    """Run registered exit handlers for `employee`. Returns
     {name: affected_count} for handlers that completed (a handler that
     raised is simply absent from the result, not included with 0 -- the
     caller can't tell "nothing to do" from "it blew up" otherwise, and the
-    exception is already logged loudly here)."""
-    return _run(_EXIT_HANDLERS, employee)
+    exception is already logged loudly here). `only`, when given, restricts
+    execution to that subset of registered names -- used by HCM remediation
+    H-2's retry_access_revocation() to re-run just the domains a prior
+    AccessRevocationObligation recorded as FAILED, not every registered
+    domain again. `only=None` (the default) runs every registered handler,
+    unchanged from the original behaviour."""
+    return _run(_EXIT_HANDLERS, employee, only=only)
 
 
-def run_restore_handlers(employee) -> dict[str, int]:
-    return _run(_RESTORE_HANDLERS, employee)
+def run_restore_handlers(employee, *, only: set[str] | None = None) -> dict[str, int]:
+    """Run registered restore handlers for `employee`. `only`, when given,
+    restricts execution to that subset of registered names (HCM
+    remediation H-1) -- a lift must restore a cascade domain only when the
+    matching suspension's own withdrawal actually affected it, not every
+    domain that happens to be inactive right now for some other reason.
+    `only=None` (the default) runs every registered handler, unchanged
+    from the original behaviour."""
+    return _run(_RESTORE_HANDLERS, employee, only=only)

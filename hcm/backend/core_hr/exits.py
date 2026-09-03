@@ -30,7 +30,7 @@ from rbac_audit.models import AuditLogEntry, RoleAssignment
 from rbac_audit.tiers import FieldTier
 
 from . import access_cascade, lifecycle_hooks
-from .models import EmploymentChange, EmploymentEvent
+from .models import AccessRevocationObligation, EmploymentChange, EmploymentEvent
 
 logger = logging.getLogger(__name__)
 
@@ -157,12 +157,34 @@ def _withdraw_access(change: EmploymentChange, employee, actor) -> None:
     if employee.user_id is not None and employee.user.is_active:
         employee.user.is_active = False
         employee.user.save(update_fields=["is_active"])
+        change.login_disabled_by_change = True
         _log(
             actor=actor, entity_type="auth.User", employee_id=employee.id,
             detail=f"login disabled for employment_change #{change.pk} ({change.change_type})",
         )
 
-    for name, count in access_cascade.run_exit_handlers(employee).items():
+    handler_results = access_cascade.run_exit_handlers(employee)
+    change.exit_handler_effects = handler_results
+    failed_domains = set(access_cascade.registered_exit_handlers()) - set(handler_results.keys())
+    now = timezone.now()
+    for name in access_cascade.registered_exit_handlers():
+        failed = name in failed_domains
+        AccessRevocationObligation.objects.create(
+            employment_change=change, domain=name,
+            status=AccessRevocationObligation.Status.FAILED if failed else AccessRevocationObligation.Status.SUCCESS,
+            completed_at=None if failed else now,
+            error_detail="handler raised an exception; see server logs for the traceback" if failed else "",
+        )
+    if failed_domains:
+        change.access_complete = False
+        _log(
+            actor=actor, entity_type="core_hr.AccessRevocationObligation", employee_id=employee.id,
+            detail=(
+                f"access NOT complete for employment_change #{change.pk} ({change.change_type}): "
+                f"failed domain(s): {', '.join(sorted(failed_domains))}"
+            ),
+        )
+    for name, count in handler_results.items():
         if count:
             _log(
                 actor=actor, entity_type=name, employee_id=employee.id,
@@ -197,7 +219,7 @@ def _restore_access(change: EmploymentChange, employee, actor) -> None:
             ),
         )
 
-    if employee.user_id is not None and not employee.user.is_active:
+    if suspension.login_disabled_by_change and employee.user_id is not None and not employee.user.is_active:
         employee.user.is_active = True
         employee.user.save(update_fields=["is_active"])
         _log(
@@ -205,7 +227,8 @@ def _restore_access(change: EmploymentChange, employee, actor) -> None:
             detail=f"login re-enabled for employment_change #{change.pk} ({change.change_type})",
         )
 
-    for name, count in access_cascade.run_restore_handlers(employee).items():
+    affected_domains = {name for name, count in suspension.exit_handler_effects.items() if count}
+    for name, count in access_cascade.run_restore_handlers(employee, only=affected_domains).items():
         if count:
             _log(
                 actor=actor, entity_type=name, employee_id=employee.id,
@@ -259,8 +282,61 @@ def execute_employment_change(change: EmploymentChange) -> EmploymentChange:
 
     change.state = EmploymentChange.State.EXECUTED
     change.executed_at = timezone.now()
-    change.save(update_fields=["state", "executed_at", "resulting_event"])
+    change.save(update_fields=[
+        "state", "executed_at", "resulting_event",
+        "login_disabled_by_change", "exit_handler_effects", "access_complete",
+    ])
     return change
+
+
+@transaction.atomic
+def retry_access_revocation(change: EmploymentChange, *, actor) -> dict[str, int]:
+    """H-2: re-run only the cascade domains a prior withdrawal recorded as
+    FAILED (`AccessRevocationObligation.Status.FAILED`), so a transient
+    handler outage doesn't leave `access_complete` wrong forever. Updates
+    each retried obligation in place rather than creating new rows, and is
+    a no-op -- returns `{}`, changes nothing -- when there is nothing left
+    to retry, so calling it again after everything already succeeded is
+    safe."""
+    if change.change_type == EmploymentChange.ChangeType.LIFT_SUSPENSION:
+        raise EmploymentChangeError("Only a withdrawal's own obligations can be retried.")
+    if change.state != EmploymentChange.State.EXECUTED:
+        raise EmploymentChangeError(f"Cannot retry access revocation for a change in '{change.state}' state.")
+
+    failing = list(change.revocation_obligations.filter(status=AccessRevocationObligation.Status.FAILED))
+    if not failing:
+        return {}
+
+    employee = change.employee
+    retry_names = {obligation.domain for obligation in failing}
+    handler_results = access_cascade.run_exit_handlers(employee, only=retry_names)
+    now = timezone.now()
+    for obligation in failing:
+        obligation.attempt_count += 1
+        if obligation.domain in handler_results:
+            obligation.status = AccessRevocationObligation.Status.SUCCESS
+            obligation.completed_at = now
+            obligation.error_detail = ""
+        obligation.save(update_fields=["attempt_count", "status", "completed_at", "error_detail", "last_attempt_at"])
+
+    change.exit_handler_effects = {**change.exit_handler_effects, **handler_results}
+    change.access_complete = not change.revocation_obligations.filter(
+        status=AccessRevocationObligation.Status.FAILED
+    ).exists()
+    change.save(update_fields=["exit_handler_effects", "access_complete"])
+
+    for name, count in handler_results.items():
+        if count:
+            _log(
+                actor=actor, entity_type=name, employee_id=employee.id,
+                detail=f"{count} row(s) suspended on retry for employment_change #{change.pk} ({change.change_type})",
+            )
+    if change.access_complete:
+        _log(
+            actor=actor, entity_type="core_hr.AccessRevocationObligation", employee_id=employee.id,
+            detail=f"access now complete for employment_change #{change.pk} after retry",
+        )
+    return handler_results
 
 
 @transaction.atomic

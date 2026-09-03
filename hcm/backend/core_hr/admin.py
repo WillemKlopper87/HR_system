@@ -2,6 +2,7 @@ from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
 from .models import (
+    AccessRevocationObligation,
     ContractRenewalDecision,
     DataQualityException,
     Department,
@@ -119,7 +120,21 @@ class DataQualityExceptionAdmin(admin.ModelAdmin):
 
 @admin.register(EmploymentChange)
 class EmploymentChangeAdmin(SimpleHistoryAdmin):
-    list_display = ("employee", "change_type", "state", "effective_date", "proposed_by", "confirmed_by")
-    list_filter = ("change_type", "state")
+    list_display = (
+        "employee", "change_type", "state", "access_complete", "effective_date", "proposed_by", "confirmed_by",
+    )
+    list_filter = ("change_type", "state", "access_complete")
     search_fields = ("employee__employee_number",)
     readonly_fields = ("revoked_role_assignments", "resulting_event")
+
+
+@admin.register(AccessRevocationObligation)
+class AccessRevocationObligationAdmin(admin.ModelAdmin):
+    """H-2's work-item surface: the FAILED filter is where an operator
+    finds every access domain that didn't finish revoking, across every
+    employment change, without having to know which one to look at first."""
+
+    list_display = ("employment_change", "domain", "status", "attempt_count", "last_attempt_at", "completed_at")
+    list_filter = ("status", "domain")
+    search_fields = ("employment_change__employee__employee_number", "domain")
+    readonly_fields = ("employment_change", "domain")

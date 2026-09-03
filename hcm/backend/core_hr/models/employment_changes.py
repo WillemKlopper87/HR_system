@@ -136,6 +136,34 @@ class EmploymentChange(TimestampedModel):
         EmploymentEvent, null=True, blank=True, on_delete=models.SET_NULL, related_name="employment_change",
     )
 
+    # HCM remediation H-1: precise access-effect snapshot, mirroring
+    # revoked_role_assignments' "restore only what this change revoked"
+    # principle for the two access effects that were previously restored
+    # by blind "is it currently inactive?" checks instead. True only when
+    # THIS change's withdrawal actually flipped user.is_active off (i.e.
+    # login was still on when this change ran) -- a lift then re-enables
+    # login only if this exact suspension is what disabled it, not because
+    # login merely happens to be off (it may be off for an independent,
+    # still-current security reason).
+    login_disabled_by_change = models.BooleanField(default=False)
+    # {handler_name: affected_count} from access_cascade.run_exit_handlers
+    # at withdrawal time -- the same purpose as revoked_role_assignments,
+    # but for cross-app cascade domains (e.g. biometrics), which are
+    # dispatched by name through a registry core_hr can't hold a typed FK
+    # into. A lift restores a given handler's domain only if this exact
+    # suspension's snapshot shows it affected something.
+    exit_handler_effects = models.JSONField(default=dict, blank=True)
+
+    # HCM remediation H-2: EXECUTED means the HR decision itself went
+    # through (roles revoked, login disabled -- steps that, if they raise,
+    # roll back the whole atomic execute_employment_change instead).
+    # access_complete is the separate, weaker claim that every
+    # cascade-registered domain also finished revoking access -- the
+    # cascade deliberately isolates a failing domain so it can't block the
+    # ones after it or the core HR change (spec §6.4), so nothing upstream
+    # of this flag would otherwise notice a domain silently failed.
+    access_complete = models.BooleanField(default=True)
+
     history = HistoricalRecords()
 
     class Meta:
@@ -156,3 +184,42 @@ class EmploymentChange(TimestampedModel):
 
     def __str__(self):
         return f"{self.employee.employee_number}: {self.get_change_type_display()} ({self.state})"
+
+
+class AccessRevocationObligation(TimestampedModel):
+    """HCM remediation H-2: durable record of whether one cascade-registered
+    exit-handler domain (access_cascade.py -- currently just
+    identity_verification's biometric enrolment, potentially SSO/physical
+    access/other integrations later) actually completed its share of an
+    EmploymentChange's access withdrawal. The cascade isolates a failing
+    handler so it can't block the ones after it or the core HR change
+    (spec §6.4) -- but before this model, that isolation meant the only
+    trace of a blown-up handler was a server log line; nothing was queryable
+    or retryable. One row per (employment_change, domain);
+    exits.retry_access_revocation() updates it in place on retry rather
+    than creating a new row per attempt, so a domain's failure/success
+    history doesn't fork across many rows for one obligation."""
+
+    class Status(models.TextChoices):
+        SUCCESS = "success", "Success"
+        FAILED = "failed", "Failed"
+
+    employment_change = models.ForeignKey(
+        EmploymentChange, related_name="revocation_obligations", on_delete=models.CASCADE,
+    )
+    domain = models.CharField(max_length=200)
+    status = models.CharField(max_length=10, choices=Status.choices)
+    attempt_count = models.PositiveIntegerField(default=1)
+    last_attempt_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    error_detail = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employment_change", "domain"], name="one_obligation_per_change_domain",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.employment_change_id}: {self.domain} ({self.status})"

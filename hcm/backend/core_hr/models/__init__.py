@@ -25,7 +25,7 @@ from .core import (  # noqa: F401
 )
 from .data_quality import DataQualityException  # noqa: F401
 from .dependants import Dependant, EmergencyContact  # noqa: F401
-from .employment_changes import EmploymentChange  # noqa: F401
+from .employment_changes import AccessRevocationObligation, EmploymentChange  # noqa: F401
 from .exit_interviews import ExitInterview  # noqa: F401
 from .probation import ProbationPeriod, ProbationReview  # noqa: F401
 from .reference_data import Department, JobGrade, Location, OccupationalLevel  # noqa: F401

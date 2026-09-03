@@ -22,8 +22,10 @@ from .exits import (
     execute_due_employment_changes,
     execute_employment_change,
     propose_employment_change,
+    retry_access_revocation,
 )
 from .models import (
+    AccessRevocationObligation,
     ContractRenewalDecision,
     Department,
     Employee,
@@ -334,6 +336,43 @@ class LiftSuspensionTests(ExitTestCase):
             RoleAssignment.objects.filter(employee=self.employee, revoked_at__isnull=True).count(), 2
         )
 
+    def test_lift_does_not_reactivate_login_that_was_already_disabled_before_suspension(self):
+        """H-1: a lift may restore only access that this suspension itself
+        revoked. Login already off (an independent, still-current reason)
+        before the suspension started must stay off after the lift."""
+        self.employee.user.is_active = False
+        self.employee.user.save(update_fields=["is_active"])
+        suspension = self._suspend()
+        self.assertFalse(suspension.login_disabled_by_change)
+
+        lift = propose_employment_change(
+            employee=self.employee, actor=self.hr_admin_1, change_type=EmploymentChange.ChangeType.LIFT_SUSPENSION,
+            effective_date=timezone.localdate(), reason="Hearing cleared them.",
+        )
+        confirm_employment_change(lift, actor=self.hr_admin_2)
+
+        self.employee.user.refresh_from_db()
+        self.assertFalse(self.employee.user.is_active)
+
+    def test_lift_does_not_reactivate_biometric_enrollment_disabled_before_suspension(self):
+        """H-1: same principle for cascade-registered domains -- a lift
+        restores a handler's domain only if this suspension's own snapshot
+        shows it affected something there."""
+        enrollment = BiometricEnrollment.objects.create(
+            employee=self.employee, descriptor=[0.1] * 128, active=False,
+        )
+        suspension = self._suspend()
+        self.assertEqual(suspension.exit_handler_effects.get("identity_verification.BiometricEnrollment"), 0)
+
+        lift = propose_employment_change(
+            employee=self.employee, actor=self.hr_admin_1, change_type=EmploymentChange.ChangeType.LIFT_SUSPENSION,
+            effective_date=timezone.localdate(), reason="Hearing cleared them.",
+        )
+        confirm_employment_change(lift, actor=self.hr_admin_2)
+
+        enrollment.refresh_from_db()
+        self.assertFalse(enrollment.active)
+
     def test_lift_does_not_restore_a_role_that_was_granted_again_in_the_meantime(self):
         suspension = self._suspend()
         RoleAssignment.objects.create(employee=self.employee, role=self.role_employee, granted_by=self.hr_admin_1)
@@ -546,6 +585,80 @@ class HandlerFailureIsolationTests(ExitTestCase):
         self.employee.user.refresh_from_db()
         self.assertFalse(self.employee.user.is_active)
         self.assertIsNotNone(change.resulting_event)
+
+
+class AccessRevocationObligationTests(ExitTestCase):
+    """H-2: a cascade domain that raises must be durably recorded and
+    retryable, not just isolated -- HandlerFailureIsolationTests above
+    already covers the isolation half (the exit itself still completes)."""
+
+    def test_exit_not_access_complete_when_a_domain_revoke_fails(self):
+        def _boom(employee):
+            raise RuntimeError("simulated handler failure")
+
+        with access_cascade.temporary_exit_handler("test.Flaky", _boom):
+            change = self._propose(change_type=EmploymentChange.ChangeType.DISMISSAL_SUMMARY)
+            confirm_employment_change(change, actor=self.hr_admin_2)
+        change.refresh_from_db()
+
+        self.assertEqual(change.state, EmploymentChange.State.EXECUTED)
+        self.assertFalse(change.access_complete)
+
+    def test_failed_revocation_is_durably_recorded(self):
+        def _boom(employee):
+            raise RuntimeError("simulated handler failure")
+
+        with access_cascade.temporary_exit_handler("test.Flaky", _boom):
+            change = self._propose(change_type=EmploymentChange.ChangeType.DISMISSAL_SUMMARY)
+            confirm_employment_change(change, actor=self.hr_admin_2)
+
+        obligation = change.revocation_obligations.get(domain="test.Flaky")
+        self.assertEqual(obligation.status, AccessRevocationObligation.Status.FAILED)
+        self.assertIsNone(obligation.completed_at)
+        self.assertEqual(obligation.attempt_count, 1)
+
+    def test_failed_revocation_can_be_retried(self):
+        attempts = []
+
+        def _flaky(employee):
+            attempts.append(1)
+            if len(attempts) == 1:
+                raise RuntimeError("simulated outage")
+            return 1
+
+        with access_cascade.temporary_exit_handler("test.Flaky", _flaky):
+            change = self._propose(change_type=EmploymentChange.ChangeType.DISMISSAL_SUMMARY)
+            confirm_employment_change(change, actor=self.hr_admin_2)
+            self.assertFalse(change.access_complete)
+
+            retry_access_revocation(change, actor=self.hr_admin_1)
+
+        change.refresh_from_db()
+        self.assertTrue(change.access_complete)
+        obligation = change.revocation_obligations.get(domain="test.Flaky")
+        self.assertEqual(obligation.status, AccessRevocationObligation.Status.SUCCESS)
+        self.assertEqual(obligation.attempt_count, 2)
+
+    def test_retry_is_idempotent(self):
+        change = self._propose(change_type=EmploymentChange.ChangeType.DISMISSAL_SUMMARY)
+        confirm_employment_change(change, actor=self.hr_admin_2)
+        change.refresh_from_db()
+        self.assertTrue(change.access_complete)
+
+        result = retry_access_revocation(change, actor=self.hr_admin_1)
+        self.assertEqual(result, {})
+
+    def test_retry_rejects_a_lift_suspension(self):
+        suspension = self._propose(change_type=EmploymentChange.ChangeType.SUSPENSION)
+        confirm_employment_change(suspension, actor=self.hr_admin_2)
+        lift = propose_employment_change(
+            employee=self.employee, actor=self.hr_admin_1, change_type=EmploymentChange.ChangeType.LIFT_SUSPENSION,
+            effective_date=timezone.localdate(), reason="Cleared.",
+        )
+        confirm_employment_change(lift, actor=self.hr_admin_2)
+
+        with self.assertRaises(EmploymentChangeError):
+            retry_access_revocation(lift, actor=self.hr_admin_1)
 
 
 class NoUserAccountTests(ExitTestCase):
