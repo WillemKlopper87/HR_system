@@ -81,6 +81,12 @@ class DataSubjectRequest(TimestampedModel):
     class Status(models.TextChoices):
         SUBMITTED = "submitted", "Submitted"
         COMPLETED = "completed", "Completed"
+        # HCM remediation H-3: distinct from COMPLETED -- set when the
+        # export ran but at least one REQUIRED personal-data domain
+        # (rbac_audit.subject_export's registry) failed, so "completed"
+        # never overstates what the export actually covered. See
+        # export_manifest below for exactly which domain(s).
+        PARTIALLY_COMPLETED = "partially_completed", "Partially completed"
         DECLINED = "declined", "Declined"
 
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="data_subject_requests")
@@ -103,6 +109,12 @@ class DataSubjectRequest(TimestampedModel):
     # Populated only when an EXPORT request completes (services.py::
     # generate_export) — never set for an ERASURE request.
     export_file = models.FileField(upload_to="data_subject_exports/%Y/%m/", null=True, blank=True)
+    # HCM remediation H-3: rbac_audit.subject_export.SubjectExportManifest.
+    # as_dict() -- every registered personal-data domain's outcome for
+    # this export (included/no_records/retained/excluded/failed), so a
+    # COMPLETED or PARTIALLY_COMPLETED request's coverage is provable
+    # rather than implied by "the file exists."
+    export_manifest = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ["-requested_at"]

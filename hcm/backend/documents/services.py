@@ -19,6 +19,7 @@ from core_hr.models import Employee
 from rbac_audit.audit import log_access
 from rbac_audit.consent import has_active_consent, withdraw_consent
 from rbac_audit.models import AuditLogEntry, ConsentRecord
+from rbac_audit.subject_export import DomainExportResult, DomainStatus, run_subject_export
 from rbac_audit.tiers import FieldTier
 
 from .models import DataSubjectRequest, EmployeeDocument
@@ -134,11 +135,12 @@ def decline_data_subject_request(request: DataSubjectRequest, *, actor, notes=""
 
 
 def _serialise_for_export(employee: Employee) -> dict:
-    """Spec §6.4: real, but honestly bounded — everything `documents` +
-    the kernel (core_hr, rbac_audit) can assemble directly, without a new
-    peer-app import. Does NOT reach into learning/performance/
-    compensation/recruitment — that needs a queries.py seam per module and
-    is recorded as scoped-out follow-up work, not silently incomplete."""
+    """Spec §6.4: everything `documents` + the kernel (core_hr, rbac_audit)
+    can assemble directly, without a new peer-app import. Registered as
+    the "documents.core_bundle" domain in rbac_audit.subject_export's
+    registry (HCM remediation H-3) rather than being the whole export by
+    itself — learning/performance/compensation/etc. are separate domains
+    registered from their own apps; this function's scope is unchanged."""
     version_history = [
         {
             "valid_from": v.valid_from.isoformat(),
@@ -202,23 +204,47 @@ def _serialise_for_export(employee: Employee) -> dict:
     }
 
 
+def _core_bundle_export_handler(employee: Employee) -> DomainExportResult:
+    """rbac_audit.subject_export registry entry for "documents.core_bundle"
+    (HCM remediation H-3) -- registered from DocumentsConfig.ready()."""
+    payload = _serialise_for_export(employee)
+    return DomainExportResult(status=DomainStatus.INCLUDED, record_count=1, payload=payload)
+
+
 @transaction.atomic
 def complete_export_request(request: DataSubjectRequest, *, actor, notes="") -> DataSubjectRequest:
     _assert_submitted(request)
     if request.request_type != DataSubjectRequest.RequestType.EXPORT:
         raise DocumentError("This is not an export request.")
-    payload = _serialise_for_export(request.employee)
+
+    domain_payloads, manifest = run_subject_export(request.employee)
+    export_document = {
+        "generated_at": timezone.now().isoformat(),
+        "manifest": manifest.as_dict(),
+        "domains": domain_payloads,
+    }
     filename = f"export-{request.employee.employee_number}-{timezone.now():%Y%m%d%H%M%S}.json"
-    request.export_file.save(filename, ContentFile(json.dumps(payload, indent=2)), save=False)
-    request.status = DataSubjectRequest.Status.COMPLETED
+    request.export_file.save(filename, ContentFile(json.dumps(export_document, indent=2)), save=False)
+    request.export_manifest = manifest.as_dict()
+    # HCM remediation H-3: COMPLETED now means every REQUIRED domain
+    # actually succeeded, not merely that documents' own portion did --
+    # PARTIALLY_COMPLETED still ships whatever domains DID succeed (an
+    # incomplete export today beats blocking the subject's statutory
+    # right entirely on one domain's transient failure) but says so, in a
+    # status an operator can query and act on.
+    request.status = (
+        DataSubjectRequest.Status.COMPLETED if manifest.complete else DataSubjectRequest.Status.PARTIALLY_COMPLETED
+    )
     request.reviewed_by = actor
     request.reviewed_at = timezone.now()
     request.resolution_notes = notes
-    request.save(update_fields=["export_file", "status", "reviewed_by", "reviewed_at", "resolution_notes"])
+    request.save(update_fields=[
+        "export_file", "export_manifest", "status", "reviewed_by", "reviewed_at", "resolution_notes",
+    ])
     log_access(
         actor=actor, action=AuditLogEntry.Action.EXPORT, entity_type="documents.DataSubjectRequest",
         entity_id=request.id, field_tier=FieldTier.RESTRICTED,
-        fields_touched=f"personal data export generated for {request.employee.employee_number}",
+        fields_touched=f"personal data export ({request.status}) generated for {request.employee.employee_number}",
     )
     return request
 

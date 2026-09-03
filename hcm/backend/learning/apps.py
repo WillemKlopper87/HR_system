@@ -15,3 +15,11 @@ class LearningConfig(AppConfig):
         from .data_quality import overdue_training_handler
 
         register(DataQualityException.ExceptionType.MANDATORY_TRAINING_OVERDUE, overdue_training_handler)
+
+        # HCM remediation H-3: this app's personal-data domain in
+        # rbac_audit's subject-export registry.
+        from rbac_audit.subject_export import register as register_export_handler
+
+        from .subject_export import export_handler
+
+        register_export_handler("learning.TrainingRecord", export_handler)

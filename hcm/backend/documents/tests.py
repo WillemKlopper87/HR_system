@@ -182,6 +182,83 @@ class DataSubjectRequestServiceTests(DocumentsServiceTestCase):
             complete_export_request(request, actor=self.hr_admin)
 
 
+class SubjectExportRegistryIntegrationTests(DocumentsServiceTestCase):
+    """HCM remediation H-3: complete_export_request() now goes through
+    rbac_audit.subject_export's domain registry rather than documents'
+    own hardcoded field list being the entire export."""
+
+    def test_export_includes_compensation_and_learning_domains(self):
+        from compensation.models import PayBand
+        from compensation.services import propose_compensation_change
+        from learning.models import TrainingRecord
+
+        PayBand.objects.create(
+            job_grade=self.employee.current_version.job_grade, min_salary=100000, mid_salary=150000, max_salary=200000,
+            valid_from=date(2020, 1, 1),
+        )
+        propose_compensation_change(employee=self.employee, proposed_annual_salary=180000, proposed_by=self.hr_admin)
+        TrainingRecord.objects.create(
+            employee=self.employee, title="First Aid", status=TrainingRecord.Status.COMPLETED,
+        )
+
+        request = submit_data_subject_request(
+            self.employee, request_type=DataSubjectRequest.RequestType.EXPORT, actor=self.employee
+        )
+        complete_export_request(request, actor=self.hr_admin)
+        request.refresh_from_db()
+
+        self.assertEqual(request.status, DataSubjectRequest.Status.COMPLETED)
+        self.assertEqual(request.export_manifest["compensation.CompProposal"]["status"], "included")
+        self.assertEqual(request.export_manifest["learning.TrainingRecord"]["status"], "included")
+        content = request.export_file.read().decode()
+        self.assertIn("180000", content)
+        self.assertIn("First Aid", content)
+
+    def test_manifest_identifies_no_record_domains(self):
+        request = submit_data_subject_request(
+            self.employee, request_type=DataSubjectRequest.RequestType.EXPORT, actor=self.employee
+        )
+        complete_export_request(request, actor=self.hr_admin)
+        request.refresh_from_db()
+
+        self.assertEqual(request.export_manifest["compensation.CompProposal"]["status"], "no_records")
+        self.assertEqual(request.export_manifest["learning.TrainingRecord"]["status"], "no_records")
+
+    def test_export_cannot_be_marked_completed_when_a_required_domain_fails(self):
+        from rbac_audit import subject_export
+
+        def boom(employee):
+            raise RuntimeError("simulated domain outage")
+
+        request = submit_data_subject_request(
+            self.employee, request_type=DataSubjectRequest.RequestType.EXPORT, actor=self.employee
+        )
+        with subject_export.temporary_handler("test.Flaky", boom):
+            complete_export_request(request, actor=self.hr_admin)
+        request.refresh_from_db()
+
+        self.assertEqual(request.status, DataSubjectRequest.Status.PARTIALLY_COMPLETED)
+        self.assertEqual(request.export_manifest["test.Flaky"]["status"], "failed")
+        # documents' own domain still succeeded and is still in the file.
+        self.assertEqual(request.export_manifest["documents.core_bundle"]["status"], "included")
+
+    def test_a_non_required_domain_failing_does_not_block_completion(self):
+        from rbac_audit import subject_export
+
+        def boom(employee):
+            raise RuntimeError("simulated non-critical outage")
+
+        request = submit_data_subject_request(
+            self.employee, request_type=DataSubjectRequest.RequestType.EXPORT, actor=self.employee
+        )
+        with subject_export.temporary_handler("test.OptionalFlaky", boom, required=False):
+            complete_export_request(request, actor=self.hr_admin)
+        request.refresh_from_db()
+
+        self.assertEqual(request.status, DataSubjectRequest.Status.COMPLETED)
+        self.assertEqual(request.export_manifest["test.OptionalFlaky"]["status"], "failed")
+
+
 class ErasureAllowListTests(DocumentsServiceTestCase):
     """Design spec §6.1 — the heart of the POPIA design decision: erasure
     is a hardcoded allow-list, and everything outside it must survive

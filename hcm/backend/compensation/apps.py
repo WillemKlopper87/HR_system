@@ -15,3 +15,11 @@ class CompensationConfig(AppConfig):
 
         register(DataQualityException.ExceptionType.COMP_PROPOSAL_STALE, stale_proposal_handler)
         register(DataQualityException.ExceptionType.COMP_CYCLE_OVERDUE, cycle_overdue_handler)
+
+        # HCM remediation H-3: this app's personal-data domain in
+        # rbac_audit's subject-export registry.
+        from rbac_audit.subject_export import register as register_export_handler
+
+        from .subject_export import export_handler
+
+        register_export_handler("compensation.CompProposal", export_handler)
