@@ -354,6 +354,22 @@ CELERY_BEAT_SCHEDULE = {
 _DEV_ASSESSMENT_WEBHOOK_SECRET = "dev-only-insecure-webhook-secret-change-me"
 ASSESSMENT_WEBHOOK_SECRET = os.environ.get("ASSESSMENT_WEBHOOK_SECRET", _DEV_ASSESSMENT_WEBHOOK_SECRET)
 
+# HCM remediation H-4: master key material for rbac_audit/field_encryption.py's
+# application-layer envelope encryption of Restricted identity fields and TOTP
+# seeds. Comma-separated so a key can be rotated by prepending a new one --
+# encryption always uses the FIRST key; decryption tries all of them, so
+# already-encrypted values keep reading under an old key until a backfill
+# re-encrypts them under the new one (see field_encryption.py's docstring).
+# Same 12-factor/env-var pattern as DJANGO_SECRET_KEY and
+# ASSESSMENT_WEBHOOK_SECRET above -- this deployment (ADR-005, single VM,
+# docker-compose .env) has no KMS/HSM; if one is introduced later, only
+# field_encryption.py's key-loading needs to change, not the ciphertext
+# format or any model/migration built on top of it.
+_DEV_FIELD_ENCRYPTION_KEY = "dev-only-insecure-field-encryption-key-change-me-please"
+FIELD_ENCRYPTION_KEYS = [
+    k for k in os.environ.get("FIELD_ENCRYPTION_KEYS", _DEV_FIELD_ENCRYPTION_KEY).split(",") if k
+]
+
 # Security hardening applied whenever DEBUG is off. TLS terminates at the
 # edge (nginx / load balancer, ADR-005) and nginx forwards X-Forwarded-Proto —
 # without SECURE_PROXY_SSL_HEADER the SSL redirect below would loop forever
@@ -361,6 +377,13 @@ ASSESSMENT_WEBHOOK_SECRET = os.environ.get("ASSESSMENT_WEBHOOK_SECRET", _DEV_ASS
 if not DEBUG:
     _require_production_secret("DJANGO_SECRET_KEY", SECRET_KEY, _DEV_SECRET_KEY)
     _require_production_secret("ASSESSMENT_WEBHOOK_SECRET", ASSESSMENT_WEBHOOK_SECRET, _DEV_ASSESSMENT_WEBHOOK_SECRET)
+    if not FIELD_ENCRYPTION_KEYS or _DEV_FIELD_ENCRYPTION_KEY in FIELD_ENCRYPTION_KEYS:
+        raise ImproperlyConfigured(
+            "FIELD_ENCRYPTION_KEYS is missing or still includes its development default. "
+            "Set one or more real, unique values before running with DJANGO_DEBUG=0."
+        )
+    for _key in FIELD_ENCRYPTION_KEYS:
+        _require_production_secret("FIELD_ENCRYPTION_KEYS", _key, _DEV_FIELD_ENCRYPTION_KEY)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     USE_X_FORWARDED_HOST = True
     SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "1") == "1"

@@ -111,7 +111,16 @@ def backfill_positions_for_current_employees() -> int:
     already-linked EmployeeVersions are skipped, safe to call more than
     once (e.g. if the migration is re-run in a dev environment)."""
     created = 0
-    for employee in Employee.objects.all():
+    # .only("id"): this migration-time backfill runs against whatever the
+    # Employee table looks like at THIS point in the migration graph (see
+    # this function's own docstring on using real model imports rather than
+    # historical apps.get_model state), so a plain Employee.objects.all()
+    # -- which SELECTs every field the *current* code defines -- breaks on
+    # a fresh database the moment core_hr.Employee gains a field whose
+    # column a later migration hasn't created yet. Nothing in this loop
+    # touches an Employee field beyond .pk (current_version queries
+    # EmployeeVersion by employee_id), so restricting the SELECT is free.
+    for employee in Employee.objects.only("id"):
         version = employee.current_version
         if version is None or version.position_id is not None:
             continue
