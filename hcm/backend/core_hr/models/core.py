@@ -118,27 +118,19 @@ class Employee(TimestampedModel):
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
     preferred_name = models.CharField(max_length=150, blank=True)
-    # Restricted-tier fields (Data-Dictionary.md). national_id_number/
-    # passport_number stay plain CharFields -- unchanged, so every existing
-    # read/write site keeps working exactly as before -- protected at rest
-    # today only by Postgres disk encryption (ADR-005), which does not
-    # protect against a DB dump or a leaked read-only credential.
-    #
-    # HCM remediation H-4, phase 1 (deliberately NOT a full cutover -- see
-    # HCM_REMEDIATION_EXECUTION_PROTOCOL_2026-09-03.md H-4's migration-safety
-    # requirement against doing this in one step): *_encrypted below are
-    # additive, application-layer-encrypted MIRRORS via
-    # rbac_audit.fields.EncryptedCharField, populated by
-    # core_hr.management.commands.backfill_field_encryption. They exist
-    # alongside the plaintext fields, not yet read from by anything, so
-    # that the encrypt/decrypt round-trip and column-count parity can be
-    # verified against real data before phase 2 (a separate, deliberate cutover
-    # that switches these to be the fields the app actually reads/writes,
-    # then drops the plaintext columns) is attempted.
-    national_id_number = models.CharField(max_length=13, blank=True)
-    passport_number = models.CharField(max_length=30, blank=True)
-    national_id_number_encrypted = EncryptedCharField(purpose="national_id", blank=True, default="")
-    passport_number_encrypted = EncryptedCharField(purpose="passport_number", blank=True, default="")
+    # Restricted-tier fields (Data-Dictionary.md), HCM remediation H-4:
+    # encrypted at rest via rbac_audit.fields.EncryptedCharField -- Postgres
+    # disk encryption (ADR-005) alone does not protect against a DB dump or
+    # a leaked read-only credential, both of which previously exposed these
+    # directly. Phase 2 cutover (HCM_REMEDIATION_EXECUTION_PROTOCOL_2026-09-03.md):
+    # this deployment has no live production data yet (confirmed before this
+    # migration was written), so the phase-1 plaintext columns and their
+    # *_encrypted mirrors were collapsed into these single fields in one
+    # migration rather than carrying the two-step dance a live cutover would
+    # require -- see that migration's own docstring for the backfill it runs
+    # first, for whatever dev/demo data exists.
+    national_id_number = EncryptedCharField(purpose="national_id", blank=True, default="")
+    passport_number = EncryptedCharField(purpose="passport_number", blank=True, default="")
     date_of_birth = models.DateField()
     work_email = models.EmailField(unique=True)
     # The same person's user id in the collab platform (ADR-011), resolved by

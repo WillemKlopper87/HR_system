@@ -208,17 +208,10 @@ class TOTPDevice(TimestampedModel):
     )
     # Base32 (pyotp.random_base32()) — not itself a password, but treated
     # as sensitive: a leaked secret lets someone generate valid codes
-    # without the physical device. Stays a plain CharField, unchanged, so
-    # every existing read/write site keeps working.
-    #
-    # HCM remediation H-4, phase 1 (see core_hr.models.core.Employee's
-    # national_id_number comment for the full phased-migration rationale):
-    # secret_encrypted is an additive, application-layer-encrypted mirror,
-    # populated by core_hr.management.commands.backfill_field_encryption,
-    # not yet read from by anything -- phase 2 is the deliberate,
-    # separate cutover.
-    secret = models.CharField(max_length=64)
-    secret_encrypted = EncryptedCharField(purpose="totp_seed", blank=True, default="")
+    # without the physical device. HCM remediation H-4: encrypted at rest
+    # via rbac_audit.fields.EncryptedCharField (see core_hr.models.core.
+    # Employee's national_id_number comment for the phase-2 cutover rationale).
+    secret = EncryptedCharField(purpose="totp_seed", blank=True, default="")
     confirmed_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
