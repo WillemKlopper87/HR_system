@@ -27,7 +27,7 @@ class ContractReminderFixtureMixin:
         # unused value instead, same fix as core_hr/tests.py's other
         # illustrative fixtures.
         self.level = OccupationalLevel.objects.create(code="P", name="Professional", order=99)
-        self.location = Location.objects.create(code="JHB", name="Johannesburg", province="Gauteng")
+        self.location = Location.objects.create(code="JHB", name="Johannesburg", province=Location.Province.GAUTENG)
         self.manager = Employee.objects.hire(
             employee_number="E800", first_name="Line", last_name="Manager",
             date_of_birth=date(1980, 1, 1), work_email="linemanager4@sentech.example.com",

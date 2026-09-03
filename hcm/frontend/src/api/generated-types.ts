@@ -5607,6 +5607,29 @@ export interface paths {
         patch: operations["v1_policies_partial_update"];
         trace?: never;
     };
+    "/api/v1/policies/{id}/approve/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description A policy_committee_member's sign-off on this draft — see
+         *     get_permissions() for why this action alone allows a non-hr_admin
+         *     through the class-level gate, and services.py::publish_policy for
+         *     what this unlocks (every current committee member must approve
+         *     before Publish becomes available).
+         */
+        post: operations["v1_policies_approve_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/policies/{id}/archive/": {
         parameters: {
             query?: never;
@@ -7262,10 +7285,11 @@ export interface components {
         /**
          * @description * `submitted` - Submitted
          *     * `completed` - Completed
+         *     * `partially_completed` - Partially completed
          *     * `declined` - Declined
          * @enum {string}
          */
-        DataSubjectRequestStatusEnum: "submitted" | "completed" | "declined";
+        DataSubjectRequestStatusEnum: "submitted" | "completed" | "partially_completed" | "declined";
         /**
          * @description * `approved` - Approved
          *     * `rejected` - Rejected
@@ -9983,6 +10007,15 @@ export interface components {
             readonly published_by?: number | null;
             /** Format: date-time */
             readonly published_at?: string | null;
+            readonly approvals?: components["schemas"]["PolicyApproval"][];
+            /**
+             * @description Names of every committee member who hasn't approved this draft
+             *     yet — empty once published/archived, since a settled policy has
+             *     nothing left pending. Committee membership is cached on `context`
+             *     (shared across every row in a `many=True` list serialization) so
+             *     listing N drafts costs one committee query, not N.
+             */
+            readonly pending_committee_approvals?: string[];
         };
         PatchedProviderConfig: {
             readonly id?: number;
@@ -10278,6 +10311,15 @@ export interface components {
             readonly published_by: number | null;
             /** Format: date-time */
             readonly published_at: string | null;
+            readonly approvals: components["schemas"]["PolicyApproval"][];
+            /**
+             * @description Names of every committee member who hasn't approved this draft
+             *     yet — empty once published/archived, since a settled policy has
+             *     nothing left pending. Committee membership is cached on `context`
+             *     (shared across every row in a `many=True` list serialization) so
+             *     listing N drafts costs one committee query, not N.
+             */
+            readonly pending_committee_approvals: string[];
         };
         PolicyAcknowledgment: {
             readonly id: number;
@@ -10288,6 +10330,14 @@ export interface components {
             readonly policy_version: number;
             /** Format: date-time */
             readonly acknowledged_at: string;
+        };
+        PolicyApproval: {
+            readonly id: number;
+            readonly approved_by: number;
+            readonly approved_by_name: string;
+            comment?: string;
+            /** Format: date-time */
+            readonly approved_at: string;
         };
         /**
          * @description * `code_of_conduct` - Code of Conduct
@@ -20470,6 +20520,34 @@ export interface operations {
                 "application/json": components["schemas"]["PatchedPolicy"];
                 "application/x-www-form-urlencoded": components["schemas"]["PatchedPolicy"];
                 "multipart/form-data": components["schemas"]["PatchedPolicy"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Policy"];
+                };
+            };
+        };
+    };
+    v1_policies_approve_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this policy. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Policy"];
+                "application/x-www-form-urlencoded": components["schemas"]["Policy"];
+                "multipart/form-data": components["schemas"]["Policy"];
             };
         };
         responses: {

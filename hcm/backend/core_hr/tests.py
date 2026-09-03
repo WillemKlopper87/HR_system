@@ -503,7 +503,7 @@ class ContractEndDateFieldTests(TestCase):
     def setUp(self):
         self.dept = Department.objects.create(code="ENG", name="Engineering")
         self.level = OccupationalLevel.objects.create(code="P", name="Professional", order=99)
-        self.location = Location.objects.create(code="JHB", name="Johannesburg", province="Gauteng")
+        self.location = Location.objects.create(code="JHB", name="Johannesburg", province=Location.Province.GAUTENG)
         self.employee = Employee.objects.hire(
             employee_number="E900", first_name="Test", last_name="Contractor",
             date_of_birth=date(1990, 1, 1), work_email="contractor@sentech.example.com",
@@ -536,7 +536,7 @@ class ContractRenewalDecisionModelTests(TestCase):
     def setUp(self):
         self.dept = Department.objects.create(code="ENG", name="Engineering")
         self.level = OccupationalLevel.objects.create(code="P", name="Professional", order=98)
-        self.location = Location.objects.create(code="JHB", name="Johannesburg", province="Gauteng")
+        self.location = Location.objects.create(code="JHB", name="Johannesburg", province=Location.Province.GAUTENG)
         self.manager = Employee.objects.hire(
             employee_number="E800", first_name="Line", last_name="Manager",
             date_of_birth=date(1980, 1, 1), work_email="linemanager@sentech.example.com",
@@ -566,7 +566,7 @@ class ContractDecisionServiceTests(TestCase):
     def setUp(self):
         self.dept = Department.objects.create(code="ENG", name="Engineering")
         self.level = OccupationalLevel.objects.create(code="P", name="Professional", order=97)
-        self.location = Location.objects.create(code="JHB", name="Johannesburg", province="Gauteng")
+        self.location = Location.objects.create(code="JHB", name="Johannesburg", province=Location.Province.GAUTENG)
         self.manager = Employee.objects.hire(
             employee_number="E800", first_name="Line", last_name="Manager",
             date_of_birth=date(1980, 1, 1), work_email="linemanager3@sentech.example.com",

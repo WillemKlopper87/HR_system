@@ -16,7 +16,7 @@ class EEStatutoryReminderFixtureMixin:
     def setUp(self):
         dept = Department.objects.create(code="ENG", name="Engineering")
         level = OccupationalLevel.objects.create(code="P", name="Professional", order=99)
-        location = Location.objects.create(code="JHB", name="Johannesburg", province="Gauteng")
+        location = Location.objects.create(code="JHB", name="Johannesburg", province=Location.Province.GAUTENG)
         self.hr_admin = Employee.objects.hire(
             employee_number="E810", first_name="HR", last_name="Admin",
             date_of_birth=date(1980, 1, 1), work_email="hradmin5@sentech.example.com",

@@ -25,7 +25,7 @@ class MandatoryTrainingReminderFixtureMixin:
         # would double-count the manager alongside their report).
         self.mgmt_dept = Department.objects.create(code="MGT", name="Management")
         self.level = OccupationalLevel.objects.create(code="P", name="Professional", order=99)
-        self.location = Location.objects.create(code="JHB", name="Johannesburg", province="Gauteng")
+        self.location = Location.objects.create(code="JHB", name="Johannesburg", province=Location.Province.GAUTENG)
         self.manager = Employee.objects.hire(
             employee_number="E810", first_name="Line", last_name="Manager", date_of_birth=date(1980, 1, 1),
             work_email="linemanager10@sentech.example.com", hire_date=date(2015, 1, 1), department=self.mgmt_dept,
