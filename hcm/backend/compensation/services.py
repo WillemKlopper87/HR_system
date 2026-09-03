@@ -158,6 +158,24 @@ def approve_proposal(proposal: CompProposal, *, approver, override_reason: str =
     update_fields = ["status", "approved_by", "approved_at"]
 
     with transaction.atomic():
+        # HCM remediation M-1: the pre-lock check above only rules out the
+        # caller's own stale in-memory copy; it can't see a concurrent
+        # approve/reject that committed between that check and this
+        # transaction starting. Lock the PROPOSAL row itself (not just the
+        # cycle, below) and re-check its state under the lock -- a second
+        # concurrent caller blocks here until the first commits, then sees
+        # status=APPROVED and is correctly rejected instead of also
+        # approving and double-firing the notification/audit/budget
+        # side effects. Deliberately a separate `current` fetch rather than
+        # rebinding `proposal` -- every write below still goes through the
+        # SAME `proposal` instance the caller passed in, matching the
+        # cycle-lock comment's "never rebound to a fresh fetch" contract
+        # callers rely on; `current` exists only to hold the lock and
+        # supply a just-locked status to check.
+        current = CompProposal.objects.select_for_update().get(pk=proposal.pk)
+        if current.status != CompProposal.Status.PROPOSED:
+            raise ApprovalError("Only a proposed compensation change can be approved.")
+
         if proposal.cycle_id is not None:
             # Lock the CYCLE row (not the proposal) so a concurrent
             # create/approve against the SAME cycle can't also read a
@@ -208,8 +226,16 @@ def approve_proposal(proposal: CompProposal, *, approver, override_reason: str =
     return proposal
 
 
+@transaction.atomic
 def reject_proposal(proposal: CompProposal, *, approver) -> CompProposal:
     if proposal.status != CompProposal.Status.PROPOSED:
+        raise ApprovalError("Only a proposed compensation change can be rejected.")
+    # M-1: same proposal-row lock + re-check as approve_proposal, and on
+    # the SAME row -- a reject racing a concurrent approve for this
+    # proposal now serializes against it too, not just against another
+    # concurrent reject.
+    current = CompProposal.objects.select_for_update().get(pk=proposal.pk)
+    if current.status != CompProposal.Status.PROPOSED:
         raise ApprovalError("Only a proposed compensation change can be rejected.")
     proposal.status = CompProposal.Status.REJECTED
     proposal.approved_by = approver

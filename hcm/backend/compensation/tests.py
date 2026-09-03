@@ -169,6 +169,58 @@ class ProposeApproveRejectWorkflowTests(TestCase):
             propose_compensation_change(employee=employee, proposed_annual_salary=350000)
 
 
+class ConcurrentApprovalTests(TestCase):
+    """M-1: two callers racing on the same proposal must not both win.
+    Modelled the way this codebase already tests staleness elsewhere --
+    two independent fetches of the same row, one approved through first --
+    rather than real OS threads: SQLite (the test/dev backend, see
+    config/settings.py) doesn't give select_for_update() real row locking,
+    so a genuinely threaded test would be nondeterministic here even
+    though Postgres (production) enforces it properly. `second` holds the
+    same stale status a concurrent second request would have read before
+    the first one committed; the fix's re-check under `select_for_update()`
+    is exactly what needs to catch that staleness -- before the fix, this
+    test fails (both calls succeed, the second re-approving/re-rejecting
+    over the first)."""
+
+    def setUp(self):
+        self.dept, self.level, self.grade, self.location = _seed_reference_data()
+        self.employee = _hire("E001", dept=self.dept, level=self.level, grade=self.grade, location=self.location)
+        self.proposer = _hire("E002", dept=self.dept, level=self.level, grade=self.grade, location=self.location)
+        self.approver = _hire("E003", dept=self.dept, level=self.level, grade=self.grade, location=self.location)
+        self.approver2 = _hire("E004", dept=self.dept, level=self.level, grade=self.grade, location=self.location)
+        PayBand.objects.create(
+            job_grade=self.grade, min_salary=300000, mid_salary=400000, max_salary=500000, valid_from=date(2020, 1, 1)
+        )
+
+    def test_concurrent_proposal_approvals_have_single_winner(self):
+        proposal = propose_compensation_change(
+            employee=self.employee, proposed_annual_salary=350000, proposed_by=self.proposer
+        )
+        stale_second_read = CompProposal.objects.get(pk=proposal.pk)
+
+        approve_proposal(proposal, approver=self.approver)
+        with self.assertRaises(ApprovalError):
+            approve_proposal(stale_second_read, approver=self.approver2)
+
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.status, "approved")
+        self.assertEqual(proposal.approved_by, self.approver)
+
+    def test_concurrent_approve_and_reject_have_single_winner(self):
+        proposal = propose_compensation_change(
+            employee=self.employee, proposed_annual_salary=350000, proposed_by=self.proposer
+        )
+        stale_second_read = CompProposal.objects.get(pk=proposal.pk)
+
+        approve_proposal(proposal, approver=self.approver)
+        with self.assertRaises(ApprovalError):
+            reject_proposal(stale_second_read, approver=self.approver2)
+
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.status, "approved")
+
+
 class BenefitsElectionTests(TestCase):
     def setUp(self):
         self.dept, self.level, self.grade, self.location = _seed_reference_data()
