@@ -103,3 +103,23 @@ class ProviderConfig(TimestampedModel):
 
     def __str__(self):
         return f"{self.display_name} ({'active' if self.active else 'inactive'})"
+
+
+class WebhookDelivery(TimestampedModel):
+    """HCM remediation M-3: a persisted replay key, so verify_signature()'s
+    freshness window (webhooks.py) isn't the only replay defense
+    (Architecture-Design.md §6 gap I4). There's no real provider under
+    contract yet (Sprint-0-Decision-Log.md A4), so there's no provider-
+    issued event ID to key on -- the HMAC signature itself is an
+    equivalent replay fingerprint: a keyed hash over the exact
+    (timestamp, body) pair, so two deliveries sharing one signature can
+    only be the same signed message delivered twice, never two distinct
+    legitimate events. No retention sweep yet (HCM_REMEDIATION_EXECUTION_
+    PROTOCOL_2026-09-03.md M-3's "bounded retention" is not fully closed
+    by this change) -- at pilot scale (Sprint-0-Decision-Log.md A4) the
+    table stays small enough that this is deferred, not forgotten."""
+
+    signature = models.CharField(max_length=64, unique=True)
+
+    def __str__(self):
+        return self.signature

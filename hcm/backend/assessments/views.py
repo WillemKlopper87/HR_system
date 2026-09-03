@@ -4,7 +4,7 @@ import json
 
 from core_hr.models import Employee
 from core_hr.permissions import IsHRAdmin
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from rbac_audit.consent import record_consent
@@ -17,7 +17,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from . import webhooks
-from .models import AssessmentAssignment, ProviderConfig
+from .models import AssessmentAssignment, ProviderConfig, WebhookDelivery
 from .permissions import CanAccessAssessmentAssignment
 from .serializers import AssessmentAssignmentSerializer, ProviderConfigSerializer
 from .services import ConsentRequiredError, WebhookProcessingError, assign_assessment, process_webhook_result, simulate_provider_completion
@@ -129,6 +129,18 @@ def assessment_webhook(request):
         webhooks.verify_signature(request.body, signature=signature, timestamp=timestamp)
     except webhooks.WebhookVerificationError as exc:
         return JsonResponse({"detail": str(exc)}, status=401)
+
+    # M-3: a persisted replay key, so protection doesn't rest solely on
+    # verify_signature's freshness window -- a validly-signed request
+    # whose exact signature has already been recorded is a replay of an
+    # already-processed (or in-flight) delivery. Recorded only after
+    # signature verification succeeds, so an attacker can't churn this
+    # table with garbage unsigned requests.
+    try:
+        with transaction.atomic():
+            WebhookDelivery.objects.create(signature=signature)
+    except IntegrityError:
+        return JsonResponse({"detail": "Already processed."}, status=200)
 
     try:
         payload = json.loads(request.body)

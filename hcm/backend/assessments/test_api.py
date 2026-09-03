@@ -13,7 +13,7 @@ from recruitment.models import Applicant, Requisition
 from rest_framework.test import APIClient
 
 from . import webhooks
-from .models import AssessmentAssignment, ProviderConfig
+from .models import AssessmentAssignment, AssessmentResult, ProviderConfig, WebhookDelivery
 
 User = get_user_model()
 
@@ -293,3 +293,64 @@ class WebhookApiTests(AssessmentsApiTestCase):
     def test_get_method_not_allowed(self):
         response = self.client.get("/webhooks/v1/assessments/")
         self.assertEqual(response.status_code, 405)
+
+    def test_webhook_event_processed_once(self):
+        response = self._post_webhook(
+            {"provider_reference": self.provider_reference, "status": "completed", "raw_score": "70"}
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(WebhookDelivery.objects.count(), 1)
+        self.assertEqual(
+            AssessmentResult.objects.filter(assignment__provider_reference=self.provider_reference).count(), 1
+        )
+
+    def test_webhook_replay_is_idempotent(self):
+        """M-3: replaying the exact same signed request (same body, same
+        timestamp, same signature) inside the freshness window must not
+        reprocess -- persisted replay protection, not just freshness."""
+        payload = {"provider_reference": self.provider_reference, "status": "completed", "raw_score": "70"}
+        ts = int(timezone.now().timestamp())
+        raw_body = json.dumps(payload).encode()
+        sig = webhooks.sign_payload(raw_body, timestamp=ts)
+        kwargs = dict(
+            data=raw_body, content_type="application/json",
+            HTTP_X_ASSESSMENT_SIGNATURE=sig, HTTP_X_ASSESSMENT_TIMESTAMP=str(ts),
+        )
+
+        first = self.client.post("/webhooks/v1/assessments/", **kwargs)
+        second = self.client.post("/webhooks/v1/assessments/", **kwargs)
+
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertEqual(WebhookDelivery.objects.filter(signature=sig).count(), 1)
+        self.assertEqual(
+            AssessmentResult.objects.filter(assignment__provider_reference=self.provider_reference).count(), 1
+        )
+
+    def test_duplicate_signature_rejected_or_nooped(self):
+        payload = {"provider_reference": self.provider_reference, "status": "in_progress"}
+        ts = int(timezone.now().timestamp())
+        raw_body = json.dumps(payload).encode()
+        sig = webhooks.sign_payload(raw_body, timestamp=ts)
+        WebhookDelivery.objects.create(signature=sig)
+
+        response = self.client.post(
+            "/webhooks/v1/assessments/", data=raw_body, content_type="application/json",
+            HTTP_X_ASSESSMENT_SIGNATURE=sig, HTTP_X_ASSESSMENT_TIMESTAMP=str(ts),
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(WebhookDelivery.objects.filter(signature=sig).count(), 1)
+        # Never reached process_webhook_result -- the assignment is
+        # untouched by this (already-recorded) delivery.
+        assignment = AssessmentAssignment.objects.get(provider_reference=self.provider_reference)
+        self.assertNotEqual(assignment.status, "in_progress")
+
+    def test_two_distinct_deliveries_for_the_same_reference_are_each_recorded(self):
+        first = self._post_webhook({"provider_reference": self.provider_reference, "status": "in_progress"})
+        second = self._post_webhook(
+            {"provider_reference": self.provider_reference, "status": "completed", "raw_score": "70"}
+        )
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertEqual(WebhookDelivery.objects.count(), 2)
