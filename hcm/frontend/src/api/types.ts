@@ -1818,14 +1818,19 @@ export interface EmergencyContact {
 }
 
 export type DataSubjectRequestType = 'export' | 'erasure'
-export type DataSubjectRequestStatus = 'submitted' | 'completed' | 'declined'
+// 'partially_completed' (HCM remediation H-3): set when an export ran but
+// at least one required personal-data domain failed -- see
+// documents/models.py's DataSubjectRequest.Status and services.py's
+// complete_export_request(). Distinct from 'completed' so the UI can
+// surface it rather than showing a blank/default status.
+export type DataSubjectRequestStatus = 'submitted' | 'completed' | 'partially_completed' | 'declined'
 
 export const DATA_SUBJECT_REQUEST_TYPE_LABELS: Record<DataSubjectRequestType, string> = {
   export: 'Export my data', erasure: 'Erasure request',
 }
 
 export const DATA_SUBJECT_REQUEST_STATUS_LABELS: Record<DataSubjectRequestStatus, string> = {
-  submitted: 'Submitted', completed: 'Completed', declined: 'Declined',
+  submitted: 'Submitted', completed: 'Completed', partially_completed: 'Partially completed', declined: 'Declined',
 }
 
 export interface DataSubjectRequest {
