@@ -4,6 +4,8 @@ from .models import (
     AuditLogEntry,
     ConsentRecord,
     RetentionRule,
+    RetentionRuleRun,
+    RetentionRun,
     Role,
     RoleAssignment,
     RoleFieldTierGrant,
@@ -58,3 +60,28 @@ class ConsentRecordAdmin(admin.ModelAdmin):
 @admin.register(RetentionRule)
 class RetentionRuleAdmin(admin.ModelAdmin):
     list_display = ("entity_type", "period_months", "action", "active")
+
+
+class RetentionRuleRunInline(admin.TabularInline):
+    model = RetentionRuleRun
+    extra = 0
+    readonly_fields = ("entity_type", "action", "period_months", "cutoff", "status", "affected", "detail")
+    can_delete = False
+
+
+@admin.register(RetentionRun)
+class RetentionRunAdmin(admin.ModelAdmin):
+    list_display = ("started_at", "completed_at", "dry_run")
+    list_filter = ("dry_run",)
+    inlines = [RetentionRuleRunInline]
+
+
+@admin.register(RetentionRuleRun)
+class RetentionRuleRunAdmin(admin.ModelAdmin):
+    """M-2's work-item surface: the ERROR/NO_HANDLER filter is where an
+    operator finds every rule that didn't run cleanly, across every run,
+    without having to open each RetentionRun individually."""
+
+    list_display = ("run", "entity_type", "status", "affected", "action")
+    list_filter = ("status", "entity_type")
+    search_fields = ("entity_type",)

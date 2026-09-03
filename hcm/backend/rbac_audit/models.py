@@ -275,3 +275,50 @@ class RetentionRule(TimestampedModel):
 
     def __str__(self):
         return f"{self.entity_type}: {self.get_action_display()} after {self.period_months}mo"
+
+
+class RetentionRun(TimestampedModel):
+    """HCM remediation M-2: one row per retention.run_retention() call.
+    Before this model, a run's outcome existed only as retention.py's
+    in-memory `RetentionRunResult` list (returned to the caller and
+    discarded) and log lines -- an `error` or `no_handler` rule was
+    invisible to anyone not tailing logs at the moment it happened. This
+    and RetentionRuleRun below give the same run a durable, queryable
+    record, without changing run_retention()'s existing return contract
+    (still the same in-memory list; every existing caller is unaffected)."""
+
+    started_at = models.DateTimeField()
+    completed_at = models.DateTimeField(null=True, blank=True)
+    dry_run = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-started_at"]
+
+    def __str__(self):
+        return f"retention run {self.started_at.isoformat()}{' (dry run)' if self.dry_run else ''}"
+
+
+class RetentionRuleRun(TimestampedModel):
+    """One rule's outcome within a RetentionRun -- mirrors
+    retention.RetentionRunResult's fields, persisted."""
+
+    class RunStatus(models.TextChoices):
+        OK = "ok", "OK"
+        SKIPPED = "skipped", "Skipped"
+        NO_HANDLER = "no_handler", "No handler registered"
+        ERROR = "error", "Error"
+
+    run = models.ForeignKey(RetentionRun, related_name="rule_runs", on_delete=models.CASCADE)
+    entity_type = models.CharField(max_length=200)
+    action = models.CharField(max_length=20)
+    period_months = models.PositiveIntegerField()
+    cutoff = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=RunStatus.choices)
+    affected = models.PositiveIntegerField(default=0)
+    detail = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["entity_type"]
+
+    def __str__(self):
+        return f"{self.run_id}: {self.entity_type} ({self.status})"

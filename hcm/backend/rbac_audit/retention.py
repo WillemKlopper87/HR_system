@@ -32,7 +32,7 @@ from typing import Callable
 
 from django.utils import timezone
 
-from .models import AuditLogEntry, RetentionRule
+from .models import AuditLogEntry, RetentionRule, RetentionRuleRun, RetentionRun
 from .tiers import FieldTier
 
 logger = logging.getLogger(__name__)
@@ -98,8 +98,15 @@ class RetentionRunResult:
 
 def run_retention(*, dry_run: bool = False, now: datetime | None = None) -> list[RetentionRunResult]:
     """Execute every active, non-RETAIN rule through its registered handler.
-    Failures are isolated per rule (one bad handler doesn't stop the run)."""
+    Failures are isolated per rule (one bad handler doesn't stop the run).
+
+    HCM remediation M-2: also persists a RetentionRun + one RetentionRuleRun
+    per rule, so a run's outcome — including `error` and `no_handler`,
+    which previously existed only as a log line — has a durable, queryable
+    record. The in-memory return value is unchanged; every existing caller
+    keeps working exactly as before."""
     now = now or timezone.now()
+    run = RetentionRun.objects.create(started_at=now, dry_run=dry_run)
     results: list[RetentionRunResult] = []
     for rule in RetentionRule.objects.all().order_by("entity_type"):
         base = dict(entity_type=rule.entity_type, action=rule.action, period_months=rule.period_months, dry_run=dry_run)
@@ -132,6 +139,16 @@ def run_retention(*, dry_run: bool = False, now: datetime | None = None) -> list
                 fields_touched=f"retention:{rule.action}:{affected} rows older than {cutoff.date().isoformat()}",
             )
         results.append(RetentionRunResult(cutoff=cutoff, status="ok", affected=affected, **base))
+
+    RetentionRuleRun.objects.bulk_create([
+        RetentionRuleRun(
+            run=run, entity_type=r.entity_type, action=r.action, period_months=r.period_months,
+            cutoff=r.cutoff, status=r.status, affected=r.affected, detail=r.detail,
+        )
+        for r in results
+    ])
+    run.completed_at = timezone.now()
+    run.save(update_fields=["completed_at"])
     return results
 
 

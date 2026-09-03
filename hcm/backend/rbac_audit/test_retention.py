@@ -6,7 +6,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from . import retention
-from .models import AuditLogEntry, RetentionRule, StepUpGrant
+from .models import AuditLogEntry, RetentionRule, RetentionRuleRun, RetentionRun, StepUpGrant
 from .tiers import FieldTier
 
 
@@ -110,6 +110,53 @@ class RetentionRunTests(TestCase):
         self.assertIn("bad handler", results["demo.Boom"].detail)
         self.assertEqual(results["rbac_audit.AuditLogEntry"].affected, 1)
 
+    def test_run_creates_a_durable_record_with_completed_at(self):
+        _rule("rbac_audit.AuditLogEntry", period_months=60, action=RetentionRule.Action.DELETE)
+        retention.run_retention(now=self.now)
+        run = RetentionRun.objects.get()
+        self.assertEqual(run.dry_run, False)
+        self.assertIsNotNone(run.completed_at)
+        self.assertGreaterEqual(run.completed_at, run.started_at)
+
+    def test_no_handler_rule_is_durably_recorded_not_just_logged(self):
+        _rule("nope.Nothing", period_months=1, action=RetentionRule.Action.DELETE)
+        retention.run_retention(now=self.now)
+        rule_run = RetentionRuleRun.objects.get(entity_type="nope.Nothing")
+        self.assertEqual(rule_run.status, RetentionRuleRun.RunStatus.NO_HANDLER)
+
+    def test_failed_rule_is_durably_recorded_not_just_logged(self):
+        def boom(*, cutoff, action, dry_run):
+            raise RuntimeError("bad handler")
+
+        _rule("demo.Boom", period_months=1, action=RetentionRule.Action.DELETE)
+        with retention.temporary_handler("demo.Boom", boom):
+            retention.run_retention(now=self.now)
+
+        rule_run = RetentionRuleRun.objects.get(entity_type="demo.Boom")
+        self.assertEqual(rule_run.status, RetentionRuleRun.RunStatus.ERROR)
+        self.assertIn("bad handler", rule_run.detail)
+
+    def test_one_rule_failure_does_not_hide_other_results_in_the_durable_record(self):
+        def boom(*, cutoff, action, dry_run):
+            raise RuntimeError("bad handler")
+
+        self._audit(70)
+        _rule("demo.Boom", period_months=1, action=RetentionRule.Action.DELETE)
+        _rule("rbac_audit.AuditLogEntry", period_months=60, action=RetentionRule.Action.DELETE)
+        with retention.temporary_handler("demo.Boom", boom):
+            retention.run_retention(now=self.now)
+
+        run = RetentionRun.objects.get()
+        statuses = {r.entity_type: r.status for r in run.rule_runs.all()}
+        self.assertEqual(statuses["demo.Boom"], RetentionRuleRun.RunStatus.ERROR)
+        self.assertEqual(statuses["rbac_audit.AuditLogEntry"], RetentionRuleRun.RunStatus.OK)
+
+    def test_successive_runs_each_get_their_own_durable_record(self):
+        _rule("rbac_audit.AuditLogEntry", period_months=60, action=RetentionRule.Action.DELETE)
+        retention.run_retention(now=self.now)
+        retention.run_retention(now=self.now)
+        self.assertEqual(RetentionRun.objects.count(), 2)
+
     def test_expired_step_up_grants_are_purged(self):
         from datetime import date
 
@@ -149,7 +196,10 @@ class RetentionEntryPointsTests(TestCase):
 
         self.assertIn("rbac_audit.tasks.run_retention_task", app.tasks)
         with mock.patch.object(retention, "run_retention", return_value=[]) as run:
-            self.assertEqual(run_retention_task.apply().get(), {"rules": 0, "affected": 0})
+            self.assertEqual(
+                run_retention_task.apply().get(),
+                {"rules": 0, "affected": 0, "errors": [], "no_handler": []},
+            )
             run.assert_called_once()
 
     def test_beat_schedule_includes_retention(self):
