@@ -125,6 +125,8 @@ six==1.17.0
     # via python-dateutil
 sqlparse==0.6.0
     # via django
+tblib==3.2.2
+    # via -r requirements.txt
 typing-extensions==4.16.0
     # via python-docx
 tzdata==2026.3

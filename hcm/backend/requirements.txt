@@ -20,3 +20,6 @@ gunicorn>=26.0                 # prod WSGI server (ADR-005)
 httpx>=0.28                    # outbound HTTP for integrations/collab.py (ADR-011); MockTransport in its tests
 sentry-sdk>=2.68               # error tracking (H3 ops/observability); inert until SENTRY_DSN is set
 drf-spectacular>=0.30          # OpenAPI schema + generated TS types (H3)
+tblib>=3.0                     # readable per-test tracebacks from `manage.py test --parallel` (CI's Postgres job) --
+                                # without it, a worker-process failure prints "cannot pickle 'traceback' object"
+                                # instead of the real traceback

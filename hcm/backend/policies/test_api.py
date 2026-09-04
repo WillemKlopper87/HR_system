@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
+from core_hr.test_utils import read_streaming_response
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -360,7 +361,7 @@ class PolicyDocumentUploadApiTests(PolicyApiTestCase):
         self.client.force_authenticate(user=self.plain_employee.user)
         response = self.client.get(f"/api/v1/policies/{policy.id}/download/")
         self.assertEqual(response.status_code, 200)
-        content = b"".join(response.streaming_content)
+        content = read_streaming_response(response)
         self.assertEqual(content, b"Everyone must arrive on time.")
 
     def test_patching_draft_body_regenerates_chunks(self):

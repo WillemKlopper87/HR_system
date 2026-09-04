@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from core_hr.models import Department, Employee, JobGrade, Location, OccupationalLevel
+from core_hr.test_utils import read_streaming_response
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from establishment.models import Position
@@ -597,8 +598,7 @@ class ApplicantResumeProtectionTests(InterviewSchedulingApiTestCase):
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response["Content-Type"], "application/pdf")
-            self.assertTrue(b"".join(response.streaming_content).startswith(b"%PDF-"))
-            response.close()
+            self.assertTrue(read_streaming_response(response).startswith(b"%PDF-"))
         self.assertTrue(AuditLogEntry.objects.filter(
             entity_type="recruitment.Applicant", entity_id=str(self.applicant.id),
             action=AuditLogEntry.Action.EXPORT,

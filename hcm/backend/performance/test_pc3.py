@@ -9,6 +9,7 @@ from datetime import date
 from decimal import Decimal
 
 from core_hr.models import EmployeeVersion
+from core_hr.test_utils import read_streaming_response
 from rbac_audit.models import Role, RoleAssignment
 
 from .models import ImprovementPlan, PerformanceAgreement, PerformancePeriod
@@ -78,7 +79,7 @@ class ArchivePeriodTests(ReviewTestCase):
         for doc in response.data["documents"]:
             pdf = self.client.get(doc["download_url"])
             self.assertEqual(pdf.status_code, 200)
-            self.assertEqual(b"".join(pdf.streaming_content)[:5], b"%PDF-")
+            self.assertEqual(read_streaming_response(pdf)[:5], b"%PDF-")
 
         blocked = self.client.post(f"/api/v1/performance-periods/{self.period.id}/archive/")
         self.assertEqual(blocked.status_code, 403)

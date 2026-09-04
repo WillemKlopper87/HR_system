@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from core_hr.test_utils import read_streaming_response
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rbac_audit.models import Role, RoleAssignment
 
@@ -373,7 +374,7 @@ class EvidenceTests(ReviewTestCase):
 
         download = self.client.get(response.data["download_url"])
         self.assertEqual(download.status_code, 200)
-        self.assertEqual(b"".join(download.streaming_content), b"Q4 revenue tracking sheet")
+        self.assertEqual(read_streaming_response(download), b"Q4 revenue tracking sheet")
 
     def test_file_content_must_match_a_supported_evidence_type(self):
         # a renamed binary that isn't PDF/image/Office/text -- the sniff, not
