@@ -172,6 +172,12 @@ test.describe('performance agreements (PC-1)', () => {
  */
 test.describe('performance reviews: mid-year and final (PC-2)', () => {
   test('a full year: contracting → mid-year → final, with evidence and a computed score', async ({ page }) => {
+    // Nine login/logout cycles plus every intermediate page load and
+    // settled() wait -- comfortably the longest single flow in the suite.
+    // The default 45s budget is tight for that even on an idle machine;
+    // give it real headroom rather than chasing a phantom app bug every
+    // time a busy dev box makes one round trip land a few seconds slow.
+    test.setTimeout(120_000)
     // --- get the seeded employee/head pair to AGREED as quickly as the UI allows
     await login(page, 'employee')
     await page.goto('/my-performance')
