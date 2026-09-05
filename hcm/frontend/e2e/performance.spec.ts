@@ -421,11 +421,29 @@ test.describe('PC-3: improvement plans, archive, records', () => {
     await page.goto('/performance-periods')
     await expectHeading(page, 'Performance Periods')
     await settled(page)
-    await expect(page.getByRole('heading', { name: 'Rating distribution' })).toBeVisible()
+    // .first(): a sanity check that the section renders at all, not tied to
+    // a specific period -- the seeded 2025/26 calibration-demo period has
+    // its own "Rating distribution" heading too, so an unscoped
+    // toBeVisible() is a strict-mode violation once both periods are on
+    // the page.
+    await expect(page.getByRole('heading', { name: 'Rating distribution' }).first()).toBeVisible()
 
     page.on('dialog', (dialog) => dialog.accept())
-    await page.getByRole('button', { name: 'Archive period' }).first().click()
-    await expect(page.getByRole('button', { name: 'Archive period' })).toHaveCount(0)
+    // Scoped to the specific period card being archived, not a page-wide
+    // count: the seeded 2025/26 calibration-demo period is deliberately
+    // left un-archived (see seed_demo_data.py) and has its own "Archive
+    // period" button, so a global toHaveCount(0) never passes once it
+    // exists alongside whichever period this test is actually archiving.
+    // `.first()` (not a `has:`/`hasText:` filter) on purpose: PerformancePeriod
+    // orders by -start_date, which archiving doesn't change, so the index
+    // stays a stable reference to the SAME card before and after the
+    // click -- a content filter keyed on "still has the button" or "still
+    // has this status text" would stop matching this exact card the
+    // moment the click succeeds and silently re-resolve to a different one.
+    const periodCard = page.locator('.detail-card').first()
+    await expect(periodCard.getByRole('button', { name: 'Archive period' })).toHaveCount(1)
+    await periodCard.getByRole('button', { name: 'Archive period' }).click()
+    await expect(periodCard.getByRole('button', { name: 'Archive period' })).toHaveCount(0)
     await logout(page)
 
     await login(page, 'hradmin')

@@ -621,6 +621,24 @@ def _notify_signature(agreement: PerformanceAgreement, *, role: str, stage: str)
 # --- phases -----------------------------------------------------------------
 
 
+# Ordinal position of each status a period can actually reach (ACTIVE/CLOSED
+# are unused TextChoices values -- nothing in this codebase ever sets them,
+# confirmed by grep). Used only to detect REGRESSION below: DRAFT and
+# CONTRACTING don't reliably predict "has this employee's agreement reached
+# AGREED yet" (create_agreement()/submit_agreement() don't check
+# period.status at all, and several tests progress an agreement to AGREED
+# without ever calling open_phase(CONTRACTING) first) -- so this can't be a
+# strict "phase N requires phase N-1 first" precondition, only a "don't
+# silently move backward past a later phase" one.
+_STATUS_RANK = {
+    PerformancePeriod.Status.DRAFT: 0,
+    PerformancePeriod.Status.CONTRACTING: 1,
+    PerformancePeriod.Status.MIDYEAR: 2,
+    PerformancePeriod.Status.FINAL: 3,
+    PerformancePeriod.Status.ARCHIVED: 4,
+}
+
+
 def open_phase(period: PerformancePeriod, stage: str, *, actor=None) -> PerformancePeriod:
     """Move the period into a stage. Contracting also generates the agreements
     so there is something for the reminders to point at; mid-year/final also
@@ -635,11 +653,31 @@ def open_phase(period: PerformancePeriod, stage: str, *, actor=None) -> Performa
             raise AgreementWorkflowError("Contracting can only be opened on a draft period.", conflict=True)
         period.status = PerformancePeriod.Status.CONTRACTING
     elif stage == PeriodPhase.Stage.MIDYEAR:
+        # Unlike CONTRACTING above, this guard was originally missing
+        # entirely -- open_phase(midyear) would unconditionally set
+        # period.status = MIDYEAR even from FINAL/ARCHIVED, silently moving
+        # an already-closed-out period backward and re-notifying/
+        # re-transitioning any straggler still sitting in AGREED. Only
+        # blocks going backward past FINAL/ARCHIVED; DRAFT/CONTRACTING/
+        # MIDYEAR are all still allowed (see _STATUS_RANK's docstring).
+        if _STATUS_RANK[period.status] > _STATUS_RANK[PerformancePeriod.Status.MIDYEAR]:
+            raise AgreementWorkflowError(
+                "Mid-year review cannot be reopened once the period has moved past it.", conflict=True
+            )
         period.status = PerformancePeriod.Status.MIDYEAR
         opened = PerformanceAgreement.objects.filter(period=period, status=PerformanceAgreement.Status.AGREED)
         _notify_stage_opened(opened, period=period, stage_label="mid-year (Q2) review")
         opened.update(status=PerformanceAgreement.Status.MIDYEAR_OPEN)
     else:
+        # Same missing-guard problem as MIDYEAR above -- only blocks
+        # reopening an already-ARCHIVED period. CONTRACTING and DRAFT are
+        # both legitimate prior states here (not just MIDYEAR/FINAL): an
+        # org can skip Q2 entirely and go straight to final -- the
+        # AGREED-or-MIDYEAR_SIGNED filter below already accounts for that.
+        if _STATUS_RANK[period.status] > _STATUS_RANK[PerformancePeriod.Status.FINAL]:
+            raise AgreementWorkflowError(
+                "Final assessment cannot be reopened once the period has been archived.", conflict=True
+            )
         period.status = PerformancePeriod.Status.FINAL
         # Whichever of the two contracted "ready" states an agreement is in —
         # mid-year genuinely happened (MIDYEAR_SIGNED) or it didn't

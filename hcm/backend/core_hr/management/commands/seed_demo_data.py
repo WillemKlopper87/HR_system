@@ -1362,7 +1362,7 @@ class Command(BaseCommand):
         record_policy_approval(popia, approver=hr_admin)
         publish_policy(popia, actor=hr_admin)
 
-        create_policy(
+        remote_work = create_policy(
             title="Remote Work Policy",
             category=Policy.Category.REMOTE_WORK,
             body=(
@@ -1372,6 +1372,13 @@ class Command(BaseCommand):
             ),
             actor=hr_admin,
         )  # left in DRAFT deliberately — hr_admin's live "publish" demo
+        # ... but publish_policy() requires every current policy_committee_member
+        # to have approved first (the committee-approval feature landed after
+        # this scenario was written) -- hr_admin IS that one seeded committee
+        # member, so record their own approval here. Still leaves the policy
+        # in DRAFT (this only satisfies the approval gate, it doesn't publish),
+        # so the live "click Publish" demo keeps working.
+        record_policy_approval(remote_work, approver=hr_admin)
 
         all_employees = list(Employee.objects.all())
         conduct_ackers = [e for e in rng.sample(all_employees, min(100, len(all_employees))) if e != direct_report]

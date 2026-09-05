@@ -1484,6 +1484,15 @@ export const PHASE_STAGE_LABELS: Record<PhaseStage, string> = {
   final: 'Final assessment (Q4)',
 }
 
+// Mirrors backend/performance/services/agreements.py's _STATUS_RANK exactly
+// (same regression-only semantics: a phase can still be opened for the
+// period's CURRENT status or anything earlier, matching what the API will
+// actually accept -- ACTIVE/CLOSED are unused statuses, never returned).
+export const PERFORMANCE_STATUS_RANK: Record<PerformancePeriodStatus, number> = {
+  draft: 0, contracting: 1, active: 1, midyear: 2, final: 3, closed: 3, archived: 4,
+}
+export const PHASE_STAGE_RANK: Record<PhaseStage, number> = { contracting: 1, midyear: 2, final: 3 }
+
 export interface PeriodPhase {
   id: number
   period: number

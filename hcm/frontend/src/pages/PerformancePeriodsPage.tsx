@@ -2,7 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import { useApiQuery, useMutation } from '../api/hooks'
 import {
+  PERFORMANCE_STATUS_RANK,
   PHASE_STAGE_LABELS,
+  PHASE_STAGE_RANK,
   type AgreementTemplateSummary,
   type ArchiveResult,
   type PeriodCompletion,
@@ -144,27 +146,44 @@ function PeriodCard({ period, onChanged }: { period: PerformancePeriod; onChange
             </tr>
           </thead>
           <tbody>
-            {period.phases.map((phase) => (
-              <tr key={phase.id}>
-                <td>{PHASE_STAGE_LABELS[phase.stage]}</td>
-                <td>{phase.opens_on}</td>
-                <td>{phase.due_on}</td>
-                <td>
-                  <ReminderOffsets phaseId={phase.id} offsets={phase.reminder_offsets_days} onChanged={onChanged} />
-                </td>
-                <td>every {phase.overdue_every_days} days</td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn-link"
-                    disabled={act.busy}
-                    onClick={() => void act.run('open-phase', { stage: phase.stage })}
-                  >
-                    Open {PHASE_STAGE_LABELS[phase.stage].toLowerCase()}
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {period.phases.map((phase) => {
+              // Once the period has REACHED or moved past a phase, "Open" for it
+              // is no longer offered -- without this check the button stayed
+              // visible and clickable forever, both before AND after a phase
+              // opened, which is both confusing (nothing indicates it already
+              // happened) and, with more than one period on the page, produces
+              // two identically-labelled buttons with no way to tell which
+              // period either belongs to. The API itself still accepts a
+              // repeat open-phase call on the CURRENT phase (services/
+              // agreements.py's _STATUS_RANK docstring) as a defensive
+              // backstop, not a click the UI should ever invite.
+              const alreadyPast = PERFORMANCE_STATUS_RANK[period.status] >= PHASE_STAGE_RANK[phase.stage]
+              return (
+                <tr key={phase.id}>
+                  <td>{PHASE_STAGE_LABELS[phase.stage]}</td>
+                  <td>{phase.opens_on}</td>
+                  <td>{phase.due_on}</td>
+                  <td>
+                    <ReminderOffsets phaseId={phase.id} offsets={phase.reminder_offsets_days} onChanged={onChanged} />
+                  </td>
+                  <td>every {phase.overdue_every_days} days</td>
+                  <td>
+                    {alreadyPast ? (
+                      <span className="hint-text">Already open</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn-link"
+                        disabled={act.busy}
+                        onClick={() => void act.run('open-phase', { stage: phase.stage })}
+                      >
+                        Open {PHASE_STAGE_LABELS[phase.stage].toLowerCase()}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
